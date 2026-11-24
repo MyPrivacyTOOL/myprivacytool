@@ -56,6 +56,11 @@ jobs:
             | jq -r '(.result // [])[].name' 2>/dev/null | sort > /tmp/secrets.before || true
       - name: Deploy
         uses: cloudflare/wrangler-action@v3
+        # The action runs `npm i wrangler@3.90.0` from the repo's npm workspace; a peer-dependency conflict from the
+        # core-brain workspace (wrangler 4 wants workers-types 5) fails with ERESOLVE and blocks the deploy (MPC-10825,
+        # run 45349974199). Same fix as deploy-mpt-leads.yml and deploy-oauth-poc.yml.
+        env:
+          NPM_CONFIG_LEGACY_PEER_DEPS: 'true'
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

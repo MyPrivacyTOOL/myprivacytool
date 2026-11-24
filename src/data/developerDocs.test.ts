@@ -117,11 +117,10 @@ describe("PaPIT limits wording", () => {
     expect(d).toMatch(/does not prove who produced/);
     expect(d).not.toMatch(/detect any edit/i);
   });
-  it("lists receipt, validity, cache, session, token and revocation, and says validity is not enforced and issued profiles cannot be recalled", () => {
+  it("lists receipt, validity, cache, session, token and revocation, and says issued profiles cannot be recalled", () => {
     const names = PAPIT_LIMITS.map((l) => l.item);
     for (const n of ["Receipt", "Snapshot validity", "Cache", "Browser session", "Access token", "Revocation"]) expect(names).toContain(n);
     const text = PAPIT_LIMITS.map((l) => l.detail).join(" ");
-    expect(text).toMatch(/nothing refuses a profile older than 30 days/);
     expect(text).toMatch(/cannot be recalled/);
     expect(text).toMatch(/24 hours/);
     expect(text).toMatch(/7 days/);
@@ -148,7 +147,9 @@ describe("PaPIT limits wording", () => {
     const cache = readFileSync(path.join(ROOT, "workers/github-channel/lib/cache.js"), "utf8");
     expect(idx).toMatch(/SESSION_TTL_MS = 7 \* 24 \* 60 \* 60 \* 1000/);
     expect(cache).toMatch(/CACHE_TTL_SECONDS = 24 \* 60 \* 60/);
-    expect(readFileSync(path.join(ROOT, "workers/github-channel/lib/papit.js"), "utf8")).toMatch(/data_retention_days: 30/);
+    const papit = readFileSync(path.join(ROOT, "workers/github-channel/lib/papit.js"), "utf8");
+    expect(papit).toMatch(/PROFILE_VALIDITY_DAYS = 30;/);
+    expect(papit).toMatch(/data_retention_days: PROFILE_VALIDITY_DAYS/);
   });
 });
 
@@ -167,5 +168,45 @@ describe("PaPIT sampling wording", () => {
     const m = /MAX_PAGES = \{ repos: (\d+), starred: (\d+), events: (\d+) \}/.exec(read("workers/github-channel/lib/adapter.js"))!;
     expect(m.slice(1).map(Number)).toEqual([3, 2, 3]);
     expect(PAPIT_SCHEMA).toContain("data_coverage");
+  });
+});
+
+// MPC-10833: the profile carries expires_at and stale ones are refused; a token is not used 90 days after consent. The limits say so, and match the code.
+describe("PaPIT expiry and re-consent wording", () => {
+  const limit = (item: string) => PAPIT_LIMITS.find((l) => l.item === item)!.detail;
+  it("says expires_at is 30 days after generated_at, what refuses a stale profile, and that nothing else checks it", () => {
+    const v = limit("Snapshot validity");
+    expect(v).toMatch(/expires_at, 30 days after generated_at/);
+    expect(v).toMatch(/POST \/papit\/verify refuses a profile past it with 410 profile_expired/);
+    expect(v).toMatch(/Nothing else checks it/);
+    expect(v).toMatch(/unkeyed checksum/);
+    expect(PAPIT_SCHEMA).toMatch(/expires_at: string/);
+    expect(PAPIT_SCHEMA).not.toMatch(/not enforced/);
+  });
+  it("says the token is not used 90 days after connecting, a refresh does not restart that, and that nothing deletes it automatically", () => {
+    const t = limit("Access token");
+    expect(t).toMatch(/90 days after the user last connected/);
+    expect(t).toMatch(/401 reconsent_required/);
+    expect(t).toMatch(/refresh does not restart the 90 days/);
+    expect(t).toMatch(/do not delete the stored token automatically/);
+  });
+  it("documents POST /papit/verify with 200, 410, 422, 400 and 413, and reconsent_required on the profile call", () => {
+    const ep = ENDPOINTS.find((e) => e.path === "/papit/verify")!;
+    expect(ep.method).toBe("POST");
+    expect(ep.responses.map((r) => r.status)).toEqual(["200", "410", "422", "400", "413"]);
+    const profile = ENDPOINTS.find((e) => e.path === "/channels/github/profile")!;
+    expect(profile.responses.some((r) => r.body?.includes("reconsent_required"))).toBe(true);
+    expect(new Set(ENDPOINTS.map((e) => e.id)).size).toBe(ENDPOINTS.length);
+  });
+  it("the stated numbers match the Worker constants and routes", () => {
+    const papit = read("workers/github-channel/lib/papit.js");
+    expect(papit).toMatch(/PROFILE_VALIDITY_DAYS = 30;/);
+    expect(papit).toMatch(/CONSENT_MAX_DAYS = 90;/);
+    expect(papit).toMatch(/expires_at: profileExpiry\(now\)/);
+    expect(read("workers/github-channel/lib/reddit-papit.js")).toMatch(/expires_at: profileExpiry\(now\)/);
+    expect(read("workers/github-channel/index.js")).toMatch(/'\/papit\/verify' && request\.method === 'POST'/);
+    const verify = read("workers/github-channel/lib/verify.js");
+    expect(verify).toMatch(/MAX_VERIFY_BYTES = 32 \* 1024/);
+    for (const code of ["410", "422", "400", "413"]) expect(verify).toContain(code);
   });
 });

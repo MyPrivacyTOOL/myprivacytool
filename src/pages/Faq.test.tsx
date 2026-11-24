@@ -4,6 +4,7 @@ import { render, screen } from "@testing-library/react";
 import { renderPage } from "@/test/render";
 import Faq from "./Faq";
 import ThankYou from "./ThankYou";
+import { STORAGE_NOTE } from "@/data/trustCopy";
 import { MemoryRouter } from "react-router-dom";
 
 const flat = (s: string) => s.replace(/\s+/g, " ").trim();
@@ -33,13 +34,16 @@ describe("FAQ", () => {
 });
 
 describe("Thank-you page trust line", () => {
+  // MPC-11242: the line is the shared home-page sentence (src/data/trustCopy.ts); it still carries the save exception.
   it("carries the save exception", () => {
     render(
       <MemoryRouter initialEntries={["/thank-you?source=contact"]}>
         <ThankYou />
       </MemoryRouter>,
     );
-    expect(flat(document.body.textContent ?? "")).toContain(`aren't stored on our servers, ${EXCEPTION}`);
+    expect(flat(document.body.textContent ?? "")).toContain(STORAGE_NOTE);
+    expect(STORAGE_NOTE).toContain("We save a scan only if you tick");
+    expect(STORAGE_NOTE).toContain("we then keep it for 12 months");
   });
 });
 

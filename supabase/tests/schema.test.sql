@@ -94,6 +94,17 @@ select pg_temp.assert(pg_temp.try_as('service_role', $$insert into public.channe
 select pg_temp.assert(pg_temp.try_as('service_role', $$insert into public.channel_tokens (user_id, provider, access_token_enc, refresh_token_enc) values ('u3', 'github', 'v1.a', 'raw')$$) = '23514', 'plaintext refresh tokens are rejected');
 select pg_temp.assert(pg_temp.try_as('service_role', $$insert into public.channel_tokens (user_id, provider, access_token_enc) values ('u1', 'github', 'v1.dup')$$) = '23505', '(user_id, provider) is unique');
 select pg_temp.assert(pg_temp.try_as('service_role', $$insert into public.channel_tokens (user_id, provider, access_token_enc, key_version) values ('u4', 'github', 'v1.a', 0)$$) = '23514', 'key_version must be >= 1');
+-- MPC-10833: consented_at (re-consent after 90 days)
+select pg_temp.assert((select is_nullable from information_schema.columns where table_name = 'channel_tokens' and column_name = 'consented_at') = 'NO', 'consented_at is NOT NULL');
+select pg_temp.assert((select count(*) from public.channel_tokens where consented_at is null) = 0, 'every channel_tokens row has a consent date');
+select pg_temp.assert((select consented_at = created_at from public.channel_tokens where user_id = 'u1' and provider = 'github'), 'a row inserted without consented_at gets the default (now(), same transaction time as created_at)');
+select pg_temp.assert(pg_temp.try_as('service_role', $$insert into public.channel_tokens (user_id, provider, access_token_enc, consented_at) values ('u5', 'github', 'v1.a', now() - interval '100 days')$$) = '', 'an explicit consent date is accepted');
+select pg_temp.assert(pg_temp.try_as('service_role', $$insert into public.channel_tokens (user_id, provider, access_token_enc, consented_at) values ('u6', 'github', 'v1.a', null)$$) = '23502', 'a null consent date is rejected');
+-- a token refresh upsert that omits consented_at keeps the stored date (PostgREST merge-duplicates sends only the columns in the payload)
+insert into public.channel_tokens (user_id, provider, access_token_enc, consented_at) values ('u7', 'github', 'v1.a', '2026-08-01T00:00:00Z');
+insert into public.channel_tokens (user_id, provider, access_token_enc, updated_at) values ('u7', 'github', 'v1.b', now())
+  on conflict (user_id, provider) do update set access_token_enc = excluded.access_token_enc, updated_at = excluded.updated_at;
+select pg_temp.assert((select consented_at = '2026-08-01T00:00:00Z' and access_token_enc = 'v1.b' from public.channel_tokens where user_id = 'u7'), 'a refresh upsert keeps consented_at');
 
 -- ===== oauth-poc: public.mpt_find_auth_user_by_email (MPC-6971) ===================================
 -- Matches case-insensitively, only CONFIRMED and NOT-deleted users, and is callable by service_role only.

@@ -106,3 +106,10 @@ test(`${FILE}: MPC-9886: goes through the registry key "ga4", and waits for the 
   assert.equal(p.gtagScripts().length, 1, 'still once');
 });
 }
+
+// MPC-10790 follow-up: the placeholder form on /shared-landing must not send the visitor's email domain to Google Analytics.
+test('public/shared-landing.html does not put the email address or its domain in any analytics event', () => {
+  const page = fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'public/shared-landing.html'), 'utf8');
+  assert.ok(!/email_domain/.test(page), 'no email_domain parameter');
+  assert.ok(!/trackEvent\([^)]*email/s.test(page.replace(/\/\/[^\n]*/g, '')), 'no trackEvent call carries the email');
+});

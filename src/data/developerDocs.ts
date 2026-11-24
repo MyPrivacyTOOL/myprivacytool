@@ -196,6 +196,7 @@ curl ${BASES.github}/channels/github/profile \\
         body: `{
   "version": "1.0",
   "generated_at": "2026-10-06T09:00:00.000Z",
+  "expires_at": "2026-11-05T09:00:00.000Z",
   "source_channel": "github",
   "cryptographic_receipt": "9f2c…64 hex chars…",
   "core_identity": { "career": { "skills": ["TypeScript", "Go"], "primary_role": "Backend Developer", "public_projects_count": 31 } },
@@ -205,11 +206,37 @@ curl ${BASES.github}/channels/github/profile \\
       },
       { status: "401", description: "No valid session.", body: `{ "error": "unauthenticated" }` },
       { status: "401", description: "The token was revoked at GitHub. MPT deletes its copy; send the user through /oauth/github/start again.", body: `{ "error": "reauthorize" }` },
+      { status: "401", description: "The user last connected more than 90 days ago. MPT does not use the stored token any more and does not delete it; send the user through /oauth/github/start again.", body: `{ "error": "reconsent_required" }` },
       { status: "404", description: "Signed in, but no stored connection.", body: `{ "error": "not_connected" }` },
       { status: "502", description: "GitHub or storage failed.", body: `{ "error": "upstream_error" }` },
     ],
     notes: [
       "The Worker is served from channels.myprivacytool.io, the same site as www.myprivacytool.io, so browsers send its session cookie from the site (Safari and Firefox block it on third-party hosts). Calls from other origins are rejected by CORS (see docs/channels/github.md).",
+    ],
+  },
+  {
+    id: "papit-verify-profile",
+    service: "GitHub channel (myprivacytool-github-channel)",
+    method: "POST",
+    path: "/papit/verify",
+    base: BASES.github,
+    status: "preview",
+    summary:
+      "Checks a PaPIT profile you hold: is its receipt intact and has it expired? Stateless: nothing is stored or logged, and no session is needed. Works for GitHub and Reddit profiles.",
+    auth: "None. Server to server; there is no CORS for browsers.",
+    source: "workers/github-channel/lib/verify.js",
+    curl: `curl -X POST ${BASES.github}/papit/verify \\
+  -H 'Content-Type: application/json' \\
+  --data @profile.json`,
+    responses: [
+      { status: "200", description: "The receipt matches and the profile has not expired.", body: `{ "valid": true, "expires_at": "2026-11-05T09:00:00.000Z" }` },
+      { status: "410", description: "The profile has expired (expires_at has passed, or 30 days after generated_at for a profile issued before expires_at existed). Refused.", body: `{ "error": "profile_expired", "expires_at": "2026-11-05T09:00:00.000Z" }` },
+      { status: "422", description: "Not a PaPIT v1 profile, the receipt does not match, or expires_at is before generated_at or more than 30 days after it.", body: `{ "error": "invalid_profile" }` },
+      { status: "400", description: "The body is not a JSON object.", body: `{ "error": "bad_request" }` },
+      { status: "413", description: "The body is larger than 32 KB.", body: `{ "error": "too_large" }` },
+    ],
+    notes: [
+      "A 200 means the profile is unchanged since it was produced, as far as an unkeyed checksum can tell. It does not prove who produced it.",
     ],
   },
   {
@@ -563,6 +590,7 @@ export const QUICK_START_STEPS = [
 export const PAPIT_SCHEMA = `interface PaPITProfile {
   version: "1.0";
   generated_at: string;                 // ISO 8601, UTC
+  expires_at: string;                   // ISO 8601, UTC: generated_at + 30 days. Absent on profiles issued before 2026-11-24 (treat as generated_at + 30 days)
   source_channel: "github";             // later: "reddit", ...
   cryptographic_receipt: string;        // lowercase hex SHA-256
   core_identity: {
@@ -583,7 +611,7 @@ export const PAPIT_SCHEMA = `interface PaPITProfile {
     interests: "found" | "no_stars" | "stars_without_topics";
   };
   privacy_boundaries: {
-    data_retention_days: 30;            // declared validity of this snapshot (not enforced), not token retention
+    data_retention_days: 30;            // the validity period in days: expires_at is generated_at plus this. Not token retention
     revocable: true;                    // the user can disconnect; an issued copy cannot be recalled (see limits)
   };
 }`;
@@ -596,10 +624,10 @@ export const PAPIT_LIMITS = [
   { item: "Empty interests", detail: "interests is empty for two different reasons, told apart by data_coverage.interests: no_stars (you have starred nothing) or stars_without_topics (the repos you starred have no topics). A failed or unavailable GitHub request is never an empty list: the profile call returns an error instead (401 reauthorize, or 5xx)." },
   { item: "Receipt", detail: "An unkeyed SHA-256 checksum (workers/github-channel/lib/papit.js). It shows a profile has not changed only if the receipt reached you by a separate trusted channel. It does not prove who produced it: an editor can recompute it. Signing is planned, not built." },
   { item: "Sanitization receipt", detail: "Also a hash, not a signature and not a zero-knowledge proof. It records which rules ran and ties the output to the profile's receipt." },
-  { item: "Snapshot validity", detail: "data_retention_days is 30. That number is declared in the profile; nothing refuses a profile older than 30 days. Check generated_at yourself." },
+  { item: "Snapshot validity", detail: "Every profile carries expires_at, 30 days after generated_at (data_retention_days: 30 says the same). POST /papit/verify refuses a profile past it with 410 profile_expired, and we never serve a cached copy past it. Nothing else checks it: if you keep a profile, check expires_at yourself or send it to /papit/verify. A profile issued before expires_at existed counts as valid until 30 days after generated_at. expires_at is covered by the receipt, but the receipt is an unkeyed checksum, so someone who edits the dates and recomputes it is not caught; signing is planned, not built." },
   { item: "Cache", detail: "We keep a copy of the derived profile for 24 hours, then fetch it again." },
   { item: "Browser session", detail: "The mpt_gh_session cookie lasts 7 days." },
-  { item: "Access token", detail: "Kept (encrypted) until the user disconnects. It has no automatic expiry yet. Person-facing pages say \"until you disconnect\"; the 30 in data_retention_days is the declared snapshot validity above, not how long we keep the connection." },
+  { item: "Access token", detail: "Kept (encrypted) until the user disconnects or connects again. We do not use it more than 90 days after the user last connected: the profile call then answers 401 reconsent_required until they connect again. A token refresh does not restart the 90 days. We do not delete the stored token automatically at 90 days; that is not built. Person-facing pages say \"until you disconnect\"; the 30 in data_retention_days is the validity of a profile (expires_at), not how long we keep the connection." },
   { item: "Revocation", detail: "A user can disconnect (DELETE /channels/github): the token is deleted, our access is revoked at GitHub and the cached copy is cleared. A profile that was already issued cannot be recalled and there is no revocation list yet." },
   { item: "Revocation without a session", detail: "After the 7-day session ends, GET /oauth/github/remove (Reddit: /oauth/reddit/remove) runs the same provider sign-in; the signed state cookie carries intent=remove. A successful sign-in proves the account, and the Worker deletes that account's stored token and cached copy and revokes the grant. It stores nothing new, issues no session and reads no profile data. It redirects to /connect/github?channel_removed=github&revoked=1|0." },
 ];

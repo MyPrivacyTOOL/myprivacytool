@@ -1,0 +1,29 @@
+name: shadow-audit-api tests
+
+# Runs the shadow-audit-api unit tests (incl. the MPC-11203 OpenOSINT adapter tests, which use an
+# in-process fake MCP server, no network). Not part of the `CI gate` job.
+on:
+  pull_request:
+    paths:
+      - "shadow-audit-api/**"
+      - ".github/workflows/shadow-audit-api-tests.yml"
+  push:
+    branches: [main]
+    paths:
+      - "shadow-audit-api/**"
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install pytest "mcp>=2.3.0,<3" cryptography
+      - working-directory: shadow-audit-api
+        run: python -m pytest tests -q

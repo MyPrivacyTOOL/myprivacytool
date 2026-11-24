@@ -321,8 +321,8 @@
             const email = document.getElementById('email').value;
             const channel = document.getElementById('channel').value;
             
+            // MPC-10790 follow-up: the email domain is no longer sent to Google Analytics; the form is a placeholder and sends nothing anywhere else.
             trackEvent('form_submit', {
-                email_domain: email.split('@')[1],
                 channel_source: channel || 'direct',
                 consent_given: document.getElementById('consent').checked
             });
