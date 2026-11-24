@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import DeviceRevealScreen from './DeviceRevealScreen';
 import { identifyDevice } from '@/lib/deviceIdentity';
+import { PRODUCT_SENTENCE } from '@/lib/productSentence';
 
 const mac = identifyDevice({
   userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/130 Safari/537.36',
@@ -42,10 +43,16 @@ describe('DeviceRevealScreen', () => {
     expect(onDone).toHaveBeenCalledWith(true);
   });
 
-  it('shows no content or button until the identity is known', () => {
+  it('shows no device content or button until the identity is known, but the product sentence is there from the first paint (MPC-10835)', () => {
     render(<DeviceRevealScreen identity={null} rotationAngle={0} onDone={() => {}} />);
     expect(screen.getByRole('dialog')).toBeTruthy();
     expect(screen.queryByRole('button')).toBeNull();
+    expect(screen.getByTestId('reveal-product-sentence').textContent).toBe(PRODUCT_SENTENCE);
+  });
+
+  it.each([['certain', mac], ['unknown', unknown]] as const)('carries the product sentence on the %s path (MPC-10835)', (_label, identity) => {
+    render(<DeviceRevealScreen identity={identity} rotationAngle={0} onDone={() => {}} />);
+    expect(screen.getByTestId('reveal-product-sentence').textContent).toBe(PRODUCT_SENTENCE);
   });
 
   it('closes on Escape', () => {

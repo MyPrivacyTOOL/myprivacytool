@@ -9,6 +9,7 @@ import { honeycombDashboardEnabled } from '@/config/honeycombDashboard';
 import { deviceHeroEnabled } from '@/config/deviceHero';
 import ShadowHands from '@/components/ShadowHands';
 import DeviceRevealScreen from '@/components/DeviceRevealScreen';
+import { PRODUCT_SENTENCE } from '@/lib/productSentence';
 import { identifyDevice, hedgeDeviceHexagon, readDeviceSignalsWithModel, type DeviceIdentity } from '@/lib/deviceIdentity';
 import FederatedLearningModal, { shouldShowFederatedModal } from '@/components/FederatedLearningModal';
 import { captureDeviceData, generateHexagonsAsync, HexagonData, DeviceData } from '@/lib/deviceDetection';
@@ -295,7 +296,7 @@ const Index = () => {
         {/* Description Text */}
         <section className="text-center pb-4 sm:pb-6 px-4" aria-label="Introduction">
           <p className="text-base sm:text-xl font-semibold text-foreground mb-3" data-testid="product-sentence">
-            MyPrivacyTOOL shows you what any website can learn about you from your browser and device, and what you can do about it.
+            {PRODUCT_SENTENCE}
           </p>
           {hexTileV2Enabled() ? (
             <>
