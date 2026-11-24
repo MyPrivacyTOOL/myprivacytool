@@ -84,3 +84,40 @@ describe("legal pages: never say there are no accounts while free accounts are l
     }
   });
 });
+
+// MPC-11242 (F8 pass 2, MPC-9907): the storage sentence is one constant used by the home page and /thank-you, and the
+// Hong Kong Stop Spam policy section (English and Chinese) obeys the same tense rules and matches the retention job.
+import ThankYou from "./ThankYou";
+import { STORAGE_NOTE } from "@/data/trustCopy";
+import { HK_POLICY_EN, HK_POLICY_ZH, HK_RETENTION_DAYS } from "@/data/hkSpamCopy";
+
+describe("storage sentence: home page and /thank-you say the same thing", () => {
+  it("/thank-you renders the shared sentence word for word", () => {
+    renderPage(<ThankYou />);
+    expect((document.body.textContent ?? "").replace(/\s+/g, " ")).toContain(STORAGE_NOTE);
+  });
+  it("the home page renders it from the same constant, not a typed copy", () => {
+    const src = readFileSync(resolve(process.cwd(), "src/pages/Index.tsx"), "utf8");
+    expect(src).toContain("{STORAGE_NOTE}");
+    expect(src).not.toMatch(/keep it for 12 months/);
+  });
+  it("says nothing false: no 'not stored on our servers' claim", () => {
+    expect(STORAGE_NOTE).not.toMatch(/aren't stored|not stored on our servers/i);
+    expect(STORAGE_NOTE).toMatch(/12 months/);
+  });
+});
+
+describe("HK Stop Spam policy copy (en and zh-HK)", () => {
+  const flat = (c: typeof HK_POLICY_EN) => [c.title, c.intro, ...c.blocks.flatMap((b) => [b.heading, ...(b.paragraphs ?? []), ...(b.bullets ?? [])])].join(" ");
+  it.each([["en", HK_POLICY_EN], ["zh", HK_POLICY_ZH]] as const)("%s: no Stripe, billing, account or refund claim and no status marker", (_l, c) => {
+    const t = flat(c);
+    expect(t).not.toMatch(/stripe|billing|subscription|refund|renews|帳戶|退款|付款|收費|扣款/i);
+    expect(t).not.toMatch(/\b(planned|coming soon|beta)\b|即將推出|計劃中/i);
+  });
+  it.each([["en", HK_POLICY_EN], ["zh", HK_POLICY_ZH]] as const)("%s: the 15.3 retention block states the %s-day period the daily purge job uses", (_l, c) => {
+    const b = c.blocks.find((x) => /^15\.3/.test(x.heading));
+    expect(b, "15.3 block").toBeTruthy();
+    expect((b?.paragraphs ?? []).join(" ")).toContain(String(HK_RETENTION_DAYS));
+    expect(HK_RETENTION_DAYS).toBe(90); // supabase/migrations/20261013000000_mpc_7538_hk_spam_consent_and_retention.sql: hk_spam_retention.days = 90
+  });
+});
