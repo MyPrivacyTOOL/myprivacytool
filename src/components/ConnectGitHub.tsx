@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { afterUserAction } from "@/lib/recipientClient";
 import { useSearchParams } from "react-router-dom";
 import { Github, ShieldCheck, Trash2, Unplug } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -33,7 +34,8 @@ export default function ConnectGitHub() {
 
   useEffect(() => {
     let alive = true;
-    fetchGithubProfile().then((r) => {
+    // MPC-10790: the profile read is a user_action recipient, so it waits for the first real action on the page (at once if there already was one).
+    afterUserAction().then(() => fetchGithubProfile()).then((r) => {
       if (!alive) return;
       if (r.status === "connected") setState({ kind: "connected", profile: r.profile });
       else setState({ kind: removed && r.status === "session_ended" ? "disconnected" : r.status });
