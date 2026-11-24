@@ -3,6 +3,9 @@ import { workerRecipientContext } from "../../../shared/recipients/worker-ctx";
 import type { Logger } from "./logger";
 
 export interface Env {
+  /** MPC-11111 the magic guess: the Mirror seals an email address found in the person's own public bio into the bridge link. Needs EMAIL_GUESS_ENABLED exactly "true" AND the EMAIL_GUESS_KEY secret (same value as on mpt-scan-report). Off by default. */
+  EMAIL_GUESS_ENABLED?: string;
+  EMAIL_GUESS_KEY?: string;
   X_CONSUMER_SECRET?: string;
   /** CK-8502 owner decision D1: "on" stores the hexagon values an X event carries (profile fields, post/DM text) with the event. Default off. Needs legal sign-off and the wording change first. */
   X_CAPTURE_HEXAGONS?: string;
