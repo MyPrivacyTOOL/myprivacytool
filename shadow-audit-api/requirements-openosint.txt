@@ -7,7 +7,7 @@
 
 # Core
 openosint>=2.38.2  # MIT license, Python 3.8+
-mcp>=1.0.0        # MCP protocol implementation
+mcp>=2.3.0        # MCP SDK; adapter uses mcp.Client (not in 1.x)
 anthropic>=0.40.0 # Anthropic API client
 
 # Web & HTTP
