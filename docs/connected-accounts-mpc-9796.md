@@ -19,8 +19,8 @@ No server-side storage binding exists (no KV, D1 or R2 in workers/oauth-poc/wran
 
 ## Found, not changed
 
-- The Connect GitHub page shows "Snapshot valid for 30 days" from `privacy_boundaries.data_retention_days: 30` (workers/github-channel/lib/papit.js 110, reddit-papit.js 140), while we cache for 24 hours. Both are true of different things, but the page does not say what the 30 days is. Needs a decision on what the field means to a recipient (filed as a follow-up).
-- Revoking needs the 7-day session cookie (`DELETE /channels/github` reads the session). After the cookie expires the stored token remains until the person connects again and disconnects. The page now says so (session_ended state).
+- The Connect GitHub page shows "Snapshot valid for 30 days" from `privacy_boundaries.data_retention_days: 30` (workers/github-channel/lib/papit.js 110, reddit-papit.js 140), while we cache for 24 hours. Both are true of different things, but the page does not say what the 30 days is. Needs a decision on what the field means to a recipient (filed as a follow-up). **Resolved by MPC-10825 (2026-11-24):** the Connect GitHub row now reads "Connection kept: Until you disconnect" and the guide copy no longer says 30 days; the numeric field stays in the JSON as declared snapshot validity (MPC-10833 decides whether to enforce it).
+- Revoking needs the 7-day session cookie (`DELETE /channels/github` reads the session). After the cookie expires the stored token remains until the person connects again and disconnects. The page now says so (session_ended state). **Resolved by MPC-10825 (2026-11-24):** `GET /oauth/github/remove` and `GET /oauth/reddit/remove` remove the stored connection after a fresh provider sign-in, with no session (see `docs/channels/github.md`).
 - Whether the Workers' platform logs are retained, and for how long, is not in the repo.
 
 Update 2026-11-24 (MPC-10833): the 30 days now means something. Profiles carry `expires_at` and `POST /papit/verify` refuses a stale one; the page shows the date. The token is not used 90 days after the person last connected (`reconsent_required`). See `docs/papit-expiry-mpc-10833.md`.

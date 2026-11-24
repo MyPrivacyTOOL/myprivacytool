@@ -1,10 +1,12 @@
 import { describe, it, expect, vi } from "vitest";
 import {
   GITHUB_CHANNEL_URL,
+  GITHUB_REMOVE_URL,
   GITHUB_START_URL,
   disconnectGithub,
   fetchGithubProfile,
   friendlyChannelError,
+  removalNotice,
 } from "./githubChannel";
 
 const res = (status: number, body: unknown = {}) => new Response(JSON.stringify(body), { status });
@@ -12,6 +14,21 @@ const res = (status: number, body: unknown = {}) => new Response(JSON.stringify(
 describe("githubChannel client", () => {
   it("starts login with a plain link to the Worker's /oauth/github/start", () => {
     expect(GITHUB_START_URL).toBe(`${GITHUB_CHANNEL_URL}/oauth/github/start`);
+  });
+
+  // MPC-10825: removing a stored connection without a session is a plain link to the Worker's /oauth/github/remove.
+  it("removes a stored connection through a plain link to the Worker's /oauth/github/remove", () => {
+    expect(GITHUB_REMOVE_URL).toBe(`${GITHUB_CHANNEL_URL}/oauth/github/remove`);
+    expect(GITHUB_REMOVE_URL).not.toBe(GITHUB_START_URL);
+  });
+
+  it("reads the removal redirect: only channel_removed=github counts, and revoked must be exactly 1", () => {
+    expect(removalNotice("github", "1")).toEqual({ revokedAtGithub: true });
+    expect(removalNotice("github", "0")).toEqual({ revokedAtGithub: false });
+    expect(removalNotice("github", null)).toEqual({ revokedAtGithub: false });
+    expect(removalNotice(null, "1")).toBeNull();
+    expect(removalNotice("reddit", "1")).toBeNull();
+    expect(removalNotice("<script>", "1")).toBeNull();
   });
 
   it("returns the profile on 200 and sends the session cookie", async () => {
@@ -65,6 +82,8 @@ describe("githubChannel client", () => {
     expect(friendlyChannelError(null)).toBeNull();
     expect(friendlyChannelError("access_denied")).toMatch(/cancelled/i);
     expect(friendlyChannelError("invalid_state")).toMatch(/expired/i);
+    expect(friendlyChannelError("remove_access_denied")).toMatch(/cancelled.*nothing was removed/i);
+    expect(friendlyChannelError("remove_failed")).toMatch(/couldn't remove the stored connection/i);
     const unknown = friendlyChannelError("<script>alert(1)</script>");
     expect(unknown).toMatch(/couldn't finish/i);
     expect(unknown).not.toContain("script");

@@ -22,11 +22,11 @@ export const faqs: { q: string; a: string }[] = [
   },
   {
     q: "How long is my data kept?",
-    a: "The profile snapshot carries an expiry date 30 days after it was made, and our check refuses it after that. It is cached for 24 hours so we do not call GitHub repeatedly. Your GitHub connection token is kept, encrypted, until you disconnect, but we stop using it 90 days after you connected and ask you to connect again. Disconnecting deletes the token and revokes our access at GitHub.",
+    a: "The profile snapshot carries an expiry date 30 days after it was made, and our check refuses it after that. It is cached for 24 hours so we do not call GitHub repeatedly. We keep your GitHub connection token, encrypted, until you disconnect, but we stop using it 90 days after you connected and ask you to connect again. Disconnecting deletes the token and revokes our access at GitHub.",
   },
   {
     q: "How do I disconnect?",
-    a: "Open the Connect GitHub page and choose Disconnect GitHub. We delete our stored token first, clear the cached profile, and then revoke the grant at GitHub. You can also revoke us yourself in GitHub under Settings, Applications.",
+    a: "Open the Connect GitHub page and choose Disconnect GitHub. We delete our stored token first, clear the cached profile, and then revoke the grant at GitHub. If your browser session has ended (it lasts 7 days), the page offers Remove my stored connection instead: you sign in with GitHub, and we delete the stored token and the cached copy and revoke our access, without reading your profile or saving anything new. You can also revoke us yourself in GitHub under Settings, Applications.",
   },
   {
     q: "What is the integrity receipt?",
@@ -136,6 +136,12 @@ const Content = () => (
       To leave, choose Disconnect GitHub on the connect page. We delete the stored token first, clear the cached
       profile, and then revoke our access at GitHub. You can also revoke access yourself at any time in GitHub under
       Settings, Applications.
+    </p>
+    <p>
+      If your browser session has ended (it lasts 7 days), the connect page shows Remove my stored connection instead. It
+      sends you through the same GitHub sign-in, which is how we know the account is yours. We then delete the stored
+      token and the cached copy and revoke our access, exactly as Disconnect does. This sign-in only removes: it reads
+      nothing from your profile, saves nothing new and does not sign you in.
     </p>
 
     <h2 id="limits">What this profile can and cannot tell you</h2>

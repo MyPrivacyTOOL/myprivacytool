@@ -125,6 +125,23 @@ describe("PaPIT limits wording", () => {
     expect(text).toMatch(/24 hours/);
     expect(text).toMatch(/7 days/);
   });
+  // MPC-10825: a person can remove a stored connection with no session; the route exists in the Worker and the pages say how long we keep it.
+  it("documents revocation without a session, and the route exists in both Workers' source", () => {
+    expect(PAPIT_LIMITS.map((l) => l.item)).toContain("Revocation without a session");
+    const e = ENDPOINTS.find((x) => x.id === "github-remove")!;
+    expect(e.path).toBe("/oauth/github/remove");
+    expect(JSON.stringify(e)).toMatch(/intent=remove/);
+    expect(read("workers/github-channel/index.js")).toContain("'/oauth/github/remove'");
+    expect(read("workers/github-channel/lib/reddit-routes.js")).toContain("'/oauth/reddit/remove'");
+  });
+  it("person-facing copy says the connection is kept until you disconnect and never calls 30 days the validity of the connection", () => {
+    const guide = read("src/content/guides/githubProfile.tsx");
+    expect(guide).not.toMatch(/valid for 30 days|30 days of validity/);
+    expect(guide).toMatch(/until you disconnect/);
+    expect(guide).toMatch(/Remove my stored connection/);
+    expect(read("src/components/ConnectGitHub.tsx")).not.toMatch(/data_retention_days/);
+    expect(read("src/pages/Privacy.tsx")).toMatch(/If your 7-day session has ended, you can still remove the stored connection/);
+  });
   it("the stated lifetimes match the Worker constants", () => {
     const idx = readFileSync(path.join(ROOT, "workers/github-channel/index.js"), "utf8");
     const cache = readFileSync(path.join(ROOT, "workers/github-channel/lib/cache.js"), "utf8");

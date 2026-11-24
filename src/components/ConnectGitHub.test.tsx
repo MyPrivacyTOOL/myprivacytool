@@ -98,8 +98,70 @@ describe("<ConnectGitHub />", () => {
   it("a session that ended says the stored connection remains until disconnected, and offers Connect", async () => {
     vi.mocked(api.fetchGithubProfile).mockResolvedValue({ status: "session_ended" });
     renderAt();
-    expect(await screen.findByTestId("session-ended")).toHaveTextContent(/we still hold that connection until you disconnect it/i);
+    expect(await screen.findByTestId("session-ended")).toHaveTextContent(/we may still hold that connection until you remove it/i);
     expect(screen.getByRole("link", { name: /connect github/i })).toBeInTheDocument();
+  });
+
+  // MPC-10825: a way to remove the stored connection when there is no session.
+  it("a session that ended offers to remove the stored connection through the Worker's sign-in, without a Disconnect button", async () => {
+    vi.mocked(api.fetchGithubProfile).mockResolvedValue({ status: "session_ended" });
+    renderAt();
+    const remove = await screen.findByRole("link", { name: /remove my stored connection/i });
+    expect(remove).toHaveAttribute("href", api.GITHUB_REMOVE_URL);
+    expect(screen.getByTestId("session-ended")).toHaveTextContent(/sign in with github.*delete the stored token.*revoke our access/i);
+    expect(screen.queryByRole("button", { name: /disconnect github/i })).toBeNull();
+  });
+
+  it("offers Remove only where something may be stored: not when disconnected, signed in, revoked or in an outage", async () => {
+    for (const status of ["disconnected", "reauthorize", "error"] as const) {
+      vi.mocked(api.fetchGithubProfile).mockResolvedValue({ status });
+      const view = renderAt();
+      await waitFor(() => expect(screen.queryByText(/checking your connection/i)).toBeNull());
+      expect(screen.queryByRole("link", { name: /remove my stored connection/i })).toBeNull();
+      view.unmount();
+    }
+    vi.mocked(api.fetchGithubProfile).mockResolvedValue({ status: "connected", profile });
+    renderAt();
+    await screen.findByText("TypeScript, Go");
+    expect(screen.queryByRole("link", { name: /remove my stored connection/i })).toBeNull();
+  });
+
+  it("after a removal it says what was removed, shows no stale 'session ended' note, and offers Connect", async () => {
+    vi.mocked(api.fetchGithubProfile).mockResolvedValue({ status: "session_ended" });
+    renderAt("/connect/github?channel_removed=github&revoked=1");
+    const note = await screen.findByTestId("removed");
+    expect(note).toHaveTextContent(/stored GitHub connection was removed.*deleted the encrypted access token.*revoked our access at GitHub/i);
+    expect(await screen.findByTestId("not-connected")).toHaveTextContent("No GitHub account is connected.");
+    expect(screen.queryByTestId("session-ended")).toBeNull();
+    expect(screen.queryByRole("link", { name: /remove my stored connection/i })).toBeNull();
+    expect(screen.getByRole("link", { name: /connect github/i })).toHaveAttribute("href", api.GITHUB_START_URL);
+  });
+
+  it("a removal whose GitHub revoke could not be confirmed says so and points to GitHub Settings", async () => {
+    vi.mocked(api.fetchGithubProfile).mockResolvedValue({ status: "session_ended" });
+    renderAt("/connect/github?channel_removed=github&revoked=0");
+    const note = await screen.findByTestId("removed");
+    expect(note).toHaveTextContent(/could not confirm the revoke at GitHub.*GitHub Settings, Applications/i);
+    expect(note).not.toHaveTextContent(/we also revoked our access/i);
+  });
+
+  it("a cancelled or failed removal shows its own message and keeps the Remove link, never claiming removal", async () => {
+    vi.mocked(api.fetchGithubProfile).mockResolvedValue({ status: "session_ended" });
+    renderAt("/connect/github?channel_error=remove_failed&stage=delete");
+    expect(await screen.findByRole("alert")).toHaveTextContent(/couldn't remove the stored connection/i);
+    expect(screen.queryByTestId("removed")).toBeNull();
+    expect(screen.getByRole("link", { name: /remove my stored connection/i })).toBeInTheDocument();
+    expect(document.body.textContent).not.toContain("remove_failed");
+  });
+
+  // MPC-10825: the "30 days" snapshot label said how long a recipient may keep a copy; it was read as how long WE keep your connection.
+  it("says the connection is kept until you disconnect, and no longer shows '30 days'", async () => {
+    vi.mocked(api.fetchGithubProfile).mockResolvedValue({ status: "connected", profile });
+    renderAt();
+    expect(await screen.findByText("Connection kept")).toBeInTheDocument();
+    expect(screen.getByText("Until you disconnect")).toBeInTheDocument();
+    expect(screen.queryByText(/declared validity/i)).toBeNull();
+    expect(document.body.textContent).not.toMatch(/30 days/);
   });
 
   it("a revoked token says GitHub no longer allows it and that our copy was deleted", async () => {

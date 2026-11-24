@@ -9,10 +9,13 @@ import vm from 'node:vm';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const html = fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'index.html'), 'utf8');
+// MPC-10790: the same cases run against public/shared-landing.html, a static page outside the app that loaded the tag before any consent.
+for (const FILE of ['index.html', 'public/shared-landing.html']) {
+const html = fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), '..', FILE), 'utf8');
 const script = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1]).find((s) => s.includes('G-1BWMDBJSPL'));
-assert.ok(script, 'found the inline gtag script in index.html');
-assert.ok(!/<script[^>]+src="https:\/\/www\.googletagmanager\.com/.test(html), 'index.html has no static googletagmanager script tag');
+assert.ok(script, `found the inline gtag script in ${FILE}`);
+assert.ok(!/<script[^>]+src="https:\/\/www\.googletagmanager\.com/.test(html), `${FILE} has no static googletagmanager script tag`);
+assert.ok(/<script src="\/recipient-client\.min\.js" defer><\/script>/.test(html), `${FILE} loads the recipient client`);
 
 const KEY = 'mpt_cookie_consent';
 function load({ host = 'www.myprivacytool.io', stored = null, storage = true, clientReady = true } = {}) {
@@ -44,18 +47,18 @@ function load({ host = 'www.myprivacytool.io', stored = null, storage = true, cl
 const REJECT = JSON.stringify({ v: 1, analytics: false, at: '2026-10-23T00:00:00.000Z' });
 const ACCEPT = JSON.stringify({ v: 1, analytics: true, at: '2026-10-23T00:00:00.000Z' });
 
-test('fresh visit, no choice yet: no gtag request, hits disabled', () => {
+test(`${FILE}: fresh visit, no choice yet: no gtag request, hits disabled`, () => {
   const p = load();
   assert.equal(p.gtagScripts().length, 0);
   assert.equal(p.disabled(), true);
 });
-test('Essential only: no gtag request, hits stay disabled', () => {
+test(`${FILE}: Essential only: no gtag request, hits stay disabled`, () => {
   const p = load();
   p.choose(REJECT);
   assert.equal(p.gtagScripts().length, 0);
   assert.equal(p.disabled(), true);
 });
-test('Accept analytics: gtag loads exactly once and hits are enabled', () => {
+test(`${FILE}: Accept analytics: gtag loads exactly once and hits are enabled`, () => {
   const p = load();
   p.choose(ACCEPT);
   assert.equal(p.gtagScripts().length, 1);
@@ -63,7 +66,7 @@ test('Accept analytics: gtag loads exactly once and hits are enabled', () => {
   assert.equal(p.disabled(), false);
   assert.ok(p.ctx.dataLayer.length >= 2, 'js and config calls queued');
 });
-test('accept, then reject again: hits disabled, no second script', () => {
+test(`${FILE}: accept, then reject again: hits disabled, no second script`, () => {
   const p = load();
   p.choose(ACCEPT);
   p.choose(REJECT);
@@ -73,12 +76,12 @@ test('accept, then reject again: hits disabled, no second script', () => {
   assert.equal(p.disabled(), false);
   assert.equal(p.gtagScripts().length, 1, 'loaded guard: still one script after re-accept');
 });
-test('returning visitor who already accepted: loads at once', () => {
+test(`${FILE}: returning visitor who already accepted: loads at once`, () => {
   const p = load({ stored: ACCEPT });
   assert.equal(p.gtagScripts().length, 1);
   assert.equal(p.disabled(), false);
 });
-test('storage blocked, damaged or from another version: fails closed', () => {
+test(`${FILE}: storage blocked, damaged or from another version: fails closed`, () => {
   assert.equal(load({ storage: false }).gtagScripts().length, 0);
   for (const bad of ['not json', '{"v":2,"analytics":true}', '{"v":1,"analytics":"yes"}', 'null']) {
     const p = load({ stored: bad });
@@ -86,14 +89,14 @@ test('storage blocked, damaged or from another version: fails closed', () => {
     assert.equal(p.disabled(), true, bad);
   }
 });
-test('previews and localhost never send hits, even with consent', () => {
+test(`${FILE}: previews and localhost never send hits, even with consent`, () => {
   for (const host of ['localhost', 'abc123.wwwmyprivacytool.pages.dev']) {
     const p = load({ host, stored: ACCEPT });
     assert.equal(p.gtagScripts().length, 0, host);
     assert.equal(p.disabled(), true, host);
   }
 });
-test('MPC-9886: goes through the registry key "ga4", and waits for the recipient client if it is not ready yet', () => {
+test(`${FILE}: MPC-9886: goes through the registry key "ga4", and waits for the recipient client if it is not ready yet`, () => {
   const p = load({ stored: ACCEPT, clientReady: false });
   assert.equal(p.gtagScripts().length, 0, 'nothing is requested before the client exists');
   p.clientReady();
@@ -102,3 +105,4 @@ test('MPC-9886: goes through the registry key "ga4", and waits for the recipient
   p.clientReady();
   assert.equal(p.gtagScripts().length, 1, 'still once');
 });
+}

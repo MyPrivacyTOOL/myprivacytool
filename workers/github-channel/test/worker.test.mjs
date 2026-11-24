@@ -379,3 +379,125 @@ test('re-consent: the DB request for a token refresh does not carry consented_at
   await saveToken(env, { subjectId: '4242', accessToken: 'a', refreshToken: 'r', consentedAt: '2026-10-05T12:00:00.000Z' }, net.fetchFn);
   assert.ok(net.log.bodies.at(-1).includes('"consented_at":"2026-10-05T12:00:00.000Z"'));
 });
+
+// ---- MPC-10825: remove a stored connection without a live session --------------------------------------------------
+import { verify } from '../lib/oauth.js';
+
+async function removeCallback(env, fetchFn, { state = 'rm-st4te', query = `code=c&state=${state}`, cookieState = state, key } = {}) {
+  const cookie = await sign({ state: cookieState, verifier: 'v'.repeat(43), exp: clock.t + 60_000, intent: 'remove' }, key ?? env.STATE_SIGNING_KEY);
+  return handle(new Request(`https://w.test/oauth/github/callback?${query}`, { headers: { Cookie: `mpt_gh_oauth=${cookie}` } }), env, { fetchFn, now });
+}
+
+test('MPC-10825 remove/start: same GitHub sign-in (read:user, S256), intent only in the SIGNED state cookie; plain start has none', async () => {
+  const env = baseEnv();
+  const res = await handle(new Request('https://w.test/oauth/github/remove'), env, { now });
+  assert.equal(res.status, 302);
+  const loc = new URL(res.headers.get('Location'));
+  assert.equal(loc.origin + loc.pathname, 'https://github.com/login/oauth/authorize');
+  assert.equal(loc.searchParams.get('scope'), 'read:user');
+  assert.equal(loc.searchParams.get('code_challenge_method'), 'S256');
+  assert.equal(loc.searchParams.get('redirect_uri'), env.REDIRECT_URI, 'reuses the registered callback');
+  assert.ok(![...loc.searchParams.keys()].some((k) => /intent|remove/i.test(k)), 'intent is not in the URL');
+  const cookie = /mpt_gh_oauth=([^;]+)/.exec(res.headers.get('Set-Cookie'))[1];
+  assert.equal((await verify(cookie, env.STATE_SIGNING_KEY, clock.t)).intent, 'remove');
+  assert.equal(await verify(cookie, 'wrong-key'.repeat(4), clock.t), null);
+
+  const plain = await handle(new Request('https://w.test/oauth/github/start'), env, { now });
+  const plainCookie = /mpt_gh_oauth=([^;]+)/.exec(plain.headers.get('Set-Cookie'))[1];
+  assert.equal((await verify(plainCookie, env.STATE_SIGNING_KEY, clock.t)).intent, undefined);
+  // Only GET starts it.
+  assert.equal((await handle(new Request('https://w.test/oauth/github/remove', { method: 'POST' }), env, { now })).status, 404);
+});
+
+test('MPC-10825 remove callback with NO session: deletes the row and cache, revokes the grant, stores nothing, signs nobody in', async () => {
+  const env = baseEnv(); const net = fakeNetwork();
+  const { session } = await connect(env, net);
+  await handle(profileReq(session), env, { fetchFn: net.fetchFn, now }); // warm the cache
+  assert.equal(net.rows.size, 1); assert.equal(env.PROFILE_CACHE._store.size, 1);
+  net.rows.set('999', { user_id: '999', provider: 'github' }); // someone else's row must survive
+  net.log.bodies.length = 0;
+
+  // Fresh browser: no session cookie at all.
+  const res = await removeCallback(env, net.fetchFn);
+  assert.equal(res.status, 302);
+  const loc = new URL(res.headers.get('Location'));
+  assert.equal(loc.origin + loc.pathname, 'https://app.test/');
+  assert.equal(loc.searchParams.get('channel_removed'), 'github');
+  assert.equal(loc.searchParams.get('revoked'), '1');
+  assert.deepEqual([...net.rows.keys()], ['999'], 'only the proven account was removed');
+  assert.equal(env.PROFILE_CACHE._store.size, 0);
+  assert.equal(net.log.revoked, 1, 'grant revoked at GitHub');
+  assert.ok(net.log.bodies.some((b) => b.includes(ACCESS_TOKEN)), 'the fresh token was the one sent to revoke');
+  assert.ok(!net.log.bodies.some((b) => b.includes('user_id')), 'nothing was written to channel_tokens');
+  const cookies = res.headers.getSetCookie().join('\n');
+  assert.match(cookies, /mpt_gh_session=; Max-Age=0/);
+  assert.doesNotMatch(cookies, /mpt_gh_session=[^;]/);
+  assert.match(cookies, /mpt_gh_oauth=; Max-Age=0/);
+});
+
+test('MPC-10825 remove callback is idempotent: nothing stored still ends cleanly and the sign-in token is revoked', async () => {
+  const env = baseEnv(); const net = fakeNetwork();
+  const res = await removeCallback(env, net.fetchFn);
+  assert.equal(new URL(res.headers.get('Location')).searchParams.get('channel_removed'), 'github');
+  assert.equal(net.rows.size, 0);
+  assert.equal(net.log.revoked, 1);
+});
+
+test('MPC-10825 remove callback: answers JSON when no SUCCESS_REDIRECT is configured', async () => {
+  const env = { ...baseEnv(), SUCCESS_REDIRECT: '' }; const net = fakeNetwork();
+  const res = await removeCallback(env, net.fetchFn);
+  assert.equal(res.status, 200);
+  assert.deepEqual(await res.json(), { ok: true, removed: true, revoked_at_github: true });
+});
+
+test('MPC-10825 remove callback: cancelling at GitHub removes nothing and says so', async () => {
+  const env = baseEnv(); const net = fakeNetwork();
+  await connect(env, net);
+  const res = await removeCallback(env, async () => { throw new Error('must not be called'); }, { query: 'error=access_denied&state=rm-st4te' });
+  assert.match(res.headers.get('Location'), /channel_error=remove_access_denied/);
+  assert.equal(net.rows.size, 1);
+});
+
+test('MPC-10825 remove callback: a state mismatch or a cookie signed with another key is rejected before any exchange', async () => {
+  const env = baseEnv(); const net = fakeNetwork();
+  await connect(env, net);
+  const never = async () => { throw new Error('must not be called'); };
+  const mismatch = await removeCallback(env, never, { query: 'code=c&state=other' });
+  assert.match(mismatch.headers.get('Location'), /channel_error=invalid_state/);
+  const forged = await removeCallback(env, never, { key: 'attacker'.repeat(6) });
+  assert.match(forged.headers.get('Location'), /channel_error=invalid_state/);
+  assert.equal(net.rows.size, 1, 'nothing removed');
+});
+
+test('MPC-10825 remove callback: a ?intent=remove query on a normal sign-in does nothing (intent comes only from the signed cookie)', async () => {
+  const env = baseEnv(); const net = fakeNetwork();
+  const state = 'st4te';
+  const cookie = await sign({ state, verifier: 'v'.repeat(43), exp: clock.t + 60_000 }, env.STATE_SIGNING_KEY);
+  const res = await handle(new Request(`https://w.test/oauth/github/callback?code=c&state=${state}&intent=remove`, { headers: { Cookie: `mpt_gh_oauth=${cookie}` } }), env, { fetchFn: net.fetchFn, now });
+  assert.equal(net.rows.size, 1, 'a normal connect stored the token');
+  assert.match(res.headers.getSetCookie().join('\n'), /mpt_gh_session=[^;]+\.[^;]+/);
+});
+
+test('MPC-10825 remove callback: if the row cannot be deleted it says so, still revokes the grant, and signs nobody in', async () => {
+  const env = baseEnv(); const net = fakeNetwork();
+  await connect(env, net);
+  const failingDelete = async (u, init = {}) => (String(u).startsWith('https://x.supabase.co') && init.method === 'DELETE' ? new Response('{}', { status: 500 }) : net.fetchFn(u, init));
+  const res = await removeCallback(env, failingDelete);
+  const loc = new URL(res.headers.get('Location'));
+  assert.equal(loc.searchParams.get('channel_error'), 'remove_failed');
+  assert.equal(loc.searchParams.get('stage'), 'delete');
+  assert.equal(loc.searchParams.get('channel_removed'), null);
+  assert.equal(net.rows.size, 1, 'row is still there, so the page must not claim it was removed');
+  assert.equal(net.log.revoked, 1, 'access is still ended at GitHub');
+  assert.doesNotMatch(res.headers.getSetCookie().join('\n'), /mpt_gh_session=[^;]/);
+});
+
+test('MPC-10825 remove callback: logs hold event names only, never tokens or the account id', async () => {
+  const env = baseEnv(); const net = fakeNetwork();
+  await connect(env, net);
+  const lines = []; const orig = console.log; console.log = (...a) => lines.push(a.join(' '));
+  try { await removeCallback(env, net.fetchFn); } finally { console.log = orig; }
+  const all = lines.join('\n');
+  assert.match(all, /removed_without_session/);
+  for (const s of [ACCESS_TOKEN, REFRESH_TOKEN, '4242', 'octo', 'csec']) assert.ok(!all.includes(s), s);
+});

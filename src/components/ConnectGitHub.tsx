@@ -1,12 +1,14 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Github, ShieldCheck, Unplug } from "lucide-react";
+import { Github, ShieldCheck, Trash2, Unplug } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
+  GITHUB_REMOVE_URL,
   GITHUB_START_URL,
   disconnectGithub,
   fetchGithubProfile,
   friendlyChannelError,
+  removalNotice,
   type PapitProfile,
 } from "@/lib/githubChannel";
 
@@ -25,16 +27,21 @@ export default function ConnectGitHub() {
   const [disconnectFailed, setDisconnectFailed] = useState(false);
   const [params] = useSearchParams();
   const callbackError = friendlyChannelError(params.get("channel_error"));
+  // MPC-10825: the Worker sends the person back here after "remove without a session". No session exists then, so the
+  // profile call says session_ended; show the plain "not connected" state under the removal notice instead.
+  const removed = removalNotice(params.get("channel_removed"), params.get("revoked"));
 
   useEffect(() => {
     let alive = true;
     fetchGithubProfile().then((r) => {
       if (!alive) return;
-      setState(r.status === "connected" ? { kind: "connected", profile: r.profile } : { kind: r.status });
+      if (r.status === "connected") setState({ kind: "connected", profile: r.profile });
+      else setState({ kind: removed && r.status === "session_ended" ? "disconnected" : r.status });
     });
     return () => {
       alive = false;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- read once on arrival; `removed` only decides which "not connected" state to show
   }, []);
 
   const onDisconnect = async () => {
@@ -60,6 +67,15 @@ export default function ConnectGitHub() {
         </p>
       )}
 
+      {removed && (
+        <p role="status" className="mb-4 rounded-md border border-border p-3 text-sm text-foreground" data-testid="removed">
+          Your stored GitHub connection was removed: we deleted the encrypted access token and the copy of your snapshot.{" "}
+          {removed.revokedAtGithub
+            ? "We also revoked our access at GitHub."
+            : "We could not confirm the revoke at GitHub, so please also remove MyPrivacyTOOL under GitHub Settings, Applications."}
+        </p>
+      )}
+
       {state.kind === "loading" && <p className="text-muted-foreground">Checking your connection…</p>}
 
       {state.kind === "error" && (
@@ -69,10 +85,19 @@ export default function ConnectGitHub() {
       )}
 
       {state.kind === "session_ended" && (
-        <p role="status" className="mb-4 text-sm text-foreground" data-testid="session-ended">
-          Your browser session ended (it lasts 7 days). If you connected GitHub before, we still hold that connection until you disconnect it.
-          Connect again to see it or to remove it.
-        </p>
+        <div className="mb-4 text-sm text-foreground" data-testid="session-ended" role="status">
+          <p>
+            Your browser session ended (it lasts 7 days). If you connected GitHub before, we may still hold that connection until you remove it.
+            You can remove it now: sign in with GitHub and we delete the stored token and the copy of your snapshot, and revoke our access.
+            Nothing is read and nothing new is saved. Or connect again to see your snapshot.
+          </p>
+          <Button asChild variant="outline" className="mt-3">
+            <a href={GITHUB_REMOVE_URL} data-testid="remove-stored">
+              <Trash2 className="mr-2 h-4 w-4" aria-hidden="true" />
+              Remove my stored connection
+            </a>
+          </Button>
+        </div>
       )}
 
       {state.kind === "reauthorize" && (
@@ -122,9 +147,10 @@ export default function ConnectGitHub() {
             {state.profile.data_coverage?.interests === "no_stars" ? <Row label="Interests note">You have not starred anything.</Row> : null}
             {state.profile.data_coverage?.interests === "stars_without_topics" ? <Row label="Interests note">The repos you starred have no topics.</Row> : null}
             <Row label="Valid until">
-              <span data-testid="valid-until">{(state.profile.expires_at ?? "").slice(0, 10) || `${state.profile.privacy_boundaries.data_retention_days} days after it was made`}</span>
+              <span data-testid="valid-until">{(state.profile.expires_at ?? "").slice(0, 10) || "30 days after it was made"}</span>
               {" "}(a copy of this profile is refused after that date)
             </Row>
+            <Row label="Connection kept">Until you disconnect</Row>
             <Row label="Checksum (not a signature)">
               <code className="break-all text-xs">{state.profile.cryptographic_receipt}</code>
             </Row>
