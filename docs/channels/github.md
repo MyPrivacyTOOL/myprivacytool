@@ -119,7 +119,15 @@ disconnect or connect again. An automatic purge would delete user data, so it is
    npx wrangler secret put SUPABASE_SERVICE_ROLE_KEY
    ```
    Local dev: copy `.dev.vars.example` to `.dev.vars` (gitignored), then `npx wrangler dev`.
-6. **Deploy**: run the "GitHub channel Worker" workflow manually (it refuses to deploy while `REPLACE_*` remain).
+6. **Deploy**: the "GitHub channel Worker" workflow (`.github/workflows/deploy-github-channel.yml`) deploys **on merge to `main`** whenever `workers/github-channel/**`,
+   `shared/recipients/**`, `scripts/ci/smoke-test.mjs` or the workflow itself changes, and can still be run by hand (workflow_dispatch). Never from a pull request.
+   Order: tests, pre-deploy check (repo secrets set, no `REPLACE_*`, `EXPECTED_SECRETS.txt` names only), snapshot of the Worker's secret names, deploy, FAIL if any secret
+   name changed or an expected one is missing, then a GET-only smoke test of the live Worker (`node scripts/ci/smoke-test.mjs github-channel`: `/health`; the GitHub sign-in
+   and the no-session remove route must both be a 302 to GitHub with `read:user`, S256, an HttpOnly state cookie and no intent in the URL; Reddit remove 503 or a 302 to Reddit;
+   profile without a session 401; POST to remove 404). If the smoke test fails the Worker is rolled back to the previous version and re-checked, and the job still ends red.
+   The same smoke test runs every 6 hours in `smoke-site.yml`. **Database changes are not deployed by this workflow**: a Worker that reads or writes a new column needs its migration
+   applied first (`deploy-supabase.yml` is manual), so check that before merging a Worker change. Manual rollback: `rollback.yml` is not wired to this Worker yet; use
+   `npx wrangler rollback` in `workers/github-channel` (Cloudflare account `35cb1717...`).
 
 ## Verifying tokens are ciphertext (manual acceptance check)
 
