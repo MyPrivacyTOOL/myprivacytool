@@ -577,7 +577,7 @@ export const PAPIT_LIMITS = [
   { item: "Cache", detail: "We keep a copy of the derived profile for 24 hours, then fetch it again." },
   { item: "Browser session", detail: "The mpt_gh_session cookie lasts 7 days." },
   { item: "Access token", detail: "Kept (encrypted) until the user disconnects. It has no automatic expiry yet." },
-  { item: "Revocation", detail: "A user can disconnect (DELETE /channels/github): the token is deleted, our access is revoked at GitHub and the cached copy is cleared. A profile that was already issued cannot be recalled and there is no revocation list yet." },
+  { item: "Revocation", detail: "A user can disconnect (DELETE /channels/github): the token is deleted, our access is revoked at GitHub and the cached copy is cleared. After the 7-day session has ended, a user can still remove the stored connection by signing in with GitHub again at /oauth/github/remove, which deletes the token and the copy, revokes our access and stores nothing from that sign-in. A profile that was already issued cannot be recalled and there is no revocation list yet." },
 ];
 
 export const INTERNAL_SERVICES = [

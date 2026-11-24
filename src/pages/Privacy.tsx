@@ -737,7 +737,9 @@ const Privacy = () => {
                 </li>
                 <li>
                   <strong>Your controls:</strong> disconnecting GitHub or Reddit deletes the stored token, revokes our access at the provider, clears the
-                  24-hour copy and ends the session. If the provider tells us you revoked access, we delete our copy of the token. The cookies are named in
+                  24-hour copy and ends the session. If your 7-day GitHub session has ended, you can still remove the stored connection from the Connect
+                  GitHub page: you sign in with GitHub once more, we delete the token and the copy and revoke our access, and we keep nothing from that
+                  sign-in. If the provider tells us you revoked access, we delete our copy of the token. The cookies are named in
                   the Cookie Policy.
                 </li>
               </ul>

@@ -9,6 +9,8 @@ export const GITHUB_CHANNEL_URL: string =
   "https://channels.myprivacytool.io";
 
 export const GITHUB_START_URL = `${GITHUB_CHANNEL_URL}/oauth/github/start`;
+/** MPC-10825: sign in with GitHub again and remove the stored connection, for a person whose 7-day session has ended. Stores nothing. */
+export const GITHUB_REMOVE_URL = `${GITHUB_CHANNEL_URL}/oauth/github/remove`;
 
 export interface PapitProfile {
   version: "1.0";

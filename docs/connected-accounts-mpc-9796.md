@@ -22,3 +22,9 @@ No server-side storage binding exists (no KV, D1 or R2 in workers/oauth-poc/wran
 - The Connect GitHub page shows "Snapshot valid for 30 days" from `privacy_boundaries.data_retention_days: 30` (workers/github-channel/lib/papit.js 110, reddit-papit.js 140), while we cache for 24 hours. Both are true of different things, but the page does not say what the 30 days is. Needs a decision on what the field means to a recipient (filed as a follow-up).
 - Revoking needs the 7-day session cookie (`DELETE /channels/github` reads the session). After the cookie expires the stored token remains until the person connects again and disconnects. The page now says so (session_ended state).
 - Whether the Workers' platform logs are retained, and for how long, is not in the repo.
+
+## Update MPC-10825 (2026-11-24, Chris: "Y" to the recommended answers)
+
+- The Connect GitHub page no longer shows "30 days (not enforced)". It says the connection is kept until you disconnect and the copy of the snapshot refreshes every 24 hours. The `data_retention_days: 30` field in the profile itself is unchanged here (MPC-10833 handles the profile).
+- A stored connection can be removed after the 7-day session ends: `GET /oauth/github/remove` (and `/oauth/reddit/remove`) runs the normal sign-in with `mode: "remove"` signed into the state cookie. The callback deletes the stored token row and the 24-hour copy, revokes at the provider (the fresh sign-in's token and the stored one), clears the session cookie, stores nothing, and redirects back with `?channel_removed=1`. Only GitHub has a page that links to it; Reddit has the Worker route but no page yet.
+- Privacy 6B and /developers (Revocation) say so.

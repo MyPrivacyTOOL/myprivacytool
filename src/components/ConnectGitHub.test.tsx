@@ -101,6 +101,24 @@ describe("<ConnectGitHub />", () => {
     expect(screen.getByRole("link", { name: /connect github/i })).toBeInTheDocument();
   });
 
+  // MPC-10825: a person whose session ended can remove the stored connection without connecting.
+  it("a session that ended offers to remove the stored connection through the Worker's remove sign-in", async () => {
+    vi.mocked(api.fetchGithubProfile).mockResolvedValue({ status: "session_ended" });
+    renderAt();
+    const link = await screen.findByTestId("remove-stored");
+    expect(link).toHaveAttribute("href", api.GITHUB_REMOVE_URL);
+    expect(api.GITHUB_REMOVE_URL).toMatch(/\/oauth\/github\/remove$/);
+    expect(link).toHaveTextContent(/remove the stored connection/i);
+  });
+
+  it("after a removal it says the connection was removed and does not claim one is still held", async () => {
+    vi.mocked(api.fetchGithubProfile).mockResolvedValue({ status: "session_ended" });
+    renderAt("/connect/github?channel_removed=1");
+    expect(await screen.findByTestId("removed")).toHaveTextContent(/stored GitHub connection was removed.*deleted the access token.*revoked our access at GitHub/i);
+    expect(screen.queryByTestId("session-ended")).toBeNull();
+    expect(screen.queryByTestId("remove-stored")).toBeNull();
+  });
+
   it("a revoked token says GitHub no longer allows it and that our copy was deleted", async () => {
     vi.mocked(api.fetchGithubProfile).mockResolvedValue({ status: "reauthorize" });
     renderAt();
@@ -124,5 +142,8 @@ describe("<ConnectGitHub />", () => {
     vi.mocked(api.fetchGithubProfile).mockResolvedValue({ status: "connected", profile });
     renderAt();
     expect(await screen.findByTestId("what-we-keep")).toHaveTextContent(/encrypted access token until you disconnect.*24 hours.*7 days/i);
+    // MPC-10825: the row says "until you disconnect", not the declared 30 days.
+    expect(screen.getByTestId("kept-until")).toHaveTextContent(/until you disconnect/i);
+    expect(document.body.textContent).not.toMatch(/30 days|not enforced|Declared validity/);
   });
 });

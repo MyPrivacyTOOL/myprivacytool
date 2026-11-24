@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { Github, ShieldCheck, Unplug } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
+  GITHUB_REMOVE_URL,
   GITHUB_START_URL,
   disconnectGithub,
   fetchGithubProfile,
@@ -25,6 +26,8 @@ export default function ConnectGitHub() {
   const [disconnectFailed, setDisconnectFailed] = useState(false);
   const [params] = useSearchParams();
   const callbackError = friendlyChannelError(params.get("channel_error"));
+  // MPC-10825: the Worker sends the person back with ?channel_removed=1 after a sign-in that only removed the stored connection.
+  const removed = params.get("channel_removed") === "1" && (state.kind === "session_ended" || state.kind === "disconnected");
 
   useEffect(() => {
     let alive = true;
@@ -68,11 +71,27 @@ export default function ConnectGitHub() {
         </p>
       )}
 
-      {state.kind === "session_ended" && (
-        <p role="status" className="mb-4 text-sm text-foreground" data-testid="session-ended">
-          Your browser session ended (it lasts 7 days). If you connected GitHub before, we still hold that connection until you disconnect it.
-          Connect again to see it or to remove it.
+      {removed && (
+        <p role="status" className="mb-4 text-sm text-foreground" data-testid="removed">
+          Your stored GitHub connection was removed. We deleted the access token and our copy of the snapshot, and revoked our access at GitHub.
         </p>
+      )}
+
+      {state.kind === "session_ended" && !removed && (
+        <div className="mb-4 text-sm text-foreground" data-testid="session-ended">
+          <p role="status">
+            Your browser session ended (it lasts 7 days). If you connected GitHub before, we still hold that connection until you disconnect it.
+            You can connect again to see it, or remove it now without connecting.
+          </p>
+          <p className="mt-2">
+            <a className="underline" href={GITHUB_REMOVE_URL} data-testid="remove-stored">
+              Remove the stored connection
+            </a>{" "}
+            <span className="text-muted-foreground">
+              (you sign in with GitHub once more to prove it is your account; we delete the token and our copy, revoke our access at GitHub, and keep nothing from that sign-in)
+            </span>
+          </p>
+        </div>
       )}
 
       {state.kind === "reauthorize" && (
@@ -81,7 +100,7 @@ export default function ConnectGitHub() {
         </p>
       )}
 
-      {state.kind === "disconnected" && (
+      {state.kind === "disconnected" && !removed && (
         <p role="status" className="mb-4 text-sm text-foreground" data-testid="not-connected">
           No GitHub account is connected.
         </p>
@@ -115,7 +134,9 @@ export default function ConnectGitHub() {
             ) : null}
             {state.profile.data_coverage?.interests === "no_stars" ? <Row label="Interests note">You have not starred anything.</Row> : null}
             {state.profile.data_coverage?.interests === "stars_without_topics" ? <Row label="Interests note">The repos you starred have no topics.</Row> : null}
-            <Row label="Declared validity">{state.profile.privacy_boundaries.data_retention_days} days (not enforced)</Row>
+            <Row label="How long we keep it">
+              <span data-testid="kept-until">Until you disconnect. The copy of this snapshot we hold is refreshed every 24 hours.</span>
+            </Row>
             <Row label="Checksum (not a signature)">
               <code className="break-all text-xs">{state.profile.cryptographic_receipt}</code>
             </Row>

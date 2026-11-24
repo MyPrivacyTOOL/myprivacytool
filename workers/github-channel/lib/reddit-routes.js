@@ -2,6 +2,7 @@
  * Reddit channel routes (MPC-116), served by the same Worker as the GitHub channel:
  *   GET    /oauth/reddit/start       redirect to Reddit consent (scopes identity read history, duration=permanent)
  *   GET    /oauth/reddit/callback    verify state, exchange code, store AES-256-GCM encrypted tokens (provider='reddit')
+ *   GET    /oauth/reddit/remove      MPC-10825: same sign-in, but the callback only removes the stored connection (no session needed)
  *   GET    /channels/reddit/behavior sanitized PaPIT v1 behavioral JSON (24h KV cache); needs the session cookie
  *   DELETE /channels/reddit          revoke: delete token row, revoke at Reddit, clear cache + session
  *
@@ -32,6 +33,7 @@ const creds = (env) => ({ clientId: env.REDDIT_CLIENT_ID, clientSecret: env.REDD
 export async function handleReddit(request, url, env, { cors = {}, fetchFn = undefined, now = () => Date.now(), limiter } = {}) {
   const { pathname } = url;
   const known = (pathname === '/oauth/reddit/start' && request.method === 'GET')
+    || (pathname === '/oauth/reddit/remove' && request.method === 'GET')
     || (pathname === '/oauth/reddit/callback' && request.method === 'GET')
     || (pathname === '/channels/reddit/behavior' && request.method === 'GET')
     || (pathname === '/channels/reddit' && request.method === 'DELETE');
@@ -39,14 +41,16 @@ export async function handleReddit(request, url, env, { cors = {}, fetchFn = und
   if (!redditConfigured(env)) return json({ error: 'reddit_not_configured' }, 503, cors);
 
   if (pathname === '/oauth/reddit/start') return start(env, now);
+  if (pathname === '/oauth/reddit/remove') return start(env, now, 'remove');
   if (pathname === '/oauth/reddit/callback') return callback(request, url, env, fetchFn, now, limiter);
   if (pathname === '/channels/reddit/behavior') return behavior(request, env, cors, fetchFn, now, limiter);
   return revoke(request, env, cors, fetchFn, now);
 }
 
-async function start(env, now) {
+async function start(env, now, mode = 'connect') {
   const state = randomString(16);
-  const cookie = await sign({ state, exp: now() + STATE_TTL_MS }, env.STATE_SIGNING_KEY);
+  // `mode` rides in the signed state cookie, so the callback cannot be switched to remove (or back) from the URL.
+  const cookie = await sign({ state, mode, exp: now() + STATE_TTL_MS }, env.STATE_SIGNING_KEY);
   const location = buildRedditAuthUrl({ clientId: env.REDDIT_CLIENT_ID, redirectUri: env.REDDIT_REDIRECT_URI, state });
   return new Response(null, {
     status: 302,
@@ -84,6 +88,7 @@ async function callback(request, url, env, fetchFn, now, limiter) {
     stage = 'reddit_user';
     const adapter = new RedditAdapter({ token: accessToken, userAgent: userAgent(env), fetchFn, limiter });
     const me = await adapter.get('/api/v1/me'); // only .id is kept
+    if (saved.mode === 'remove') { stage = 'remove'; return await removeStored(env, me.id, refreshToken, accessToken, clear, fetchFn); }
     stage = 'store';
     await saveToken(env, {
       provider: PROVIDER, subjectId: me.id, accessToken, refreshToken, scope: tokens.scope, expiresIn: tokens.expires_in,
@@ -108,6 +113,36 @@ async function callback(request, url, env, fetchFn, now, limiter) {
     }
     return fail('connect_failed', 502, stage, String(e?.message || 'error').slice(0, 120));
   }
+}
+
+/** MPC-10825: remove a stored connection without a live session, after a fresh sign-in proves the account. Nothing from that sign-in is stored. */
+async function removeStored(env, subjectId, freshRefresh, freshAccess, clear, fetchFn) {
+  let stored = null;
+  try { stored = await loadTokens(env, subjectId, fetchFn, PROVIDER); } catch { /* still delete below */ }
+  await deleteToken(env, subjectId, fetchFn, PROVIDER);
+  await deleteCached(env.PROFILE_CACHE, subjectId, PROVIDER);
+  // Reddit revokes per token: revoke the one this sign-in just created, and the one we held.
+  const toRevoke = [
+    freshRefresh ? { token: freshRefresh, hint: 'refresh_token' } : freshAccess ? { token: freshAccess, hint: 'access_token' } : null,
+    stored?.refreshToken ? { token: stored.refreshToken, hint: 'refresh_token' } : stored?.accessToken ? { token: stored.accessToken, hint: 'access_token' } : null,
+  ].filter(Boolean);
+  let revokedAtReddit = toRevoke.length > 0;
+  for (const t of toRevoke) {
+    const ok = await revokeRedditToken({ ...t, ...creds(env) }, fetchFn).catch(() => false);
+    revokedAtReddit = revokedAtReddit && ok;
+  }
+  log('reddit_removed_without_session', { revokedAtReddit, hadStored: !!stored });
+  const headers = new Headers();
+  headers.append('Set-Cookie', clear);
+  headers.append('Set-Cookie', setCookie(SESSION_COOKIE, '', 0, '/', 'None'));
+  if (env.REDDIT_SUCCESS_REDIRECT) {
+    const to = new URL(env.REDDIT_SUCCESS_REDIRECT);
+    to.searchParams.set('channel_removed', '1');
+    headers.set('Location', to.toString());
+    return new Response(null, { status: 302, headers });
+  }
+  headers.set('Content-Type', 'application/json');
+  return new Response(JSON.stringify({ ok: true, removed: true, revoked_at_reddit: revokedAtReddit }), { status: 200, headers });
 }
 
 async function sessionSubject(request, env, now) {

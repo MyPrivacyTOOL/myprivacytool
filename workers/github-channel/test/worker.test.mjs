@@ -295,3 +295,64 @@ test('401 with no refresh token stored: reauthorize without calling the refresh 
   assert.equal(seen.refreshBodies.length, 0);
   assert.equal(net.rows.size, 0);
 });
+
+// MPC-10825: remove a stored connection after the 7-day session has expired, by signing in again.
+const removeFlow = async (env, net) => {
+  const start = await handle(new Request('https://w.test/oauth/github/remove'), env, { now });
+  assert.equal(start.status, 302);
+  assert.equal(new URL(start.headers.get('Location')).origin, 'https://github.com');
+  const cookie = /mpt_gh_oauth=([^;]+)/.exec(start.headers.get('Set-Cookie'))[1];
+  const state = new URL(start.headers.get('Location')).searchParams.get('state');
+  return handle(new Request(`https://w.test/oauth/github/callback?code=c&state=${state}`, { headers: { Cookie: `mpt_gh_oauth=${cookie}` } }), env, { fetchFn: net.fetchFn, now });
+};
+
+test('remove without a session: fresh sign-in deletes the stored row and cache, revokes at GitHub, stores nothing, sets no session', async () => {
+  const env = baseEnv(); const net = fakeNetwork();
+  const { session } = await connect(env, net);
+  await handle(profileReq(session), env, { fetchFn: net.fetchFn, now }); // populate cache
+  assert.equal(net.rows.size, 1); assert.equal(env.PROFILE_CACHE._store.size, 1);
+  clock.t += 8 * 86_400_000; // the 7-day session is gone
+  try {
+    const res = await removeFlow(env, net);
+    assert.equal(res.status, 302);
+    const loc = new URL(res.headers.get('Location'));
+    assert.equal(loc.origin + loc.pathname, 'https://app.test/'); assert.equal(loc.searchParams.get('channel_removed'), '1');
+    assert.equal(net.rows.size, 0, 'stored token row deleted');
+    assert.equal(env.PROFILE_CACHE._store.size, 0, 'cached copy deleted');
+    assert.ok(net.log.revoked >= 1, 'grant revoked at GitHub');
+    const cookies = res.headers.getSetCookie().join('\n');
+    assert.match(cookies, /mpt_gh_session=;[^\n]*Max-Age=0/);
+    assert.ok(!/mpt_gh_session=[^;]+\./.test(cookies), 'no session cookie issued');
+  } finally { clock.t -= 8 * 86_400_000; }
+});
+
+test('remove with nothing stored: still ends cleanly and revokes the fresh sign-in', async () => {
+  const env = baseEnv(); const net = fakeNetwork();
+  const res = await removeFlow(env, net);
+  assert.equal(new URL(res.headers.get('Location')).searchParams.get('channel_removed'), '1');
+  assert.equal(net.rows.size, 0);
+  assert.equal(net.log.revoked, 1);
+});
+
+test('remove: the mode is signed into the state cookie, so a forged remove cookie is rejected before any exchange', async () => {
+  const env = baseEnv(); const net = fakeNetwork();
+  const { session } = await connect(env, net);
+  assert.ok(session);
+  // a normal connect still stores the row
+  assert.equal(net.rows.size, 1);
+  // a forged cookie with mode: 'remove' but a bad signature is rejected before any exchange
+  const forged = await sign({ state: 'x', verifier: 'v'.repeat(43), mode: 'remove', exp: clock.t + 60_000 }, 'wrong-key'.repeat(4));
+  const res = await handle(new Request('https://w.test/oauth/github/callback?code=c&state=x', { headers: { Cookie: `mpt_gh_oauth=${forged}` } }), env, { fetchFn: async () => { throw new Error('must not be called'); }, now });
+  assert.match(res.headers.get('Location'), /channel_error=invalid_state/);
+  assert.equal(net.rows.size, 1, 'nothing removed');
+});
+
+test('remove: logs carry no tokens or PII', async () => {
+  const env = baseEnv(); const net = fakeNetwork();
+  await connect(env, net);
+  const lines = []; const orig = console.log; console.log = (...a) => lines.push(a.join(' '));
+  try { await removeFlow(env, net); } finally { console.log = orig; }
+  const all = lines.join('\n');
+  assert.ok(lines.some((l) => l.includes('removed_without_session')));
+  for (const s of [ACCESS_TOKEN, REFRESH_TOKEN, 'octo', 'Real Name', 'p@example.com', 'csec', '4242']) assert.ok(!all.includes(s), s);
+});

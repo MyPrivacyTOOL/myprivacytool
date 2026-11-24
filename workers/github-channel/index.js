@@ -4,6 +4,7 @@
  * Routes
  *   GET    /oauth/github/start       redirect to GitHub consent (auth code + PKCE S256 + signed state cookie)
  *   GET    /oauth/github/callback    verify state, exchange code, store AES-256-GCM encrypted token, set session
+ *   GET    /oauth/github/remove      MPC-10825: same sign-in, but the callback only removes the stored connection (no session needed)
  *   GET    /channels/github/profile  sanitized PaPIT v1 JSON (24h KV cache); needs the session cookie
  *   DELETE /channels/github          revoke: delete token row, revoke grant at GitHub, clear cache + session
  *   GET    /health
@@ -36,6 +37,7 @@ export async function handle(request, env, deps = {}) {
     return handleReddit(request, url, env, { cors, fetchFn, now, limiter: deps.limiter });
   }
   if (url.pathname === '/oauth/github/start' && request.method === 'GET') return start(env, now);
+  if (url.pathname === '/oauth/github/remove' && request.method === 'GET') return start(env, now, 'remove');
   if (url.pathname === '/oauth/github/callback' && request.method === 'GET') return callback(request, url, env, fetchFn, now);
   if (url.pathname === '/channels/github/profile' && request.method === 'GET') return profile(request, env, cors, fetchFn, now);
   if (url.pathname === '/channels/github' && request.method === 'DELETE') return revoke(request, env, cors, fetchFn, now);
@@ -44,10 +46,11 @@ export async function handle(request, env, deps = {}) {
 
 export default { fetch: (request, env) => handle(request, env) };
 
-async function start(env, now) {
+async function start(env, now, mode = 'connect') {
   const state = randomString(16);
   const verifier = randomString(48);
-  const cookie = await sign({ state, verifier, exp: now() + STATE_TTL_MS }, env.STATE_SIGNING_KEY);
+  // `mode` rides in the signed state cookie, so the callback cannot be switched to remove (or back) from the URL.
+  const cookie = await sign({ state, verifier, mode, exp: now() + STATE_TTL_MS }, env.STATE_SIGNING_KEY);
   const location = await buildAuthUrl({ clientId: env.GITHUB_CLIENT_ID, redirectUri: env.REDIRECT_URI, state, verifier });
   return new Response(null, {
     status: 302,
@@ -88,6 +91,7 @@ async function callback(request, url, env, fetchFn, now) {
     stage = 'github_user';
     const adapter = new GitHubAdapter({ token: accessToken, fetchFn });
     const me = await adapter.get('/user'); // only .id is kept
+    if (saved.mode === 'remove') { stage = 'remove'; return await removeStored(env, me.id, accessToken, clear, fetchFn); }
     stage = 'store';
     await saveToken(env, {
       subjectId: me.id, accessToken, refreshToken: tokens.refresh_token, scope: tokens.scope, expiresIn: tokens.expires_in,
@@ -111,6 +115,37 @@ async function callback(request, url, env, fetchFn, now) {
     }
     return fail('connect_failed', 502, stage, String(e?.message || 'error').slice(0, 120));
   }
+}
+
+/**
+ * MPC-10825: remove a stored connection without a live session. The person proves it is their GitHub account by
+ * signing in again; nothing from that sign-in is stored. We delete the stored token row and the 24-hour copy, revoke
+ * the grant at GitHub (GitHub revokes every token of this app for that person, including the one we held), and clear
+ * any session cookie.
+ */
+async function removeStored(env, subjectId, freshToken, clear, fetchFn) {
+  let stored = null;
+  try { stored = await loadAccessToken(env, subjectId, fetchFn); } catch { /* still delete below */ }
+  await deleteToken(env, subjectId, fetchFn);
+  await deleteCached(env.PROFILE_CACHE, subjectId);
+  let revokedAtGithub = false;
+  for (const token of [freshToken, stored]) {
+    if (!token) continue;
+    const ok = await revokeGrant({ accessToken: token, clientId: env.GITHUB_CLIENT_ID, clientSecret: env.GITHUB_CLIENT_SECRET }, fetchFn).catch(() => false);
+    revokedAtGithub = revokedAtGithub || ok;
+  }
+  log('removed_without_session', { revokedAtGithub, hadStored: !!stored });
+  const headers = new Headers();
+  headers.append('Set-Cookie', clear);
+  headers.append('Set-Cookie', setCookie(SESSION_COOKIE, '', 0, '/', 'None'));
+  if (env.SUCCESS_REDIRECT) {
+    const to = new URL(env.SUCCESS_REDIRECT);
+    to.searchParams.set('channel_removed', '1');
+    headers.set('Location', to.toString());
+    return new Response(null, { status: 302, headers });
+  }
+  headers.set('Content-Type', 'application/json');
+  return new Response(JSON.stringify({ ok: true, removed: true, revoked_at_github: revokedAtGithub }), { status: 200, headers });
 }
 
 async function session(request, env, now) {

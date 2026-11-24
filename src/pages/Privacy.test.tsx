@@ -54,6 +54,14 @@ describe("Privacy: saved scan", () => {
     expect(text).toContain("We do not currently check whether your email address appears in data breaches");
   });
 
+  // MPC-10825: a stored GitHub connection can be removed after the 7-day session has ended, and Privacy 6B says how.
+  it("6B says a stored GitHub connection can be removed without a live session", () => {
+    renderPage(<Privacy />);
+    const text = flat(document.body.textContent ?? "");
+    expect(text).toContain("If your 7-day GitHub session has ended, you can still remove the stored connection from the Connect GitHub page");
+    expect(text).toContain("we keep nothing from that sign-in");
+  });
+
   // MPC-9776: the optional password check sends 5 hash characters to Have I Been Pwned from the visitor's browser; that must be named here.
   it("names Have I Been Pwned for the password check and says what is sent", () => {
     renderPage(<Privacy />);

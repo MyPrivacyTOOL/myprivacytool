@@ -251,3 +251,34 @@ test('connect failure at the store step revokes the freshly issued Reddit token 
   assert.equal(loc.searchParams.get('channel_error'), 'connect_failed'); assert.equal(loc.searchParams.get('stage'), 'store');
   assert.equal(net.seen.revokeCalls.length, 1);
 });
+
+// MPC-10825: remove a stored connection after the 7-day session has expired, by signing in again.
+test('remove without a session: fresh sign-in deletes the stored row and cache, revokes both tokens at Reddit, stores nothing', async () => {
+  const env = baseEnv(); const net = fakeNetwork();
+  const { session } = await connect(env, net);
+  net.state.validToken = ACCESS;
+  await get(env, net, behaviorReq(session)); // populate cache
+  assert.equal(net.rows.size, 1); assert.equal(env.PROFILE_CACHE._store.size, 1);
+  net.seen.revokeCalls.length = 0;
+
+  const start = await handle(new Request('https://w.test/oauth/reddit/remove'), env, { now });
+  assert.equal(start.status, 302);
+  assert.equal(new URL(start.headers.get('Location')).origin, 'https://www.reddit.com');
+  const cookie = /mpt_rd_oauth=([^;]+)/.exec(start.headers.get('Set-Cookie'))[1];
+  const state = new URL(start.headers.get('Location')).searchParams.get('state');
+  const res = await get(env, net, new Request(`https://w.test/oauth/reddit/callback?code=c&state=${state}`, { headers: { Cookie: `mpt_rd_oauth=${cookie}` } }));
+
+  assert.equal(res.status, 302);
+  const loc = new URL(res.headers.get('Location'));
+  assert.equal(loc.origin + loc.pathname, 'https://app.test/connect/reddit'); assert.equal(loc.searchParams.get('channel_removed'), '1');
+  assert.equal(net.rows.size, 0, 'stored row deleted'); assert.equal(env.PROFILE_CACHE._store.size, 0, 'cache deleted');
+  assert.equal(net.seen.revokeCalls.length, 2, 'the fresh token and the stored token are both revoked');
+  const cookies = res.headers.getSetCookie().join('\n');
+  assert.match(cookies, /mpt_rd_session=;[^\n]*Max-Age=0/);
+});
+
+test('remove: unconfigured Reddit still answers 503 on the remove route', async () => {
+  const env = baseEnv(); delete env.REDDIT_CLIENT_ID;
+  const res = await handle(new Request('https://w.test/oauth/reddit/remove'), env, { now });
+  assert.equal(res.status, 503);
+});
