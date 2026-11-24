@@ -98,12 +98,21 @@ const Privacy = () => {
                 2.0 What Stays in Your Browser
               </h3>
               <p className="text-muted-foreground">
-                The free scan on our homepage detects device, browser and network
-                characteristics directly in your browser, and shows them to you
-                there. The finished result stays in your browser. It is not sent
-                to us unless you ask for your report and choose to save it (see
-                section 2.4). If you leave without giving us an email address,
-                nothing from the scan is saved. The other information described
+                The free scan on our homepage reads device, browser and network
+                characteristics in your browser and shows them to you there. Two
+                parts of it use a server. Your IP address and approximate
+                location come from a lookup on our own servers, which stores
+                nothing. When you press Scan me, your browser sends us a record
+                of your agreement (a random scan ID, the version of the wording
+                and a hash of the text you saw), and the network leak check asks an
+                outside service for the public address your connection shows (the
+                services are named in section 5). The finished result stays in
+                your browser. It is not sent to us unless you ask for your report
+                and choose to save it (see section 2.4). If you give us details to
+                look up, such as an email address, they go to our servers to run
+                the lookups (see section 2.1). If you leave without giving us an
+                email address, we keep no copy of your scan result, only the
+                record that you pressed Scan me. The other information described
                 below is stored only when you take an action that submits it (for
                 example, entering your email address, messaging our bot, or
                 requesting a scan of a social handle).
@@ -330,14 +339,14 @@ const Privacy = () => {
               </h3>
               <p className="text-muted-foreground">
                 The free scan runs in your browser and shows you the results
-                there. We do not save it unless you ask for your report. When you
-                enter your email address and tick the box to save your scan
+                there. We do not save the result unless you ask for your report.
+                When you enter your email address and tick the box to save your scan
                 result, we save the full result, meaning the technical details
                 your browser reported such as IP address, device, browser,
                 language, screen and fingerprint-style values, together with your
                 email address, for 12 months, so your report can show it. If you
-                leave without giving an email address, nothing from the scan is
-                saved. We only count, without personal data, how many visitors
+                leave without giving an email address, we do not save the result
+                (see section 2.0 for what pressing Scan me sends). We only count, without personal data, how many visitors
                 finish a scan and how many ask for a report, through our analytics
                 if you accepted analytics cookies.
               </p>
