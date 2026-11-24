@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import DeviceReveal from '@/components/DeviceReveal';
 import UnknownDeviceHero from '@/components/UnknownDeviceHero';
 import type { DeviceIdentity } from '@/lib/deviceIdentity';
+import { PRODUCT_SENTENCE } from '@/lib/productSentence';
 
 interface DeviceRevealScreenProps {
   /** null while the signals are still being read: the screen is up, the content follows. */
@@ -59,8 +60,14 @@ export default function DeviceRevealScreen({
       aria-modal="true"
       aria-label="Your device"
       data-testid="device-reveal-screen"
-      className="fixed inset-0 z-[100] flex flex-col items-center justify-center gap-6 overflow-y-auto bg-background px-6 pb-40 pt-10 text-center"
+      className="fixed inset-0 z-[100] flex flex-col items-center justify-start gap-6 overflow-y-auto bg-background px-6 pb-40 pt-10 text-center"
     >
+      {/* MPC-10835: this screen covers the home headline on a first visit, so it carries the product sentence itself, from the first paint. It sits first, so the
+          first-visit cookie banner at the bottom of the screen cannot hide it. */}
+      <p className="mt-auto max-w-xl text-base font-semibold text-foreground sm:text-lg" data-testid="reveal-product-sentence">
+        {PRODUCT_SENTENCE}
+      </p>
+
       {identity?.certain && (
         <DeviceReveal
           identity={identity}
@@ -79,6 +86,8 @@ export default function DeviceRevealScreen({
           {unknown ? 'See what we can see' : 'See everything we found'}
         </Button>
       )}
+      {/* Auto margins above and below centre the content when it fits and start it at the top when it does not, so nothing is pushed off the top. */}
+      <div aria-hidden="true" className="mb-auto" />
     </div>
   );
 }

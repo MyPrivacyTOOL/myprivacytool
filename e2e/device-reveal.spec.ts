@@ -14,6 +14,12 @@ test("the reveal covers the whole screen, then one button hands over to the page
   expect(box?.height).toBe(viewport?.height);
   await expect.poll(() => page.evaluate(() => document.body.style.overflow)).toBe("hidden");
 
+  // MPC-10835: the reveal covers the home headline, so it says what the product is itself.
+  await expect(dialog.getByTestId("reveal-product-sentence")).toHaveText(
+    "MyPrivacyTOOL shows you what any website can learn about you from your browser and device, and what you can do about it.",
+  );
+  await expect(dialog.getByTestId("reveal-product-sentence")).toBeInViewport();
+
   // A device we can be certain about, or the honest unknown path: either way there is one way forward.
   const next = dialog.getByRole("button", { name: /see everything we found|see what we can see/i });
   await expect(next).toBeVisible({ timeout: 10_000 });
