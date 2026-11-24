@@ -1,0 +1,56 @@
+# OpenOSINT MCP Server Dependencies
+# Wave 0 exposure scanning integration
+# 
+# OpenOSINT v2.38.2 — 21-tool OSINT framework
+# MCP protocol for Claude integration
+# Anthropic SDK for model interaction
+
+# Core
+openosint>=2.38.2  # MIT license, Python 3.8+
+mcp>=1.0.0        # MCP protocol implementation
+anthropic>=0.40.0 # Anthropic API client
+
+# Web & HTTP
+httpx>=0.25.0     # Async HTTP client
+aiohttp>=3.9.0    # Async HTTP requests
+requests>=2.31.0  # Fallback HTTP client
+beautifulsoup4>=4.12.0  # HTML parsing
+
+# Data & Serialization
+pydantic>=2.0.0   # Data validation
+pydantic-settings>=2.0.0  # Environment configuration
+python-dotenv>=1.0.0  # .env file support
+
+# Async & Concurrency
+asyncio-contextmanager>=1.0.0  # Async context utilities
+aiofiles>=23.1.0  # Async file I/O
+
+# Caching & Storage
+redis>=5.0.0      # Redis client for result caching
+databases>=0.8.0  # Async database support
+sqlalchemy>=2.0.0  # ORM for PostgreSQL
+
+# API Keys & Secrets
+cryptography>=41.0.0  # For secure credential storage
+python-multipart>=0.0.6  # Multipart form parsing
+
+# OSINT-specific tools
+shodan>=1.28.0    # Shodan API client (requires SHODAN_API_KEY)
+geoip2>=4.7.0     # GeoIP2 database lookups
+dnspython>=2.4.0  # DNS lookups
+whois>=0.9.0      # WHOIS lookups
+# Note: Additional OSINT tools installed as part of openosint package
+
+# Logging & Monitoring
+python-json-logger>=2.0.0  # JSON structured logging
+colorlog>=6.7.0   # Colored terminal output
+
+# Testing (dev)
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+pytest-cov>=4.1.0
+httpx[http2]>=0.25.0  # HTTP/2 support for testing
+
+# Security scanning (optional, for CI/CD)
+bandit>=1.7.5
+safety>=2.3.0
