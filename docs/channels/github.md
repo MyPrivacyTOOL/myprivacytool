@@ -37,7 +37,8 @@ SPA                      Worker (github-channel)                  GitHub        
 | `GET /oauth/github/start` | Redirect to GitHub. Scope `read:user`, PKCE S256. |
 | `GET /oauth/github/callback` | On success 302 to `SUCCESS_REDIRECT`; on failure 302 with `?channel_error=<code>` (`access_denied`, `invalid_state`, `missing_code`, `connect_failed`). If the token cannot be stored it is revoked at GitHub. |
 | `GET /channels/github/profile` | `200` PaPIT JSON, header `X-Cache: HIT|MISS`. `401 unauthenticated` (no session), `401 reauthorize` (token revoked at GitHub; our copy is deleted), `404 not_connected`, `502 upstream_error`. |
-| `DELETE /channels/github` | User revoke: deletes the token row first, clears the cache, then revokes the grant at GitHub. |
+| `DELETE /channels/github` | User revoke: deletes the token row first, clears the cache, then revokes the grant at GitHub. Needs the session cookie. |
+| `GET /oauth/github/remove` | MPC-10825: revoke **without a session**. Same GitHub sign-in as `/start`, with `intent: "remove"` in the HMAC-signed state cookie (never in the URL). The callback verifies state, exchanges the code, reads only `/user` `id`, then deletes that account's row and cache and revokes the grant (`DELETE /applications/{client_id}/grant` ends every token of this app for the user, including the one just issued). It stores nothing, issues no session and clears `mpt_gh_session`. Success: 302 to `SUCCESS_REDIRECT?channel_removed=github&revoked=1\|0`. Failure: `?channel_error=remove_access_denied\|invalid_state\|missing_code\|remove_failed`; on `remove_failed` the row is kept and the page says nothing was removed. |
 | `GET /health` | `{status:"ok"}` |
 
 The session cookie is `HttpOnly; Secure; SameSite=None` so the SPA (different origin) can call the Worker with
@@ -62,7 +63,10 @@ The session cookie is `HttpOnly; Secure; SameSite=None` so the SPA (different or
 The button is a plain link to the Worker's `/oauth/github/start`; after the GitHub round trip the Worker redirects back to
 `SUCCESS_REDIRECT` (`https://www.myprivacytool.io/?channel=github`). The page then reads `GET /channels/github/profile` with
 `credentials: "include"`, shows the sanitized profile, and offers **Disconnect** (`DELETE /channels/github`). `?channel_error=`
-codes are mapped to friendly copy and the raw code is never shown.
+codes are mapped to friendly copy and the raw code is never shown. When the 7-day session has ended (`401 unauthenticated`) the page offers
+**Remove my stored connection**, a plain link to `/oauth/github/remove` (MPC-10825); on return it reads `?channel_removed=github&revoked=` and says what was removed.
+The Connect page's snapshot row reads "Connection kept: Until you disconnect" (MPC-10825). The `data_retention_days: 30` field stays in the PaPIT JSON as a declared
+snapshot validity (see [MPC-10833](../papit-limits-mpc-9794.md)); person-facing pages no longer present it as how long we keep the connection.
 
 - **Unlisted on purpose:** `noindex`, not in the sitemap or nav. Link to it when the channel is ready to launch.
 - After login the Worker redirects to `SUCCESS_REDIRECT` (`https://www.myprivacytool.io/connect/github`).
