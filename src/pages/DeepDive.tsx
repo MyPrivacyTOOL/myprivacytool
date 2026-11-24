@@ -8,6 +8,7 @@ import { canConfirm, canDispute } from "@/lib/identityConfirmation";
 import { findingHexagonData, findingTile, honeycomb } from "@/lib/deepDiveTiles";
 import { Button } from "@/components/ui/button";
 import { useHexagonState } from "@/hooks/useHexagonState";
+import { afterUserAction } from "@/lib/recipientClient";
 import { fetchDeepDiveScan, fetchFinalScore, finalizeDeepDive, isDeepDiveApiConfigured, type FinalScore } from "@/lib/hexagonInteractionApi";
 import type { Hexagon as Finding } from "@/types/hexagon";
 
@@ -113,7 +114,8 @@ export default function DeepDive() {
   useEffect(() => {
     if (!scanId || !isDeepDiveApiConfigured()) return;
     let live = true;
-    void fetchDeepDiveScan(scanId).then((r) => {
+    // MPC-10790: deep-dive-api is a user_action recipient, so the read waits for the first real action on the page (at once if there already was one).
+    void afterUserAction().then(() => fetchDeepDiveScan(scanId)).then((r) => {
       if (live) setState(r ? { status: "ready", hexagons: r.hexagons, finalized: r.finalized } : { status: "failed", why: "expired" });
     });
     return () => { live = false; };
