@@ -610,8 +610,14 @@ describe("GA4 dm_received (MPC-11111)", () => {
       const sent = ga4Calls();
       expect(sent).toHaveLength(1);
       const wire = String(sent[0].init?.body);
-      expect(JSON.parse(wire).events).toEqual([{ name: "dm_received", params: { channel: "telegram" } }]);
-      expect(wire).not.toContain("42");              // the sender id
+      const body = JSON.parse(wire);
+      expect(body.events).toEqual([{ name: "dm_received", params: { channel: "telegram" } }]);
+      // The only other field is client_id: 32 random hex chars, so it can contain "42" by chance. Check the fields instead of a substring
+      // of the whole body (the old check failed about 1 run in 9).
+      expect(Object.keys(body).sort()).toEqual(["client_id", "events"]);
+      expect(body.client_id).toMatch(/^[0-9a-f]{32}$/);
+      expect(body.client_id).not.toBe("42");
+      expect(JSON.stringify(body.events)).not.toContain("42"); // the sender id
       expect(wire).not.toContain("secret question"); // the text
       expect(wire).not.toContain("jane@");
     } finally { restore(); }
