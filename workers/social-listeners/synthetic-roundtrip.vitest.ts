@@ -45,7 +45,14 @@ describe("POST /synthetic/telegram-roundtrip", () => {
     expect(sent).toHaveLength(1);
     expect((sent[0] as { chat_id: number }).chat_id).toBe(555);
     expect(rows.every((r) => r.sender_id === "555")).toBe(true);
-    expect(text).not.toContain("555");
-    expect(text).not.toContain("666");
+    // The body holds a random update_id and timestamps, which can contain "555" or "666" by chance (it turned #859 red), so a substring
+    // check on the whole body is flaky. Check the fields instead: the exact set of keys, and that no field that could carry an id does.
+    expect(Object.keys(body).sort()).toEqual(["brain_at", "budget_ms", "in_at", "ms", "out_at", "pass", "problems", "reply_text_start", "sent_at", "update_id"]);
+    expect(typeof body.update_id).toBe("number");
+    expect([555, 666]).not.toContain(body.update_id);
+    for (const key of ["problems", "reply_text_start"]) {
+      expect(JSON.stringify(body[key])).not.toContain("555");
+      expect(JSON.stringify(body[key])).not.toContain("666");
+    }
   });
 });
