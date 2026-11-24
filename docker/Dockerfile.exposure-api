@@ -1,0 +1,10 @@
+# Exposure scan API (FastAPI) for the OpenOSINT POC, MPC-11203. Used by docker-compose.yml.
+# Build context is the repo root: docker build -f docker/Dockerfile.exposure-api .
+FROM python:3.11-slim
+WORKDIR /app
+RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
+RUN pip install --no-cache-dir "mcp>=2.3.0" "fastapi>=0.104" "uvicorn>=0.24" "pydantic>=2" email-validator
+COPY shadow-audit-api/app /app/app
+ENV PORT=8001
+EXPOSE 8001
+CMD ["uvicorn", "app.exposure_app:app", "--host", "0.0.0.0", "--port", "8001"]

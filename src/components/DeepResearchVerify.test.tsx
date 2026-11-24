@@ -2,7 +2,16 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import DeepResearchVerify from "./DeepResearchVerify";
 
-vi.mock("@/components/TurnstileBox", () => ({ default: () => <div data-testid="turnstile-stub" /> }));
+// The stub shows the `armed` prop and has a button that plays Cloudflare handing back a token.
+vi.mock("@/components/TurnstileBox", () => ({
+  default: ({ armed, onToken }: { armed?: boolean; onToken: (t: string) => void }) => (
+    <div data-testid="turnstile-stub" data-armed={String(!!armed)}><button type="button" onClick={() => onToken("cf-tok")}>give token</button></div>
+  ),
+}));
+vi.mock("@/lib/turnstile", () => ({ SCAN_TURNSTILE_SITE_KEY: "site-key", loadTurnstile: vi.fn(() => Promise.resolve(undefined)) }));
+import { loadTurnstile } from "@/lib/turnstile";
+import { __resetScanConsentForTests } from "@/lib/scanConsent";
+import { CONSENT_CONFIG } from "../../shared/recipients/consent-config";
 vi.mock("@/lib/deepResearchApi", () => ({
   deepResearchEnabled: vi.fn(),
   startCheck: vi.fn(),
@@ -25,6 +34,7 @@ const typeCode = (c = "123456") => {
 describe("DeepResearchVerify", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    __resetScanConsentForTests();
     vi.mocked(deepResearchEnabled).mockReturnValue(true);
     vi.mocked(startCheck).mockResolvedValue({ ok: true, data: { challenge_id: "cid-1" } });
     vi.mocked(verifyCode).mockResolvedValue({ ok: true, data: { token: "tok", expires_in: 3600 } });
@@ -109,5 +119,27 @@ describe("DeepResearchVerify", () => {
     await waitFor(() => expect(screen.getByLabelText("Your email address")).toBeTruthy());
     expect(deleteMyData).toHaveBeenCalledWith("tok");
     expect(screen.getByRole("status").textContent).toMatch(/deleted/i);
+  });
+
+  // MPC-10790: Cloudflare's script is not requested when the page opens.
+  it("does not load Turnstile on mount, and arms it only at the 'Email me a code' click", async () => {
+    vi.mocked(loadTurnstile).mockResolvedValue({ render: vi.fn(), reset: vi.fn(), remove: vi.fn() });
+    render(<DeepResearchVerify />);
+    expect(loadTurnstile).not.toHaveBeenCalled();
+    expect(screen.getByTestId("turnstile-stub").getAttribute("data-armed")).toBe("false");
+    typeEmail();
+    await waitFor(() => expect(screen.getByTestId("turnstile-stub").getAttribute("data-armed")).toBe("true"));
+    expect(loadTurnstile).toHaveBeenCalledTimes(1);
+    // the code request waits for the token, then goes out by itself
+    expect(startCheck).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "give token" }));
+    await waitFor(() => expect(startCheck).toHaveBeenCalledWith("owner@example.com", "cf-tok"));
+  });
+
+  it("is armed from the start when this journey already pressed Scan me", () => {
+    __resetScanConsentForTests();
+    window.sessionStorage.setItem("mpt_scan_consent", JSON.stringify({ scanId: "11111111-1111-4111-8111-111111111111", consentId: "22222222-2222-4222-8222-222222222222", version: CONSENT_CONFIG.consent_version, at: "2026-11-24T00:00:00Z" }));
+    render(<DeepResearchVerify />);
+    expect(screen.getByTestId("turnstile-stub").getAttribute("data-armed")).toBe("true");
   });
 });

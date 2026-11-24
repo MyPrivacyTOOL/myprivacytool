@@ -1,3 +1,4 @@
+import { STORAGE_NOTE } from "@/data/trustCopy";
 import { useEffect, useState, useRef, useMemo } from 'react';
 import FeatureStatus from "@/components/FeatureStatus";
 import { hexTileV2Enabled } from '@/config/hexagonTile';
@@ -461,8 +462,7 @@ const Index = () => {
             </div>
 
             <p className="text-xs text-muted-foreground mt-4 max-w-md mx-auto">
-              The scan runs in your browser. We save a scan only if you tick &ldquo;save my scan&rdquo;; we then keep it for 12 months, and you can have it deleted at any time by quoting your scan number. We only store what you choose to submit, such as your email
-              address, and we use analytics only with your consent.{" "}
+              {STORAGE_NOTE}{" "}
               <a href="/privacy" className="underline hover:text-foreground">
                 Privacy Policy
               </a>

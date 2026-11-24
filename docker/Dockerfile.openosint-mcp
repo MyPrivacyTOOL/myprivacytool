@@ -33,7 +33,7 @@ RUN pip install --no-cache-dir \
     -r requirements.txt \
     -r requirements-openosint.txt \
     openosint>=2.38.2 \
-    mcp>=1.0.0 \
+    "mcp>=2.3.0" \
     anthropic>=0.40.0 \
     uvicorn>=0.24.0 \
     fastapi>=0.104.0
