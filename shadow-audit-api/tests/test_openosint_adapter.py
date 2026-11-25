@@ -14,7 +14,7 @@ import unittest
 from pathlib import Path
 
 from app.openosint_mcp_adapter import (
-    ERROR_API_KEY, ERROR_OTHER, ERROR_POLICY, ERROR_RATE_LIMIT, ERROR_TIMEOUT,
+    ERROR_API_KEY, ERROR_NOT_FOUND, ERROR_OTHER, ERROR_POLICY, ERROR_RATE_LIMIT, ERROR_TIMEOUT,
     NON_PASSIVE_TOOLS, PASSIVE_TOOLS, PLANS, TOOLS, MCPToolClient, OpenOSINTAdapter,
     ProvenanceRecord, ToolError, ToolPolicy, classify_error_text,
 )
@@ -80,6 +80,23 @@ class RealOutputTests(unittest.TestCase):
                              ("search_dns", "dns resolver", "dns_records"))
             self.assertTrue(r.timestamp.endswith("Z"))
             self.assertFalse(r.is_active)
+
+    def test_nxdomain_is_an_error_not_a_finding(self):
+        with self.assertRaises(ToolError) as cm:
+            parse("dns_nxdomain", "search_dns")
+        self.assertEqual(cm.exception.kind, ERROR_NOT_FOUND)
+
+    def test_nxdomain_scan_reports_error_and_no_finding(self):
+        c = FakeClient({"search_dns": lambda a: json.loads(SAMPLES["dns_nxdomain"]["text"]),
+                        "search_rdap": lambda a: out("[+] Registrar: X")})
+        r = run(OpenOSINTAdapter(client=c).scan_domain("gone.example", "s1"))
+        self.assertIn({"tool": "search_dns", "kind": ERROR_NOT_FOUND}, r.tool_errors)
+        self.assertEqual([f.tool_name for f in r.findings], ["search_rdap"])  # no "does not exist" finding
+
+    def test_dns_warnings_and_similar_lines_are_still_findings(self):
+        for line in ("[!] No SPF record found - anyone can spoof email", "Domain 'x.example' is registered but has no A record"):
+            recs = OpenOSINTAdapter(client=FakeClient())._records(out(line), "search_dns")
+            self.assertEqual([r.finding for r in recs], [line])
 
     def test_missing_key_is_classified(self):
         with self.assertRaises(ToolError) as cm:
@@ -343,7 +360,7 @@ class LiveServerTests(unittest.TestCase):
         self.assertEqual(run(OpenOSINTAdapter().missing_tools()), [])
 
     def test_real_domain_scan_returns_dns_provenance(self):
-        r = run(OpenOSINTAdapter().scan_domain("example.com", "live"))
+        r = run(OpenOSINTAdapter().scan_domain("github.com", "live"))
         self.assertTrue(any(f.tool_name == "search_dns" for f in r.findings))
 
 

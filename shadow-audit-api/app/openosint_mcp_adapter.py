@@ -90,6 +90,7 @@ ERROR_TIMEOUT = "timeout"
 ERROR_API_KEY = "api_key_missing"
 ERROR_RATE_LIMIT = "rate_limited"
 ERROR_POLICY = "policy_blocked"
+ERROR_NOT_FOUND = "domain_not_found"
 ERROR_OTHER = "error"
 
 
@@ -220,6 +221,9 @@ def _now() -> str:
 
 # "No breaches found for ...", "[GitHub] No users found ...". A bracketed tag like "[!]" is not
 # stripped, so DNS warnings such as "[!] No SPF record found" stay findings.
+# search_dns reports an NXDOMAIN as the line "Domain '<name>' does not exist." That is a failure of
+# the lookup (a typo, or a broken resolver), not an exposure, so it is an error, not a finding.
+_NOT_FOUND = re.compile(r"^Domain '.*' does not exist\.?$")
 _EMPTY_RESULT = re.compile(r"^(\[[A-Za-z]+\]\s*)?No .+ (found|mentioning)\b", re.IGNORECASE)
 
 
@@ -325,6 +329,8 @@ class OpenOSINTAdapter:
         failed = [ln for ln in lines if ln.startswith("Scan error:") or ln.startswith("[key_required]")]
         if failed:
             raise ToolError(classify_error_text(" ".join(failed)), "tool reported a scan error")
+        if any(_NOT_FOUND.match(ln) for ln in lines):
+            raise ToolError(ERROR_NOT_FOUND, "domain does not exist")
         _, source, category, _ = TOOLS.get(tool, ("target", tool, "other", 30))
         now = _now()
         return [
