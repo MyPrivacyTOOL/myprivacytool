@@ -63,9 +63,11 @@ NON_PASSIVE_TOOLS = frozenset({
 # Confidence when the tool reports none. It means "unscored", not "50% likely".
 UNSCORED_CONFIDENCE = 0.5
 
+# search_paste (psbdmp.ws) is left out of the plans: psbdmp.ws answered 502 in every live run on
+# 2026-11-24/25. It stays in TOOLS, so it can be added back to a plan once the service is reliable.
 PLANS: Dict[str, List[str]] = {
-    "email": ["search_breach", "search_paste", "search_github"],
-    "username": ["search_github", "search_paste", "search_footprint"],
+    "email": ["search_breach", "search_github"],
+    "username": ["search_github", "search_footprint"],
     "domain": ["search_whois", "search_rdap", "search_dns", "search_virustotal", "search_footprint"],
 }
 
@@ -200,7 +202,9 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
-_EMPTY_RESULT = re.compile(r"^No .+ (found|mentioning)\b", re.IGNORECASE)
+# "No breaches found for ...", "[GitHub] No users found ...". A bracketed tag like "[!]" is not
+# stripped, so DNS warnings such as "[!] No SPF record found" stay findings.
+_EMPTY_RESULT = re.compile(r"^(\[[A-Za-z]+\]\s*)?No .+ (found|mentioning)\b", re.IGNORECASE)
 
 
 class OpenOSINTAdapter:
