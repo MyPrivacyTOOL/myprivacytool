@@ -8,6 +8,7 @@ import EnterpriseIncludes from "@/components/EnterpriseIncludes";
 import pageMeta from "@/data/pageMeta.json";
 import { submitHubSpotForm, consentFields } from "@/lib/hubspot";
 import ConsentCheckbox from "@/components/ConsentCheckbox";
+import { ENTERPRISE_CONSENT_LABEL } from "@/lib/consentWording";
 import { trackEnterpriseLead } from "@/lib/analytics";
 
 // MPC-102: enterprise demo request. Reuses the "Business Inquiry" HubSpot form (portal 246502821);
@@ -121,7 +122,7 @@ const Enterprise = () => {
                   <option value="500-2000">500–2,000 employees</option>
                   <option value="2000+">2,000+ employees</option>
                 </select>
-                <ConsentCheckbox id="enterprise-consent" checked={consent} onChange={setConsent} disabled={status === "loading"} labelClassName="text-muted-foreground" />
+                <ConsentCheckbox id="enterprise-consent" label={ENTERPRISE_CONSENT_LABEL} checked={consent} onChange={setConsent} disabled={status === "loading"} labelClassName="text-muted-foreground" />
                 {status === "error" && (
                   <p role="alert" className="text-destructive text-xs">{errorMsg}</p>
                 )}

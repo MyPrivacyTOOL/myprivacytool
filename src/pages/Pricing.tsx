@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import Seo from "@/components/Seo";
 import ConsentCheckbox from "@/components/ConsentCheckbox";
+import { WAITLIST_CONSENT_LABEL } from "@/lib/consentWording";
 import SubmitButton from "@/components/SubmitButton";
 import pageMeta from "@/data/pageMeta.json";
 import { useExperiment } from "@/hooks/useExperiment";
@@ -272,6 +273,7 @@ const Pricing = () => {
             <div ref={consentRef}>
               <ConsentCheckbox
                 id="waitlist-consent"
+                label={WAITLIST_CONSENT_LABEL}
                 checked={consent}
                 onChange={(v) => {
                   setConsent(v);
