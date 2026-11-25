@@ -1,0 +1,64 @@
+# TEMPORARY, read-only. Final integrity check of the Hexagon Registry. Prints only totals and row ids. Removed after one run.
+name: tmp-registry-formula-read
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ['claude/ecstatic-mayer-lmc29y']
+    paths: ['.github/workflows/tmp-registry-formula-read.yml']
+
+permissions:
+  contents: read
+
+jobs:
+  read:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      T1: ${{ secrets.NOTION_TOKEN }}
+    steps:
+      - name: Final registry check
+        run: |
+          python3 - <<'EOF'
+          import json, os, urllib.request, urllib.error, collections
+          DB = '40c28547eaa7810ba183cda4378d7597'
+          tok = os.environ['T1']
+          def call(method, path, body=None):
+              req = urllib.request.Request('https://api.notion.com/v1' + path, method=method,
+                  data=(json.dumps(body).encode() if body is not None else None),
+                  headers={'Authorization': 'Bearer ' + tok, 'Notion-Version': '2022-06-28', 'Content-Type': 'application/json'})
+              try:
+                  with urllib.request.urlopen(req, timeout=30) as r: return r.status, json.loads(r.read())
+              except urllib.error.HTTPError as e: return e.code, {}
+          rows = []; cur = None
+          while True:
+              body = {'page_size': 100}
+              if cur: body['start_cursor'] = cur
+              s, j = call('POST', '/databases/' + DB + '/query', body)
+              if s != 200: print('QUERY FAILED', s); raise SystemExit(0)
+              rows += j['results']; cur = j.get('next_cursor')
+              if not j.get('has_more'): break
+          def txt(pr, c): return ''.join(x.get('plain_text', '') for x in (pr.get(c) or {}).get('rich_text', []))
+          def sel(pr, c): return ((pr.get(c) or {}).get('select') or {}).get('name')
+          def num(pr, c): return (pr.get(c) or {}).get('number')
+          def fv(pr, c):
+              f = (pr.get(c) or {}).get('formula') or {}
+              return f.get(f.get('type'))
+          R = []
+          for r in rows:
+              pr = r['properties']
+              R.append({'id': int(num(pr, 'Hexagon ID') or 0), 'ch': sel(pr, 'Channel'), 'tech': txt(pr, 'Technical Field Name'), 'cat': sel(pr, 'Data Category'),
+                        'gdpr': sel(pr, 'EU GDPR Status'), 'ds': (pr.get('Data Sources') or {}).get('multi_select', []), 'risk': sel(pr, 'Risk Score'),
+                        'oc': num(pr, 'Overlap Channels'), 'conf': fv(pr, 'Confidence %'), 'sc': fv(pr, 'Source Count')})
+          cnt = collections.Counter(x['id'] for x in R)
+          print('TOTAL ROWS', len(R), '| distinct ids', len(cnt), '| max id', max(cnt), '| missing ids', [i for i in range(1, max(cnt) + 1) if i not in cnt])
+          print('IDS WITH MORE THAN ONE ROW', sorted(i for i, n in cnt.items() if n > 1), '| rows with id 0', cnt.get(0, 0))
+          print('EMPTY Technical Field Name', [x['id'] for x in R if not x['tech']])
+          print('EMPTY Data Category', [x['id'] for x in R if not x['cat']])
+          print('EMPTY EU GDPR Status', [x['id'] for x in R if not x['gdpr']])
+          print('EMPTY Data Sources', [x['id'] for x in R if not x['ds']])
+          print('EMPTY Risk Score', sorted(x['id'] for x in R if not x['risk']))
+          print('CROSS-CHANNEL rows', sum(1 for x in R if x['ch'] == 'Cross-Channel / General'))
+          print('CONFIDENCE distribution', dict(collections.Counter(x['conf'] for x in R)))
+          print('NEW CHANNEL rows', dict(collections.Counter(x['ch'] for x in R if x['ch'] in ('Slack', 'Mastodon', 'Twitch', 'iMessage/RCS', 'Snapchat'))))
+          EOF
