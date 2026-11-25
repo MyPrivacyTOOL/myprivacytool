@@ -285,6 +285,58 @@ class MCPProtocolTests(unittest.TestCase):
                          {"search_rdap", "search_dns", "search_footprint"})
 
 
+class SpawnedServerStderrTests(unittest.TestCase):
+    """OpenOSINT logs every tool call with its target to stderr; the adapter must not pass that on."""
+
+    FAKE_SERVER = (
+        "#!{python}\n"
+        "import json, sys\n"
+        "from mcp.server.mcpserver import MCPServer\n"
+        "s = MCPServer('fake-openosint')\n"
+        "@s.tool()\n"
+        "def search_dns(domain: str, json_output: bool = False) -> dict:\n"
+        "    print('LEAKED-TARGET:' + domain, file=sys.stderr, flush=True)\n"
+        "    return {{'tool': 'search_dns', 'target': domain, 'timestamp': 't', 'results': ['[DNS] A: 1.2.3.4'], 'error': None}}\n"
+        "s.run(transport='stdio')\n"
+    )
+    RUNNER = (
+        "import asyncio, sys\n"
+        "from app.openosint_mcp_adapter import OpenOSINTAdapter\n"
+        "r = asyncio.run(OpenOSINTAdapter().scan_domain('secret-domain.example', 's1'))\n"
+        "print('FINDINGS', [f.finding for f in r.findings if f.tool_name == 'search_dns'])\n"
+    )
+
+    @classmethod
+    def setUpClass(cls):
+        try:
+            import mcp.server.mcpserver  # noqa: F401
+        except ImportError:
+            raise unittest.SkipTest("mcp>=2 SDK not installed")
+
+    def _run(self, **extra_env):
+        import subprocess
+        import sys
+        import tempfile
+        with tempfile.TemporaryDirectory() as d:
+            server = Path(d) / "fake-openosint-mcp"
+            server.write_text(self.FAKE_SERVER.format(python=sys.executable))
+            server.chmod(0o755)
+            env = dict(os.environ, OPENOSINT_MCP_COMMAND=str(server), **extra_env)
+            env.pop("OPENOSINT_DEBUG_STDERR", None) if "OPENOSINT_DEBUG_STDERR" not in extra_env else None
+            return subprocess.run([sys.executable, "-c", self.RUNNER], capture_output=True, text=True,
+                                  env=env, cwd=Path(__file__).parent.parent, timeout=60)
+
+    def test_server_stderr_with_the_target_is_not_passed_on(self):
+        r = self._run()
+        self.assertIn("[DNS] A: 1.2.3.4", r.stdout, r.stderr)  # the scan itself worked
+        self.assertNotIn("LEAKED-TARGET", r.stderr)
+        self.assertNotIn("secret-domain.example", r.stderr)
+
+    def test_control_debug_flag_does_pass_it_on(self):
+        r = self._run(OPENOSINT_DEBUG_STDERR="1")
+        self.assertIn("LEAKED-TARGET:secret-domain.example", r.stderr)  # proves the test can see a leak
+
+
 @unittest.skipUnless(os.getenv("OPENOSINT_MCP_COMMAND"), "set OPENOSINT_MCP_COMMAND to run against a real openosint-mcp")
 class LiveServerTests(unittest.TestCase):
     def test_real_server_has_every_tool_the_adapter_uses(self):
