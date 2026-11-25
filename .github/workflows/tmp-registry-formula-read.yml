@@ -55,15 +55,44 @@ jobs:
           for col in ('Confidence %', 'Source Count', 'Overlap Confidence %'):
               p = props.get(col, {})
               print('FORMULA', col, '=', (p.get('formula') or {}).get('expression'))
-          for hid in (650, 644, 423):
-              s, j = call(tok, 'POST', '/databases/' + DB + '/query', {'filter': {'property': 'Hexagon ID', 'number': {'equals': hid}}, 'page_size': 1})
-              if s != 200 or not j.get('results'):
-                  print('ROW', hid, 'query ->', s, j if s != 200 else 'no result'); continue
-              pr = j['results'][0]['properties']
-              def fv(c):
-                  f = (pr.get(c) or {}).get('formula') or {}
-                  return f.get(f.get('type'))
-              ds = [x.get('name') for x in (pr.get('Data Sources') or {}).get('multi_select', [])]
-              oc = (pr.get('Overlap Channels') or {}).get('number')
-              print('ROW', hid, '| Confidence %', fv('Confidence %'), '| Source Count', fv('Source Count'), '| Overlap Confidence %', fv('Overlap Confidence %'), '| Overlap Channels', oc, '| Data Sources', ds)
+          rows = []; cur = None
+          while True:
+              body = {'page_size': 100}
+              if cur: body['start_cursor'] = cur
+              s, j = call(tok, 'POST', '/databases/' + DB + '/query', body)
+              if s != 200: print('QUERY FAILED', s, j); raise SystemExit(0)
+              rows += j['results']; cur = j.get('next_cursor')
+              if not j.get('has_more'): break
+          def txt(pr, c):
+              return ''.join(x.get('plain_text', '') for x in (pr.get(c) or {}).get('rich_text', []))
+          def sel(pr, c):
+              return ((pr.get(c) or {}).get('select') or {}).get('name')
+          def num(pr, c):
+              return (pr.get(c) or {}).get('number')
+          def fval(pr, c):
+              f = (pr.get(c) or {}).get('formula') or {}
+              return f.get(f.get('type'))
+          R = []
+          for r in rows:
+              pr = r['properties']
+              R.append({'id': int(num(pr, 'Hexagon ID') or 0), 'ch': sel(pr, 'Channel'), 'tech': txt(pr, 'Technical Field Name'), 'cat': sel(pr, 'Data Category'),
+                        'gdpr': sel(pr, 'EU GDPR Status'), 'ds': [x['name'] for x in (pr.get('Data Sources') or {}).get('multi_select', [])],
+                        'risk': sel(pr, 'Risk Score'), 'conf': fval(pr, 'Confidence %'), 'sc': fval(pr, 'Source Count'), 'oc': num(pr, 'Overlap Channels')})
+          ids = {x['id'] for x in R}
+          print('TOTAL ROWS', len(R), '| max id', max(ids), '| missing ids', [i for i in range(1, max(ids) + 1) if i not in ids])
+          print('EMPTY Technical Field Name', [x['id'] for x in R if not x['tech']])
+          print('EMPTY Data Category', [x['id'] for x in R if not x['cat']])
+          print('EMPTY EU GDPR Status', [x['id'] for x in R if not x['gdpr']])
+          print('EMPTY Data Sources', [x['id'] for x in R if not x['ds']])
+          print('EMPTY Risk Score', sorted(x['id'] for x in R if not x['risk']))
+          CC = 'Cross-Channel / General'
+          print('CROSS-CHANNEL rows', sum(1 for x in R if x['ch'] == CC))
+          exp = {'Social Media (IG/FB/X/TikTok)': [244,245,246,247,248,249,250,324,325,326,329,330,331], 'Fax': [264,265,266,267,268], 'SMS / Phone Call': [281,282,284,286,288,290], 'QQ': [231]}
+          byid = {x['id']: x for x in R}
+          bad = [(i, byid[i]['ch'], c) for c, l in exp.items() for i in l if i not in byid or byid[i]['ch'] != c]
+          print('LAST 25 RELABELS: wrong', bad, '(0 wrong = all correct)')
+          import collections
+          print('CONFIDENCE distribution', dict(sorted(collections.Counter(x['conf'] for x in R).items(), key=lambda kv: (kv[0] is None, kv[0]))))
+          print('SOURCE COUNT distribution', dict(collections.Counter(x['sc'] for x in R)))
+          print('CONFIDENCE vs OVERLAP mismatches', [(x['id'], x['conf'], x['oc'], x['sc']) for x in R if x['conf'] != (100 if (x['sc'] or 0) >= 2 else (min(97, round(100 * (1 - 0.4 ** x['oc']))) if (x['oc'] or 0) >= 2 else 50))][:10])
           EOF
