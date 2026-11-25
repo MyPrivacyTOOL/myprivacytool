@@ -24,7 +24,10 @@ Behaviour:
     with a timeout (OpenOSINT's own per-tool default unless `timeout_seconds` overrides it).
   - Per-tool failures never fail the scan; they are counted and classified
     (timeout / api_key_missing / rate_limited / policy_blocked / error) in `tool_errors`.
-  - Targets (emails, usernames, domains) are never written to logs.
+  - Targets (emails, usernames, domains) are never written to logs. OpenOSINT itself logs every
+    tool call with its arguments to stderr (hardcoded INFO, no switch), so the spawned server's
+    stderr is discarded. Set OPENOSINT_DEBUG_STDERR=1 to inherit it when debugging; that WILL put
+    scan targets in your logs.
 """
 
 import asyncio
@@ -146,9 +149,7 @@ class MCPToolClient:
         self._server = server
         self._allow_active = allow_active
 
-    def _target(self) -> Any:
-        if self._server is not None:
-            return self._server
+    def _stdio_params(self) -> Any:
         from mcp import StdioServerParameters
 
         env = {k: os.environ[k] for k in _FORWARDED_ENV if k in os.environ}
@@ -157,16 +158,31 @@ class MCPToolClient:
             command=os.getenv("OPENOSINT_MCP_COMMAND", "openosint-mcp"), args=[], env=env)
 
     @contextlib.asynccontextmanager
-    async def session(self) -> AsyncIterator[ToolSession]:
+    async def _client(self) -> AsyncIterator[Any]:
         from mcp import Client  # imported lazily so the adapter loads without the SDK
 
-        async with Client(self._target()) as client:
+        if self._server is not None:
+            async with Client(self._server) as client:
+                yield client
+            return
+        if os.getenv("OPENOSINT_DEBUG_STDERR") == "1":
+            async with Client(self._stdio_params()) as client:
+                yield client
+            return
+        from mcp.client.stdio import stdio_client
+
+        # OpenOSINT logs "Tool: <name> | args: <target>" to stderr and cannot be told not to.
+        with open(os.devnull, "w") as quiet:
+            async with Client(stdio_client(self._stdio_params(), errlog=quiet)) as client:
+                yield client
+
+    @contextlib.asynccontextmanager
+    async def session(self) -> AsyncIterator[ToolSession]:
+        async with self._client() as client:
             yield _MCPSession(client)
 
     async def list_tool_names(self) -> List[str]:
-        from mcp import Client
-
-        async with Client(self._target()) as client:
+        async with self._client() as client:
             return [t.name for t in (await client.list_tools()).tools]
 
 
