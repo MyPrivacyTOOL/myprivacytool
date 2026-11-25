@@ -65,7 +65,7 @@ export function buildRegistrationRow(input: RegistrationInput): RegistrationRow 
 /** Inserts the row. Resolves true on success, false on any failure; never throws and never reads data back. */
 export async function insertRegistration(row: RegistrationRow): Promise<boolean> {
   try {
-    const res = await recipientFetch("supabase", REGISTRATIONS_ENDPOINT, {
+    const res = await recipientFetch("supabase-signups", REGISTRATIONS_ENDPOINT, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
