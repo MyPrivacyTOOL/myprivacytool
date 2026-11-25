@@ -1,6 +1,8 @@
 // MPC-7381: Cloudflare Web Analytics (RUM) beacon. Cookieless; loads only when VITE_CF_WEB_ANALYTICS_TOKEN is set at build time.
 // MPC-9057: and only after the visitor chose "Accept analytics" (see loadCfWebAnalyticsWhenConsented).
+// MPC-10790 (decision A): and only once the journey also holds the scan consent (the Scan me click), the same gate as GA4 (analyticsAllowed).
 import { hasConsent, onConsentChange } from "./cookieConsent";
+import { hasScanConsent, onScanConsent } from "./scanConsent";
 import { recipientScript } from "./recipientClient";
 const BEACON_SRC = "https://static.cloudflareinsights.com/beacon.min.js";
 
@@ -18,15 +20,22 @@ export function loadCfWebAnalytics(token = import.meta.env.VITE_CF_WEB_ANALYTICS
   return true;
 }
 
+const bothConsents = (): boolean => hasConsent() && hasScanConsent();
+const onEitherConsent = (cb: () => void): (() => void) => {
+  const a = onConsentChange(cb);
+  const b = onScanConsent(cb);
+  return () => { a(); b(); };
+};
+
 /**
- * Loads the beacon only once the visitor has accepted analytics: at once if they already did on an earlier visit, or the
- * moment they accept. Before that no request to cloudflareinsights.com is made. (A beacon already loaded cannot be
- * unloaded; withdrawing consent takes effect on the next page load.) Returns the unsubscribe function.
+ * Loads the beacon only once the visitor has accepted analytics AND pressed Scan me (MPC-10790, decision A: "Accept analytics" alone sends
+ * nothing): at once if both already hold, or the moment the second one arrives. Before that no request to cloudflareinsights.com is made.
+ * (A beacon already loaded cannot be unloaded; withdrawing consent takes effect on the next page load.) Returns the unsubscribe function.
  */
 export function loadCfWebAnalyticsWhenConsented(
   load: () => boolean = loadCfWebAnalytics,
-  consented: () => boolean = hasConsent,
-  subscribe: (cb: () => void) => () => void = onConsentChange,
+  consented: () => boolean = bothConsents,
+  subscribe: (cb: () => void) => () => void = onEitherConsent,
 ): () => void {
   if (consented()) load();
   return subscribe(() => {

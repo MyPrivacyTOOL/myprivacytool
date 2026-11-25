@@ -24,6 +24,6 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - run: pip install pytest "mcp>=2.3.0,<3" cryptography
+      - run: pip install pytest "mcp>=2.3.0,<3" cryptography fastapi httpx email-validator
       - working-directory: shadow-audit-api
         run: python -m pytest tests -q
