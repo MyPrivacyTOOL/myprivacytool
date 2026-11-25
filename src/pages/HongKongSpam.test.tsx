@@ -459,3 +459,88 @@ describe("Hong Kong only and the kill switch", () => {
     expect(events()).toEqual([]);
   });
 });
+
+describe("Spam Shield waitlist (CK-11387)", () => {
+  const emailBox = () => screen.getByLabelText(/^your email$/i);
+  const joinButton = () => screen.getByRole("button", { name: /join the waitlist/i });
+
+  it("says nothing is for sale, has no purchase link, and collects no phone number", () => {
+    renderEn();
+    const section = screen.getByRole("heading", { name: /spam shield waitlist/i }).closest("section") as HTMLElement;
+    expect(section).toHaveTextContent(/nothing is for sale/i);
+    expect(within(section).queryByRole("link", { name: /buy|subscribe|purchase|price|\$/i })).not.toBeInTheDocument();
+    expect(within(section).getByTestId("hk-shield-detail")).toHaveTextContent(/never collect your phone number/i);
+  });
+
+  it("blocks a bad email and a missing tick without calling the network", async () => {
+    const f = stubFetch();
+    const user = userEvent.setup();
+    renderEn();
+    await user.type(emailBox(), "nope");
+    await user.click(joinButton());
+    expect(await screen.findByText(/does not look right/i)).toBeInTheDocument();
+    await user.clear(emailBox());
+    await user.type(emailBox(), "me@example.com");
+    await user.click(joinButton());
+    expect(await screen.findByText(/tick the box to join/i)).toBeInTheDocument();
+    expect(f).not.toHaveBeenCalled();
+    expect(events()).not.toContain("hk_shield_waitlist_signup");
+  });
+
+  it("inserts ONE row with consent and utm, tracks hk_shield_waitlist_signup without the email, and remembers it", async () => {
+    const f = stubFetch();
+    const user = userEvent.setup();
+    window.history.pushState({}, "", `${ROUTE}?utm_source=linkedin&utm_medium=organic&utm_campaign=hk-spam-w1`);
+    renderEn();
+    await user.type(emailBox(), "me@example.com");
+    await user.click(screen.getByRole("checkbox", { name: /email me once if spam shield is built/i }));
+    await user.click(joinButton());
+    await screen.findByTestId("hk-shield-done");
+    expect(f).toHaveBeenCalledTimes(1);
+    const [url, init] = f.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toMatch(/\/rest\/v1\/hk_shield_waitlist$/);
+    expect(JSON.parse(init.body as string)).toMatchObject({
+      email: "me@example.com", consent: true, utm_source: "linkedin", source_page: "/HongKongSpam",
+    });
+    expect(events()).toContain("hk_shield_waitlist_signup");
+    expect(JSON.stringify(gtag.mock.calls)).not.toContain("me@example.com");
+    expect(localStorage.getItem("mpt_hk_shield_waitlist")).toBe("1");
+  });
+
+  it("an address already on the list gets a friendly answer and no second GA4 signup event", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: false, status: 409 }) as Response));
+    const user = userEvent.setup();
+    renderEn();
+    await user.type(emailBox(), "me@example.com");
+    await user.click(screen.getByRole("checkbox", { name: /email me once if spam shield is built/i }));
+    await user.click(joinButton());
+    expect(await screen.findByTestId("hk-shield-done")).toHaveTextContent(/already on the waitlist/i);
+    expect(events()).not.toContain("hk_shield_waitlist_signup");
+  });
+
+  it("a failed save shows an error, keeps the form, and fires no signup event", async () => {
+    stubFetch(false);
+    const user = userEvent.setup();
+    renderEn();
+    await user.type(emailBox(), "me@example.com");
+    await user.click(screen.getByRole("checkbox", { name: /email me once if spam shield is built/i }));
+    await user.click(joinButton());
+    expect(await screen.findByText(/could not save that/i)).toBeInTheDocument();
+    expect(joinButton()).toBeInTheDocument();
+    expect(events()).not.toContain("hk_shield_waitlist_signup");
+  });
+
+  it("shows the Traditional Chinese waitlist with ?lang=zh", () => {
+    window.history.pushState({}, "", `${ROUTE}?lang=zh`);
+    renderEn();
+    expect(screen.getByRole("button", { name: "加入候補名單" })).toBeInTheDocument();
+    expect(screen.getByText(/目前並不發售任何產品/)).toBeInTheDocument();
+  });
+
+  it("a returning signup sees the thank-you instead of the form", () => {
+    localStorage.setItem("mpt_hk_shield_waitlist", "1");
+    renderEn();
+    expect(screen.getByTestId("hk-shield-done")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /join the waitlist/i })).not.toBeInTheDocument();
+  });
+});

@@ -47,6 +47,17 @@ export interface HkCopy {
   reminderLabel: string;
   marketingLabel: string;
   marketingHint: string;
+  /** CK-11387: Spam Shield waitlist. Interest only, nothing is for sale. */
+  shieldTitle: string;
+  shieldBody: string;
+  shieldEmailLabel: string;
+  shieldConsent: string;
+  shieldDetail: string;
+  shieldConsentNeeded: string;
+  shieldButton: string;
+  shieldDone: string;
+  shieldDuplicate: string;
+  shieldError: string;
   doneButton: string;
   saving: string;
   resultTitle: string;
@@ -136,6 +147,18 @@ export const EN: HkCopy = {
   reminderLabel: "Send me the reminder",
   marketingLabel: "Send me MyPrivacyTOOL privacy tips",
   marketingHint: "Optional. Not needed for the reminder. You can unsubscribe at any time.",
+  shieldTitle: "Want call blocking too? Join the Spam Shield waitlist",
+  shieldBody:
+    "We are checking whether people want a paid app that blocks sales calls from real people and scam calls on your phone. It does not exist yet and nothing is for sale. Join the waitlist and we will email you once if we build it.",
+  shieldEmailLabel: "Your email",
+  shieldConsent: "Email me once if Spam Shield is built. I understand nothing is for sale now.",
+  shieldDetail:
+    "We store your email, your phone type (Android, iPhone or other) and your language, only for this. We never collect your phone number. We delete your email if nothing is built within 12 months, or when you ask: write to privacy@myprivacytool.io. ",
+  shieldConsentNeeded: "Tick the box to join the waitlist.",
+  shieldButton: "Join the waitlist",
+  shieldDone: "You are on the waitlist. We will email you once if Spam Shield is built.",
+  shieldDuplicate: "This email is already on the waitlist. Nothing more to do.",
+  shieldError: "We could not save that. Please try again in a moment.",
   doneButton: "Done: I have registered",
   saving: "Saving...",
   resultTitle: "You're protected from {date}",
@@ -255,6 +278,18 @@ export const ZH: HkCopy = {
   reminderLabel: "請發送提醒給我",
   marketingLabel: "請向我發送 MyPrivacyTOOL 私隱貼士",
   marketingHint: "選填。接收提醒不需要剔選此項。你可隨時取消訂閱。",
+  shieldTitle: "想連來電攔截都一併擁有？加入「Spam Shield」候補名單",
+  shieldBody:
+    "我們正在了解大家是否需要一個付費應用程式，用來攔截真人電話推銷及詐騙來電。這個應用程式尚未存在，目前並不發售任何產品。加入候補名單後，如果我們開發此應用程式，會發送一封電郵通知你。",
+  shieldEmailLabel: "你的電郵地址",
+  shieldConsent: "如果開發 Spam Shield，請發送一封電郵通知我。我明白現時並無發售任何產品。",
+  shieldDetail:
+    "我們只為此目的儲存你的電郵地址、手機類型（Android、iPhone 或其他）及語言，絕不收集你的電話號碼。如果 12 個月內沒有開發此應用程式，或你要求刪除，我們會刪除你的電郵地址：請電郵至 privacy@myprivacytool.io。",
+  shieldConsentNeeded: "請剔選方格才能加入候補名單。",
+  shieldButton: "加入候補名單",
+  shieldDone: "你已加入候補名單。如果開發 Spam Shield，我們會發送一封電郵通知你。",
+  shieldDuplicate: "此電郵地址已在候補名單內，無需再做任何事。",
+  shieldError: "未能儲存，請稍後再試。",
   doneButton: "完成，我已登記",
   saving: "儲存中……",
   resultTitle: "你由 {date}起受保障",

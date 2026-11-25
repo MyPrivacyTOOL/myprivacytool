@@ -50,5 +50,10 @@
   "search_shodan",
   "search_virustotal",
   "search_whois"
- ]
+ ],
+ "dns_nxdomain": {
+  "tool": "search_dns",
+  "is_error": false,
+  "text": "{\n  \"tool\": \"search_dns\",\n  \"target\": \"mpc-11203-no-such-domain.invalid\",\n  \"timestamp\": \"2026-11-25T05:59:30.907009+00:00\",\n  \"results\": [\n    \"Domain 'mpc-11203-no-such-domain.invalid' does not exist.\"\n  ],\n  \"error\": null\n}"
+ }
 }

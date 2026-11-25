@@ -24,7 +24,10 @@ Behaviour:
     with a timeout (OpenOSINT's own per-tool default unless `timeout_seconds` overrides it).
   - Per-tool failures never fail the scan; they are counted and classified
     (timeout / api_key_missing / rate_limited / policy_blocked / error) in `tool_errors`.
-  - Targets (emails, usernames, domains) are never written to logs.
+  - Targets (emails, usernames, domains) are never written to logs. OpenOSINT itself logs every
+    tool call with its arguments to stderr (hardcoded INFO, no switch), so the spawned server's
+    stderr is discarded. Set OPENOSINT_DEBUG_STDERR=1 to inherit it when debugging; that WILL put
+    scan targets in your logs.
 """
 
 import asyncio
@@ -63,9 +66,11 @@ NON_PASSIVE_TOOLS = frozenset({
 # Confidence when the tool reports none. It means "unscored", not "50% likely".
 UNSCORED_CONFIDENCE = 0.5
 
+# search_paste (psbdmp.ws) is left out of the plans: psbdmp.ws answered 502 in every live run on
+# 2026-11-24/25. It stays in TOOLS, so it can be added back to a plan once the service is reliable.
 PLANS: Dict[str, List[str]] = {
-    "email": ["search_breach", "search_paste", "search_github"],
-    "username": ["search_github", "search_paste", "search_footprint"],
+    "email": ["search_breach", "search_github"],
+    "username": ["search_github", "search_footprint"],
     "domain": ["search_whois", "search_rdap", "search_dns", "search_virustotal", "search_footprint"],
 }
 
@@ -85,6 +90,7 @@ ERROR_TIMEOUT = "timeout"
 ERROR_API_KEY = "api_key_missing"
 ERROR_RATE_LIMIT = "rate_limited"
 ERROR_POLICY = "policy_blocked"
+ERROR_NOT_FOUND = "domain_not_found"
 ERROR_OTHER = "error"
 
 
@@ -144,9 +150,7 @@ class MCPToolClient:
         self._server = server
         self._allow_active = allow_active
 
-    def _target(self) -> Any:
-        if self._server is not None:
-            return self._server
+    def _stdio_params(self) -> Any:
         from mcp import StdioServerParameters
 
         env = {k: os.environ[k] for k in _FORWARDED_ENV if k in os.environ}
@@ -155,16 +159,31 @@ class MCPToolClient:
             command=os.getenv("OPENOSINT_MCP_COMMAND", "openosint-mcp"), args=[], env=env)
 
     @contextlib.asynccontextmanager
-    async def session(self) -> AsyncIterator[ToolSession]:
+    async def _client(self) -> AsyncIterator[Any]:
         from mcp import Client  # imported lazily so the adapter loads without the SDK
 
-        async with Client(self._target()) as client:
+        if self._server is not None:
+            async with Client(self._server) as client:
+                yield client
+            return
+        if os.getenv("OPENOSINT_DEBUG_STDERR") == "1":
+            async with Client(self._stdio_params()) as client:
+                yield client
+            return
+        from mcp.client.stdio import stdio_client
+
+        # OpenOSINT logs "Tool: <name> | args: <target>" to stderr and cannot be told not to.
+        with open(os.devnull, "w") as quiet:
+            async with Client(stdio_client(self._stdio_params(), errlog=quiet)) as client:
+                yield client
+
+    @contextlib.asynccontextmanager
+    async def session(self) -> AsyncIterator[ToolSession]:
+        async with self._client() as client:
             yield _MCPSession(client)
 
     async def list_tool_names(self) -> List[str]:
-        from mcp import Client
-
-        async with Client(self._target()) as client:
+        async with self._client() as client:
             return [t.name for t in (await client.list_tools()).tools]
 
 
@@ -200,7 +219,12 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
-_EMPTY_RESULT = re.compile(r"^No .+ (found|mentioning)\b", re.IGNORECASE)
+# "No breaches found for ...", "[GitHub] No users found ...". A bracketed tag like "[!]" is not
+# stripped, so DNS warnings such as "[!] No SPF record found" stay findings.
+# search_dns reports an NXDOMAIN as the line "Domain '<name>' does not exist." That is a failure of
+# the lookup (a typo, or a broken resolver), not an exposure, so it is an error, not a finding.
+_NOT_FOUND = re.compile(r"^Domain '.*' does not exist\.?$")
+_EMPTY_RESULT = re.compile(r"^(\[[A-Za-z]+\]\s*)?No .+ (found|mentioning)\b", re.IGNORECASE)
 
 
 class OpenOSINTAdapter:
@@ -305,6 +329,8 @@ class OpenOSINTAdapter:
         failed = [ln for ln in lines if ln.startswith("Scan error:") or ln.startswith("[key_required]")]
         if failed:
             raise ToolError(classify_error_text(" ".join(failed)), "tool reported a scan error")
+        if any(_NOT_FOUND.match(ln) for ln in lines):
+            raise ToolError(ERROR_NOT_FOUND, "domain does not exist")
         _, source, category, _ = TOOLS.get(tool, ("target", tool, "other", 30))
         now = _now()
         return [

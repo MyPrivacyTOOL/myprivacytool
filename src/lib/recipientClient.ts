@@ -38,12 +38,8 @@ export const USER_ACTION_MARKER = "user-action:no-scan-consent";
 /**
  * Which post_click recipients may carry the marker after a user action: the ones whose basis is the person's own action (user_action) or the service they asked
  * for (service: scan-report calls from the unsubscribe page, a Deep Research form, ...). Not scan_consent, not analytics_consent.
- * One named exception: "supabase" is registered as scan_consent (the Workers' database), but the browser also writes the /newsletter sign-up and the hk-spam
- * registration to it directly, each its own form submit. Those keep working on a trusted submit; the registry basis for browser-direct Supabase writes is
- * flagged on MPC-10790 for a decision, so this stays one line, not a pattern.
  */
-const FORM_SUBMIT_KEYS = new Set(["supabase"]);
-const markerBases = (r: { key: string; consent_basis: string }): boolean => r.consent_basis === "user_action" || r.consent_basis === "service" || FORM_SUBMIT_KEYS.has(r.key);
+const markerBases = (r: { consent_basis: string }): boolean => r.consent_basis === "user_action" || r.consent_basis === "service";
 
 // A real user action on this page: a TRUSTED pointer, touch, click, Enter/Space or submit event (script-dispatched events are not trusted). Listens from the
 // moment this module loads, capture phase and passive, so it sees the gesture before any handler that then makes the call.

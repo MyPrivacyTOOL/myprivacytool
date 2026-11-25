@@ -20,13 +20,30 @@ async function body(page: import("@playwright/test").Page, url: string): Promise
   });
 }
 
+// The scan's own area (#how-it-works) shows a loading spinner while the device scan runs and the results once it has finished. Which of the two the page is in at
+// capture time depends on how fast the machine is (a fast local run is already past the spinner), and the area is not part of this feature either. It is emptied on
+// both sides of the comparison, so the snapshot holds the rest of the page and no longer depends on timing.
+export function emptySection(html: string, id: string): string {
+  const open = new RegExp(`<section id="${id}"[^>]*>`).exec(html);
+  if (!open) return html;
+  const from = open.index + open[0].length;
+  let depth = 1;
+  const tags = /<(\/?)section\b[^>]*>/g;
+  tags.lastIndex = from;
+  for (let m = tags.exec(html); m; m = tags.exec(html)) {
+    depth += m[1] ? -1 : 1;
+    if (depth === 0) return html.slice(0, from) + html.slice(m.index);
+  }
+  return html;
+}
+
 for (const [name, url] of [["home", "/"], ["scan", "/scan"]] as const) {
   test(`flag off: ${name} page is unchanged (DOM snapshot)`, async ({ page }, info) => {
     test.skip(info.project.name !== "desktop", "one viewport is enough for a DOM snapshot");
     const html = await body(page, url);
     const file = path.join(dir, `${name}.html`);
     if (process.env.FP_WRITE === "1") { fs.writeFileSync(file, html); return; }
-    expect(html).toBe(fs.readFileSync(file, "utf8"));
+    expect(emptySection(html, "how-it-works")).toBe(emptySection(fs.readFileSync(file, "utf8"), "how-it-works"));
     expect(html).not.toContain("footprint-path");
   });
 }

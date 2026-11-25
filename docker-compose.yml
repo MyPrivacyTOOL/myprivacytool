@@ -1,11 +1,14 @@
 # MyPrivacyTOOL exposure scan POC (MPC-11203): one service, local use only.
 #
+#   export EXPOSURE_API_TOKEN=<a long random value you generate; never commit it>
 #   docker compose up --build
-#   curl http://127.0.0.1:8001/api/v1/health
+#   curl http://127.0.0.1:8001/api/v1/health                      # open, no token
+#   curl -H "Authorization: Bearer $EXPOSURE_API_TOKEN" http://127.0.0.1:8001/api/v1/scans/<id>
 #
 # OpenOSINT is not a separate service: its MCP server is stdio-only, so the API spawns it
-# (OPENOSINT_MCP_COMMAND) inside the same container. The routes have no auth, so the port is
-# bound to 127.0.0.1 only; add bearer auth before exposing it anywhere else.
+# (OPENOSINT_MCP_COMMAND) inside the same container. Every route except /health needs
+# `Authorization: Bearer $EXPOSURE_API_TOKEN`; with no token set the API refuses all requests, and
+# compose refuses to start without one. The port stays bound to 127.0.0.1 regardless.
 # API keys are optional. Without them the keyed tools report api_key_missing and are skipped.
 services:
   shadow-audit-api:
@@ -15,6 +18,7 @@ services:
     ports:
       - "127.0.0.1:8001:8001"
     environment:
+      EXPOSURE_API_TOKEN: ${EXPOSURE_API_TOKEN:?set EXPOSURE_API_TOKEN to a long random value}
       OPENOSINT_LOG_LEVEL: ${OPENOSINT_LOG_LEVEL:-INFO}
       HIBP_API_KEY: ${HIBP_API_KEY:-}
       GITHUB_TOKEN: ${GITHUB_TOKEN:-}

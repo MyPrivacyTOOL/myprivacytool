@@ -24,6 +24,7 @@ const MPC_9885_ADDED = ["anthropic", "cloudflare-api", "ga4-data-api", "youtube-
 
 /** MPC-9915: added after the MPC-9885 sweep; read-only Google Ads API for the metrics collector. Kept out of the seed pins below. */
 const MPC_9915_ADDED = ["google-ads-api"];
+const MPC_10790_ADDED = ["supabase-signups"];   // the sign-up forms' own entry, split from "supabase" so each use has its own basis
 
 describe("bundler-safe module", () => {
   it("recipients.data.js is exactly the generated copy of recipients.json (run `npm run recipients:module`)", async () => {
@@ -37,7 +38,7 @@ describe("seed (MPC-9883, design 1.5)", () => {
   it("pins 13 first-party (8 + account-service MPC-9817 + 3 MPC-9886 + business-team-service MPC-9824) and 24 third-party/processor/platform live recipients (the Map's 21, less hibp, switched off by MPC-9885 until MPC-9904, plus pwned-password MPC-9886, meta-graph and stripe, switched on by MPC-9885: WhatsApp replies are live and checkout is gated by CHECKOUT_ENABLED)", () => {
     expect(registry.recipients.find((r) => r.key === "hibp")).toMatchObject({ enabled: false });
     expect(live.filter((r) => r.party === "first" && !MPC_9885_ADDED.includes(r.key))).toHaveLength(13);
-    expect(live.filter((r) => r.party !== "first" && !MPC_9885_ADDED.includes(r.key) && !MPC_9915_ADDED.includes(r.key))).toHaveLength(24);
+    expect(live.filter((r) => r.party !== "first" && !MPC_9885_ADDED.includes(r.key) && !MPC_9915_ADDED.includes(r.key) && !MPC_10790_ADDED.includes(r.key))).toHaveLength(24);
     expect(MPC_9915_ADDED.every((k) => registry.recipients.find((r) => r.key === k)?.enabled === true)).toBe(true);
   });
   it("MPC-9885 added exactly these recipients, all enabled", () => {
@@ -50,7 +51,7 @@ describe("seed (MPC-9883, design 1.5)", () => {
     const planned = registry.recipients.filter((r) => r.planned);
     expect(planned).toHaveLength(9);
     expect(planned.every((r) => !r.enabled)).toBe(true);
-    expect(registry.recipients).toHaveLength(62);
+    expect(registry.recipients).toHaveLength(63);   // MPC-10790: +supabase-signups (the sign-up forms' own entry, split from supabase)
   });
   it("validates cleanly, and every live key from design 1.5 is present", () => {
     expect(validateRegistry(data)).toEqual([]);
