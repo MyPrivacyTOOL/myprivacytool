@@ -83,9 +83,9 @@ not per version, so they are kept; the workflow verifies the names to be sure.
 
 ## 5. Known gaps
 
-* **Live HubSpot form for `/contact`:** `VITE_HUBSPOT_CONTACT_FORM_ID` is not set in production yet (MPC-7172), so the
-  live page falls back to `mailto:`. E2E builds with a test GUID to cover the HubSpot path; the mailto fallback is
-  covered by a unit test.
+* **Live HubSpot form for `/contact`:** `VITE_HUBSPOT_CONTACT_FORM_ID` is set in `.env.production` (MPC-8515, 2026-11-25), so the
+  live page sends to HubSpot. E2E builds with a test GUID to cover the HubSpot path; the mailto fallback (used only when the id is unset) is
+  covered by a unit test, and `src/pages/ContactProductionConfig.test.ts` fails if production loses the id.
 * **E2E never touches live backends** by design. Live behaviour is covered by the post-deploy smoke tests, which are
   deliberately side-effect free (no real signup is created).
 * **Scan engine** (`src/lib/*Detection*`, TensorFlow models, hexagon logic) has only the pre-existing `HexagonGrid` test.
