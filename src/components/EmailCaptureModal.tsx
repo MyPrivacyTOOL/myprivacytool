@@ -14,6 +14,7 @@ import SaveScanConsentCheckbox from '@/components/SaveScanConsentCheckbox';
 import ScanSavingNotice from '@/components/ScanSavingNotice';
 import ScanNumberNotice from '@/components/ScanNumberNotice';
 import { canOfferScanSave } from '@/lib/webScan';
+import { hasScanConsent, onScanConsent } from '@/lib/scanConsent';
 import { ReportRequestError, REPORT_FAILED_MESSAGE, REPORT_WAIT_MESSAGE, requestScanReport, type ReportOutcome } from '@/lib/scanReport';
 import { trackReportFailed, trackReportRequested } from '@/lib/analytics';
 import ListingCheckFields from '@/components/ListingCheckFields';
@@ -73,7 +74,12 @@ export default function EmailCaptureModal({
   const turnstileApi = useRef<TurnstileApi>();
   const turnstileWidget = useRef<string>();
 
+  // MPC-10790: Cloudflare's script loads once this journey holds the scan consent (the Scan me click), not when the dialog mounts. The report request needs
+  // that consent anyway (requestScanReport refuses without it), so a dialog opened without it has nothing to verify yet and loads nothing.
+  const [turnstileArmed, setTurnstileArmed] = useState(() => hasScanConsent());
+  useEffect(() => onScanConsent(() => { if (hasScanConsent()) setTurnstileArmed(true); }), []);
   useEffect(() => {
+    if (!turnstileArmed) return;
     let cancelled = false;
     loadTurnstile().then((ts) => {
       if (cancelled || !ts || !turnstileBox.current) return;
@@ -91,7 +97,7 @@ export default function EmailCaptureModal({
       if (turnstileWidget.current) turnstileApi.current?.remove(turnstileWidget.current);
       turnstileWidget.current = undefined;
     };
-  }, []);
+  }, [turnstileArmed]);
 
   // MPC-7471-F1: confetti fires once when this dialog opens, briefly, behind the dialog layer so it cannot cover text or controls.
   // Not at all for visitors who ask for reduced motion; the message is the same either way.

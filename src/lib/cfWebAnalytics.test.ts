@@ -1,4 +1,6 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, afterEach, beforeEach } from "vitest";
+import { setChoice } from "./cookieConsent";
+import { __resetScanConsentForTests, __seedScanConsentForTests } from "./scanConsent";
 import { loadCfWebAnalytics, loadCfWebAnalyticsWhenConsented } from "./cfWebAnalytics";
 
 describe("loadCfWebAnalytics", () => {
@@ -50,5 +52,37 @@ describe("loadCfWebAnalyticsWhenConsented (MPC-9057)", () => {
     h.stop();
     h.choose(true);
     expect(h.loads()).toBe(0);
+  });
+});
+
+// MPC-10790 (decision A): with the real consent sources (no injected harness), "Accept analytics" alone loads nothing; the beacon loads at the Scan me click.
+describe("loadCfWebAnalyticsWhenConsented with the real consents (MPC-10790)", () => {
+  beforeEach(() => { __resetScanConsentForTests(); }); // src/test/setup.ts seeds a scan consent before every test; these start without one
+  afterEach(() => { window.localStorage.removeItem("mpt_cookie_consent"); __resetScanConsentForTests(); });
+  it("Accept analytics alone: no load; then Scan me: one load", () => {
+    let loads = 0;
+    const stop = loadCfWebAnalyticsWhenConsented(() => (loads++, true));
+    setChoice(true);
+    expect(loads).toBe(0);
+    __seedScanConsentForTests();
+    window.dispatchEvent(new Event("mpt:scan-consent"));
+    expect(loads).toBe(1);
+    stop();
+  });
+  it("Scan me alone (analytics declined): no load", () => {
+    let loads = 0;
+    const stop = loadCfWebAnalyticsWhenConsented(() => (loads++, true));
+    setChoice(false);
+    __seedScanConsentForTests();
+    window.dispatchEvent(new Event("mpt:scan-consent"));
+    expect(loads).toBe(0);
+    stop();
+  });
+  it("both already held on arrival: loads at once", () => {
+    setChoice(true);
+    __seedScanConsentForTests();
+    let loads = 0;
+    loadCfWebAnalyticsWhenConsented(() => (loads++, true))();
+    expect(loads).toBe(1);
   });
 });

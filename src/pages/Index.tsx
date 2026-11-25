@@ -1,3 +1,4 @@
+import { STORAGE_NOTE } from "@/data/trustCopy";
 import { useEffect, useState, useRef, useMemo } from 'react';
 import FeatureStatus from "@/components/FeatureStatus";
 import { hexTileV2Enabled } from '@/config/hexagonTile';
@@ -21,6 +22,7 @@ import logoFull from '@/assets/logo-full.png';
 import {
   trackFunnelStep,
   trackDeviceProfile,
+  analyticsAllowed,
   startSessionTimer,
   trackSessionDuration,
   trackError,
@@ -149,9 +151,7 @@ const Index = () => {
         const data = await captureDeviceData();
         setDeviceData(data);
         
-        // Track device profile for analytics
-        trackDeviceProfile(data as DeviceData);
-        
+        // MPC-10790: the device profile (city, country, ISP) is no longer sent from here, on mount. It goes out once, after the Scan me click (effect below).
         const hexagonData = await generateHexagonsAsync(data);
         setHexagons(hexagonData);
         
@@ -201,25 +201,39 @@ const Index = () => {
     return () => observer.disconnect();
   }, []);
 
-  // Load HubSpot embed script only after cookie consent (Cookie Policy: HubSpot runs after consent)
+  // Load HubSpot embed script only after cookie consent (Cookie Policy: HubSpot runs after consent). MPC-10790 (decision A): "Accept analytics" alone is not
+  // enough either; the script waits for the Scan me click (the scan consent), like GA4.
   useEffect(() => {
     const scriptId = 'hs-forms-embed';
     let requested = false; // the wrapper adds the <script> a tick later; this stops a second consent event starting a second load
     const load = () => {
-      if (!hasConsent() || requested || document.getElementById(scriptId)) return;
+      if (!analyticsAllowed() || requested || document.getElementById(scriptId)) return;
       requested = true;
       // MPC-9886: through the registry ("hubspot", basis user_action). Same consent test as before.
       void recipientScript('hubspot', 'https://js-na2.hsforms.net/forms/embed/246502821.js', { id: scriptId, defer: '' }).catch(() => { requested = false; });
     };
     load();
-    const unsubscribe = onConsentChange(load);
+    const unsubscribeChoice = onConsentChange(load);
+    const unsubscribeScan = onScanConsent(load);
     return () => {
-      unsubscribe();
+      unsubscribeChoice();
+      unsubscribeScan();
       requested = false;
       const existing = document.getElementById(scriptId);
       if (existing) existing.remove();
     };
   }, []);
+
+  // MPC-10790: the device profile reaches GA4 once per page view, and only when the visitor may be measured (analytics chosen AND the Scan me click made).
+  // Before that the event is not queued anywhere, so it cannot flush when the tag loads later.
+  const [analyticsChoice, setAnalyticsChoice] = useState(() => hasConsent());
+  useEffect(() => onConsentChange(() => setAnalyticsChoice(hasConsent())), []);
+  const profileTracked = useRef(false);
+  useEffect(() => {
+    if (profileTracked.current || !deviceData || !consented || !analyticsChoice || !analyticsAllowed()) return;
+    profileTracked.current = true;
+    trackDeviceProfile(deviceData as DeviceData);
+  }, [deviceData, consented, analyticsChoice]);
 
   // The newsletter form is a HubSpot embed; HubSpot posts a message to the page when it submits successfully.
   useEffect(() => {
@@ -461,8 +475,7 @@ const Index = () => {
             </div>
 
             <p className="text-xs text-muted-foreground mt-4 max-w-md mx-auto">
-              The scan runs in your browser. We save a scan only if you tick &ldquo;save my scan&rdquo;; we then keep it for 12 months, and you can have it deleted at any time by quoting your scan number. We only store what you choose to submit, such as your email
-              address, and we use analytics only with your consent.{" "}
+              {STORAGE_NOTE}{" "}
               <a href="/privacy" className="underline hover:text-foreground">
                 Privacy Policy
               </a>

@@ -24,6 +24,7 @@ Merge to `main`; GitHub Actions does the rest.
 | `deploy-mpt-leads.yml` | `workers/mpt-leads/**` | tests, secret-name guard, `wrangler deploy` |
 | `deploy-scan-report.yml` | `workers/scan-report/**`, `src/data/optOutGuides.json` | regenerates `lib/guides.generated.js`, tests, `wrangler deploy`. The Worker also owns the HK Spam day-10 email cron (OFF by flag): `docs/hk-spam-day10-email-mpc-7448.md` |
 | `deploy-oauth-poc.yml` | `workers/oauth-poc/**` | tests, secret-name guard, `wrangler deploy` |
+| `deploy-github-channel.yml` | `workers/github-channel/**`, `shared/recipients/**` | tests, pre-deploy check, secret-name guard, `wrangler deploy` on merge to main, GET-only smoke test, auto-rollback |
 
 Needs repo Actions secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`.
 Always check the Actions run after merging: a green merge does not mean a green deploy.

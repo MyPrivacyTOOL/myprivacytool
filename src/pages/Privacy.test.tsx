@@ -13,10 +13,10 @@ describe("Privacy: saved scan", () => {
     expect(screen.getByRole("heading", { name: "2.4 Your Saved Scan Result" })).toBeInTheDocument();
     const text = flat(document.body.textContent ?? "");
     expect(text).toContain(
-      "The free scan runs in your browser and shows you the results there. We do not save it unless you ask for your report. " +
+      "The free scan runs in your browser and shows you the results there. We do not save the result unless you ask for your report. " +
         "When you enter your email address and tick the box to save your scan result, we save the full result, meaning the technical details your browser reported " +
         "such as IP address, device, browser, language, screen and fingerprint-style values, together with your email address, for 12 months, so your report can show it. " +
-        "If you leave without giving an email address, nothing from the scan is saved. We only count, without personal data, how many visitors finish a scan and how many ask for a report, " +
+        "If you leave without giving an email address, we do not save the result (see section 2.0 for what pressing Scan me sends). We only count, without personal data, how many visitors finish a scan and how many ask for a report, " +
         "through our analytics if you accepted analytics cookies.",
     );
   });

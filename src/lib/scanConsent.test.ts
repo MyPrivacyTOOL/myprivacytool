@@ -1,19 +1,19 @@
 // MPC-9888: the browser half of the scan consent.
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { __resetScanConsentForTests, adoptExistingConsent, getConsentId, giveScanConsent, hasScanConsent } from "./scanConsent";
-import { browserContext } from "./recipientClient";
+import { __setUserActionForTests, browserContext, hasUserAction } from "./recipientClient";
 import { CONSENT_CONFIG } from "../../shared/recipients/consent-config";
 
 const ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const reply = (status: number, body: unknown) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
 
-beforeEach(() => { __resetScanConsentForTests(); vi.restoreAllMocks(); });
+beforeEach(() => { __resetScanConsentForTests(); __setUserActionForTests(false); vi.restoreAllMocks(); });
 
 describe("scan consent (browser)", () => {
   it("holds no consent until the button is pressed, and a scan_consent recipient then has no consent id", () => {
     expect(hasScanConsent()).toBe(false);
     expect(browserContext({}, "google-stun").consentId).toBeNull();            // STUN is refused without it
-    expect(browserContext({}, "leads").consentId).toBe("user-action:no-scan-consent");   // a form submit is not covered by the scan consent
+    expect(browserContext({}, "leads").consentId).toBeNull();   // MPC-10790: a form submit is not covered by the scan consent, and with no user action yet it carries no marker either
   });
 
   it("POSTs only the four allowed fields, keeps the id, and a second press writes nothing again", async () => {
