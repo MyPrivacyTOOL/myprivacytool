@@ -9,8 +9,8 @@ import type { PageLang } from "@/lib/hkSpamPage";
 import { ivrLanguage } from "@/lib/hkSpamPage";
 import { recipientFetch } from "@/lib/recipientClient";
 
-const SUPABASE_URL = "https://xmdmkumwxpgahmlweuug.supabase.co";
-const SUPABASE_ANON_KEY = "sb_publishable_4Nn6HUiPhuUqCgS04tvU0Q_3Ua6R2tV";
+export const SUPABASE_URL = "https://xmdmkumwxpgahmlweuug.supabase.co";
+export const SUPABASE_ANON_KEY = "sb_publishable_4Nn6HUiPhuUqCgS04tvU0Q_3Ua6R2tV";
 export const REGISTRATIONS_ENDPOINT = `${SUPABASE_URL}/rest/v1/hk_spam_registrations`;
 export const SOURCE_PAGE = "/HongKongSpam";
 export const REGISTERED_STORAGE_KEY = "mpt_hk_registered";
