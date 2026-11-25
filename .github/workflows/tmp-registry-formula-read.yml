@@ -80,12 +80,14 @@ jobs:
                         'risk': sel(pr, 'Risk Score'), 'conf': fval(pr, 'Confidence %'), 'sc': fval(pr, 'Source Count'), 'oc': num(pr, 'Overlap Channels')})
           cnt = {}
           for r, x in zip(rows, R):
-              x['url'] = r['url']; x['created'] = r.get('created_time'); x['title'] = ''.join(y.get('plain_text', '') for y in (r['properties'].get('Footprint') or {}).get('title', []))
+              pr = r['properties']
+              x['url'] = r['url']; x['created'] = r.get('created_time'); x['edited'] = r.get('last_edited_time')
+              x['cby'] = (r.get('created_by') or {}).get('id', '')[:8] + ':' + (r.get('created_by') or {}).get('type', '')
+              x['eby'] = (r.get('last_edited_by') or {}).get('id', '')[:8]
+              x['title'] = ''.join(y.get('plain_text', '') for y in (pr.get('Footprint') or {}).get('title', []))
+              x['code'] = txt(pr, 'Catalogue Code'); x['key'] = txt(pr, 'Evidence Key')
               cnt[x['id']] = cnt.get(x['id'], 0) + 1
-          print('TOTAL', len(R), 'distinct ids', len(cnt))
-          dups = sorted(i for i, n in cnt.items() if n > 1)
-          print('IDS WITH MORE THAN ONE ROW', dups)
           for x in sorted(R, key=lambda x: (x['id'], x['created'] or '')):
-              if cnt[x['id']] > 1 or x['id'] == 0:
-                  print('ROW id', x['id'], '|', x['title'][:45], '|', x['ch'], '|', x['created'], '|', x['ds'], '|', x['url'].split('/')[-1])
+              if cnt[x['id']] > 1 or x['id'] in (644, 645, 646, 647, 648, 649, 650, 651, 652, 280):
+                  print('ROW', x['id'], '|', x['title'][:28], '| code', x['code'], '| key', x['key'], '| risk', x['risk'], '| cat', x['cat'], '| conf', x['conf'], '| created', x['created'], 'by', x['cby'], '| edited', x['edited'], 'by', x['eby'], '|', x['url'].split('-')[-1])
           EOF
