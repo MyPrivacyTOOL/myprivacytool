@@ -16,7 +16,6 @@ Add a PR here when a Notion row marks it held; remove it when the row is closed.
 ## Held PRs (by number), from titles marked HOLD / DO NOT MERGE, checked 2026-11-18
 | PR | Why held |
 |---|---|
-| 821 | Titled "HOLD, do not merge" (MPC-9808 support@ and reply time on /contact) |
 | 624 | Titled "ROLLBACK ... DO NOT MERGE" (MPC-8731 learning-event collection off) |
 | 732 | Draft for review: Privacy/DPA wording for Telegram email ask (MPC-9224) |
 | 572 | Draft, gated live-write test (MPC-7471-F3) |
@@ -24,4 +23,5 @@ Add a PR here when a Notion row marks it held; remove it when the row is closed.
 
 ## Released
 - MPC-7385 scan go-live (PR 162): no longer held. PR 162 merged 2026-10-10 14:52 UTC (https://github.com/MyPrivacyTOOL/myprivacytool/pull/162); row MPC-7385 is Done.
+- MPC-9808 /contact support@ and reply time (PR 821): no longer held. Chris said "merge #821" on 2026-11-25 (MPC-10803) after the support@ test email arrived. PR 821 merged 2026-11-25 05:22 UTC as d07e671 (https://github.com/MyPrivacyTOOL/myprivacytool/pull/821); the MPC-6798 swarm and real-people check was not done and Chris accepted that.
 Notes: Never merge a PR opened by another session or person.
