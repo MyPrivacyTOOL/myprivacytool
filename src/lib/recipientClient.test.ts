@@ -16,14 +16,15 @@ const USER_ACTION_OR_SERVICE = ["github-channel", "oauth-session", "deep-dive-ap
 
 describe("browserContext (MPC-10790)", () => {
   it("before any click: nothing carries the marker, for any recipient", () => {
-    for (const k of [...SCAN_OR_ANALYTICS, ...USER_ACTION_OR_SERVICE, "supabase", "cloudflare-turnstile", "whoami"]) expect(browserContext({}, k).consentId, k).toBeNull();
+    for (const k of [...SCAN_OR_ANALYTICS, ...USER_ACTION_OR_SERVICE, "supabase", "supabase-signups", "cloudflare-turnstile", "whoami"]) expect(browserContext({}, k).consentId, k).toBeNull();
     expect(browserContext({}).consentId).toBeNull();
   });
 
   it("after a user action but no Scan me: only user_action / service recipients (and the named browser form write) get the marker", () => {
     __setUserActionForTests(true);
     for (const k of USER_ACTION_OR_SERVICE) expect(browserContext({}, k).consentId, k).toBe(USER_ACTION_MARKER);
-    expect(browserContext({}, "supabase").consentId).toBe(USER_ACTION_MARKER);   // /newsletter and hk-spam sign-ups: each its own form submit
+    expect(browserContext({}, "supabase-signups").consentId).toBe(USER_ACTION_MARKER);   // /newsletter and hk-spam sign-ups: each its own form submit
+    expect(browserContext({}, "supabase").consentId, "the Workers' database entry needs the real id").toBeNull();
     for (const k of SCAN_OR_ANALYTICS) expect(browserContext({}, k).consentId, `${k} needs the real id`).toBeNull();
     expect(browserContext({}, "not-in-the-registry").consentId).toBeNull();
   });

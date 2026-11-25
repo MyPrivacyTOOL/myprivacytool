@@ -5,7 +5,7 @@
       "locale": "en",
       "translation_pending": false,
       "translation_note": null,
-      "as_of": "2026-11-23",
+      "as_of": "2026-11-25",
       "privacy": {
         "groups": [
           {
@@ -104,6 +104,11 @@
                 "key": "supabase",
                 "name": "Supabase",
                 "text": "Supabase receives your city, your country, your email address, the domain of your email address, a scrambled fingerprint of your email address, your IP address, the text of your message, your name, your phone number, the page that sent you, your scan results, usernames you typed, the campaign tags on the link you came from. Why: Database that holds saved scans and sign-ups. Kept: Provider-side."
+              },
+              {
+                "key": "supabase-signups",
+                "name": "Supabase (sign-up forms)",
+                "text": "Supabase (sign-up forms) receives your email address, the campaign tags on the link you came from. Why: Stores the email you type into the newsletter or Hong Kong spam sign-up form, when you submit it. Kept: Provider-side."
               },
               {
                 "key": "resend",
@@ -317,6 +322,11 @@
             "text": "Google STUN servers receives your IP address. Why: Lets the WebRTC leak hexagon see your public IP; runs only inside the consented scan. Kept: Provider-side."
           },
           {
+            "key": "supabase-signups",
+            "name": "Supabase (sign-up forms)",
+            "text": "Supabase (sign-up forms) receives your email address, the campaign tags on the link you came from. Why: Stores the email you type into the newsletter or Hong Kong spam sign-up form, when you submit it. Kept: Provider-side."
+          },
+          {
             "key": "pwned-passwords",
             "name": "Have I Been Pwned (password check)",
             "text": "Have I Been Pwned (password check) receives a short lookup identifier made from your password (the first 5 characters of a one-way fingerprint of it), your IP address, your browser and device string. Why: Optional password exposure check in the browser: only the first 5 characters of a SHA-1 hash leave the page (k-anonymity), never the password. Kept: Provider-side."
@@ -354,6 +364,12 @@
             "key": "supabase",
             "name": "Supabase",
             "purpose": "Database that holds saved scans and sign-ups.",
+            "retention": "Provider-side"
+          },
+          {
+            "key": "supabase-signups",
+            "name": "Supabase (sign-up forms)",
+            "purpose": "Stores the email you type into the newsletter or Hong Kong spam sign-up form, when you submit it.",
             "retention": "Provider-side"
           },
           {
@@ -441,7 +457,7 @@
       "locale": "ja",
       "translation_pending": true,
       "translation_note": "This section is shown in English while its translation is pending. The English text is the one that applies.",
-      "as_of": "2026-11-23",
+      "as_of": "2026-11-25",
       "privacy": {
         "groups": [
           {
@@ -540,6 +556,11 @@
                 "key": "supabase",
                 "name": "Supabase",
                 "text": "Supabase receives your city, your country, your email address, the domain of your email address, a scrambled fingerprint of your email address, your IP address, the text of your message, your name, your phone number, the page that sent you, your scan results, usernames you typed, the campaign tags on the link you came from. Why: Database that holds saved scans and sign-ups. Kept: Provider-side."
+              },
+              {
+                "key": "supabase-signups",
+                "name": "Supabase (sign-up forms)",
+                "text": "Supabase (sign-up forms) receives your email address, the campaign tags on the link you came from. Why: Stores the email you type into the newsletter or Hong Kong spam sign-up form, when you submit it. Kept: Provider-side."
               },
               {
                 "key": "resend",
@@ -753,6 +774,11 @@
             "text": "Google STUN servers receives your IP address. Why: Lets the WebRTC leak hexagon see your public IP; runs only inside the consented scan. Kept: Provider-side."
           },
           {
+            "key": "supabase-signups",
+            "name": "Supabase (sign-up forms)",
+            "text": "Supabase (sign-up forms) receives your email address, the campaign tags on the link you came from. Why: Stores the email you type into the newsletter or Hong Kong spam sign-up form, when you submit it. Kept: Provider-side."
+          },
+          {
             "key": "pwned-passwords",
             "name": "Have I Been Pwned (password check)",
             "text": "Have I Been Pwned (password check) receives a short lookup identifier made from your password (the first 5 characters of a one-way fingerprint of it), your IP address, your browser and device string. Why: Optional password exposure check in the browser: only the first 5 characters of a SHA-1 hash leave the page (k-anonymity), never the password. Kept: Provider-side."
@@ -790,6 +816,12 @@
             "key": "supabase",
             "name": "Supabase",
             "purpose": "Database that holds saved scans and sign-ups.",
+            "retention": "Provider-side"
+          },
+          {
+            "key": "supabase-signups",
+            "name": "Supabase (sign-up forms)",
+            "purpose": "Stores the email you type into the newsletter or Hong Kong spam sign-up form, when you submit it.",
             "retention": "Provider-side"
           },
           {
@@ -877,7 +909,7 @@
       "locale": "zh",
       "translation_pending": true,
       "translation_note": "This section is shown in English while its translation is pending. The English text is the one that applies.",
-      "as_of": "2026-11-23",
+      "as_of": "2026-11-25",
       "privacy": {
         "groups": [
           {
@@ -976,6 +1008,11 @@
                 "key": "supabase",
                 "name": "Supabase",
                 "text": "Supabase receives your city, your country, your email address, the domain of your email address, a scrambled fingerprint of your email address, your IP address, the text of your message, your name, your phone number, the page that sent you, your scan results, usernames you typed, the campaign tags on the link you came from. Why: Database that holds saved scans and sign-ups. Kept: Provider-side."
+              },
+              {
+                "key": "supabase-signups",
+                "name": "Supabase (sign-up forms)",
+                "text": "Supabase (sign-up forms) receives your email address, the campaign tags on the link you came from. Why: Stores the email you type into the newsletter or Hong Kong spam sign-up form, when you submit it. Kept: Provider-side."
               },
               {
                 "key": "resend",
@@ -1189,6 +1226,11 @@
             "text": "Google STUN servers receives your IP address. Why: Lets the WebRTC leak hexagon see your public IP; runs only inside the consented scan. Kept: Provider-side."
           },
           {
+            "key": "supabase-signups",
+            "name": "Supabase (sign-up forms)",
+            "text": "Supabase (sign-up forms) receives your email address, the campaign tags on the link you came from. Why: Stores the email you type into the newsletter or Hong Kong spam sign-up form, when you submit it. Kept: Provider-side."
+          },
+          {
             "key": "pwned-passwords",
             "name": "Have I Been Pwned (password check)",
             "text": "Have I Been Pwned (password check) receives a short lookup identifier made from your password (the first 5 characters of a one-way fingerprint of it), your IP address, your browser and device string. Why: Optional password exposure check in the browser: only the first 5 characters of a SHA-1 hash leave the page (k-anonymity), never the password. Kept: Provider-side."
@@ -1226,6 +1268,12 @@
             "key": "supabase",
             "name": "Supabase",
             "purpose": "Database that holds saved scans and sign-ups.",
+            "retention": "Provider-side"
+          },
+          {
+            "key": "supabase-signups",
+            "name": "Supabase (sign-up forms)",
+            "purpose": "Stores the email you type into the newsletter or Hong Kong spam sign-up form, when you submit it.",
             "retention": "Provider-side"
           },
           {
@@ -1313,7 +1361,7 @@
       "locale": "ko",
       "translation_pending": true,
       "translation_note": "This section is shown in English while its translation is pending. The English text is the one that applies.",
-      "as_of": "2026-11-23",
+      "as_of": "2026-11-25",
       "privacy": {
         "groups": [
           {
@@ -1412,6 +1460,11 @@
                 "key": "supabase",
                 "name": "Supabase",
                 "text": "Supabase receives your city, your country, your email address, the domain of your email address, a scrambled fingerprint of your email address, your IP address, the text of your message, your name, your phone number, the page that sent you, your scan results, usernames you typed, the campaign tags on the link you came from. Why: Database that holds saved scans and sign-ups. Kept: Provider-side."
+              },
+              {
+                "key": "supabase-signups",
+                "name": "Supabase (sign-up forms)",
+                "text": "Supabase (sign-up forms) receives your email address, the campaign tags on the link you came from. Why: Stores the email you type into the newsletter or Hong Kong spam sign-up form, when you submit it. Kept: Provider-side."
               },
               {
                 "key": "resend",
@@ -1625,6 +1678,11 @@
             "text": "Google STUN servers receives your IP address. Why: Lets the WebRTC leak hexagon see your public IP; runs only inside the consented scan. Kept: Provider-side."
           },
           {
+            "key": "supabase-signups",
+            "name": "Supabase (sign-up forms)",
+            "text": "Supabase (sign-up forms) receives your email address, the campaign tags on the link you came from. Why: Stores the email you type into the newsletter or Hong Kong spam sign-up form, when you submit it. Kept: Provider-side."
+          },
+          {
             "key": "pwned-passwords",
             "name": "Have I Been Pwned (password check)",
             "text": "Have I Been Pwned (password check) receives a short lookup identifier made from your password (the first 5 characters of a one-way fingerprint of it), your IP address, your browser and device string. Why: Optional password exposure check in the browser: only the first 5 characters of a SHA-1 hash leave the page (k-anonymity), never the password. Kept: Provider-side."
@@ -1662,6 +1720,12 @@
             "key": "supabase",
             "name": "Supabase",
             "purpose": "Database that holds saved scans and sign-ups.",
+            "retention": "Provider-side"
+          },
+          {
+            "key": "supabase-signups",
+            "name": "Supabase (sign-up forms)",
+            "purpose": "Stores the email you type into the newsletter or Hong Kong spam sign-up form, when you submit it.",
             "retention": "Provider-side"
           },
           {
@@ -1749,7 +1813,7 @@
       "locale": "vi",
       "translation_pending": true,
       "translation_note": "This section is shown in English while its translation is pending. The English text is the one that applies.",
-      "as_of": "2026-11-23",
+      "as_of": "2026-11-25",
       "privacy": {
         "groups": [
           {
@@ -1848,6 +1912,11 @@
                 "key": "supabase",
                 "name": "Supabase",
                 "text": "Supabase receives your city, your country, your email address, the domain of your email address, a scrambled fingerprint of your email address, your IP address, the text of your message, your name, your phone number, the page that sent you, your scan results, usernames you typed, the campaign tags on the link you came from. Why: Database that holds saved scans and sign-ups. Kept: Provider-side."
+              },
+              {
+                "key": "supabase-signups",
+                "name": "Supabase (sign-up forms)",
+                "text": "Supabase (sign-up forms) receives your email address, the campaign tags on the link you came from. Why: Stores the email you type into the newsletter or Hong Kong spam sign-up form, when you submit it. Kept: Provider-side."
               },
               {
                 "key": "resend",
@@ -2061,6 +2130,11 @@
             "text": "Google STUN servers receives your IP address. Why: Lets the WebRTC leak hexagon see your public IP; runs only inside the consented scan. Kept: Provider-side."
           },
           {
+            "key": "supabase-signups",
+            "name": "Supabase (sign-up forms)",
+            "text": "Supabase (sign-up forms) receives your email address, the campaign tags on the link you came from. Why: Stores the email you type into the newsletter or Hong Kong spam sign-up form, when you submit it. Kept: Provider-side."
+          },
+          {
             "key": "pwned-passwords",
             "name": "Have I Been Pwned (password check)",
             "text": "Have I Been Pwned (password check) receives a short lookup identifier made from your password (the first 5 characters of a one-way fingerprint of it), your IP address, your browser and device string. Why: Optional password exposure check in the browser: only the first 5 characters of a SHA-1 hash leave the page (k-anonymity), never the password. Kept: Provider-side."
@@ -2098,6 +2172,12 @@
             "key": "supabase",
             "name": "Supabase",
             "purpose": "Database that holds saved scans and sign-ups.",
+            "retention": "Provider-side"
+          },
+          {
+            "key": "supabase-signups",
+            "name": "Supabase (sign-up forms)",
+            "purpose": "Stores the email you type into the newsletter or Hong Kong spam sign-up form, when you submit it.",
             "retention": "Provider-side"
           },
           {
@@ -2185,7 +2265,7 @@
       "locale": "es",
       "translation_pending": true,
       "translation_note": "This section is shown in English while its translation is pending. The English text is the one that applies.",
-      "as_of": "2026-11-23",
+      "as_of": "2026-11-25",
       "privacy": {
         "groups": [
           {
@@ -2284,6 +2364,11 @@
                 "key": "supabase",
                 "name": "Supabase",
                 "text": "Supabase receives your city, your country, your email address, the domain of your email address, a scrambled fingerprint of your email address, your IP address, the text of your message, your name, your phone number, the page that sent you, your scan results, usernames you typed, the campaign tags on the link you came from. Why: Database that holds saved scans and sign-ups. Kept: Provider-side."
+              },
+              {
+                "key": "supabase-signups",
+                "name": "Supabase (sign-up forms)",
+                "text": "Supabase (sign-up forms) receives your email address, the campaign tags on the link you came from. Why: Stores the email you type into the newsletter or Hong Kong spam sign-up form, when you submit it. Kept: Provider-side."
               },
               {
                 "key": "resend",
@@ -2497,6 +2582,11 @@
             "text": "Google STUN servers receives your IP address. Why: Lets the WebRTC leak hexagon see your public IP; runs only inside the consented scan. Kept: Provider-side."
           },
           {
+            "key": "supabase-signups",
+            "name": "Supabase (sign-up forms)",
+            "text": "Supabase (sign-up forms) receives your email address, the campaign tags on the link you came from. Why: Stores the email you type into the newsletter or Hong Kong spam sign-up form, when you submit it. Kept: Provider-side."
+          },
+          {
             "key": "pwned-passwords",
             "name": "Have I Been Pwned (password check)",
             "text": "Have I Been Pwned (password check) receives a short lookup identifier made from your password (the first 5 characters of a one-way fingerprint of it), your IP address, your browser and device string. Why: Optional password exposure check in the browser: only the first 5 characters of a SHA-1 hash leave the page (k-anonymity), never the password. Kept: Provider-side."
@@ -2534,6 +2624,12 @@
             "key": "supabase",
             "name": "Supabase",
             "purpose": "Database that holds saved scans and sign-ups.",
+            "retention": "Provider-side"
+          },
+          {
+            "key": "supabase-signups",
+            "name": "Supabase (sign-up forms)",
+            "purpose": "Stores the email you type into the newsletter or Hong Kong spam sign-up form, when you submit it.",
             "retention": "Provider-side"
           },
           {
@@ -2621,7 +2717,7 @@
       "locale": "de",
       "translation_pending": true,
       "translation_note": "This section is shown in English while its translation is pending. The English text is the one that applies.",
-      "as_of": "2026-11-23",
+      "as_of": "2026-11-25",
       "privacy": {
         "groups": [
           {
@@ -2720,6 +2816,11 @@
                 "key": "supabase",
                 "name": "Supabase",
                 "text": "Supabase receives your city, your country, your email address, the domain of your email address, a scrambled fingerprint of your email address, your IP address, the text of your message, your name, your phone number, the page that sent you, your scan results, usernames you typed, the campaign tags on the link you came from. Why: Database that holds saved scans and sign-ups. Kept: Provider-side."
+              },
+              {
+                "key": "supabase-signups",
+                "name": "Supabase (sign-up forms)",
+                "text": "Supabase (sign-up forms) receives your email address, the campaign tags on the link you came from. Why: Stores the email you type into the newsletter or Hong Kong spam sign-up form, when you submit it. Kept: Provider-side."
               },
               {
                 "key": "resend",
@@ -2933,6 +3034,11 @@
             "text": "Google STUN servers receives your IP address. Why: Lets the WebRTC leak hexagon see your public IP; runs only inside the consented scan. Kept: Provider-side."
           },
           {
+            "key": "supabase-signups",
+            "name": "Supabase (sign-up forms)",
+            "text": "Supabase (sign-up forms) receives your email address, the campaign tags on the link you came from. Why: Stores the email you type into the newsletter or Hong Kong spam sign-up form, when you submit it. Kept: Provider-side."
+          },
+          {
             "key": "pwned-passwords",
             "name": "Have I Been Pwned (password check)",
             "text": "Have I Been Pwned (password check) receives a short lookup identifier made from your password (the first 5 characters of a one-way fingerprint of it), your IP address, your browser and device string. Why: Optional password exposure check in the browser: only the first 5 characters of a SHA-1 hash leave the page (k-anonymity), never the password. Kept: Provider-side."
@@ -2970,6 +3076,12 @@
             "key": "supabase",
             "name": "Supabase",
             "purpose": "Database that holds saved scans and sign-ups.",
+            "retention": "Provider-side"
+          },
+          {
+            "key": "supabase-signups",
+            "name": "Supabase (sign-up forms)",
+            "purpose": "Stores the email you type into the newsletter or Hong Kong spam sign-up form, when you submit it.",
             "retention": "Provider-side"
           },
           {
@@ -3057,7 +3169,7 @@
       "locale": "fr",
       "translation_pending": true,
       "translation_note": "This section is shown in English while its translation is pending. The English text is the one that applies.",
-      "as_of": "2026-11-23",
+      "as_of": "2026-11-25",
       "privacy": {
         "groups": [
           {
@@ -3156,6 +3268,11 @@
                 "key": "supabase",
                 "name": "Supabase",
                 "text": "Supabase receives your city, your country, your email address, the domain of your email address, a scrambled fingerprint of your email address, your IP address, the text of your message, your name, your phone number, the page that sent you, your scan results, usernames you typed, the campaign tags on the link you came from. Why: Database that holds saved scans and sign-ups. Kept: Provider-side."
+              },
+              {
+                "key": "supabase-signups",
+                "name": "Supabase (sign-up forms)",
+                "text": "Supabase (sign-up forms) receives your email address, the campaign tags on the link you came from. Why: Stores the email you type into the newsletter or Hong Kong spam sign-up form, when you submit it. Kept: Provider-side."
               },
               {
                 "key": "resend",
@@ -3369,6 +3486,11 @@
             "text": "Google STUN servers receives your IP address. Why: Lets the WebRTC leak hexagon see your public IP; runs only inside the consented scan. Kept: Provider-side."
           },
           {
+            "key": "supabase-signups",
+            "name": "Supabase (sign-up forms)",
+            "text": "Supabase (sign-up forms) receives your email address, the campaign tags on the link you came from. Why: Stores the email you type into the newsletter or Hong Kong spam sign-up form, when you submit it. Kept: Provider-side."
+          },
+          {
             "key": "pwned-passwords",
             "name": "Have I Been Pwned (password check)",
             "text": "Have I Been Pwned (password check) receives a short lookup identifier made from your password (the first 5 characters of a one-way fingerprint of it), your IP address, your browser and device string. Why: Optional password exposure check in the browser: only the first 5 characters of a SHA-1 hash leave the page (k-anonymity), never the password. Kept: Provider-side."
@@ -3406,6 +3528,12 @@
             "key": "supabase",
             "name": "Supabase",
             "purpose": "Database that holds saved scans and sign-ups.",
+            "retention": "Provider-side"
+          },
+          {
+            "key": "supabase-signups",
+            "name": "Supabase (sign-up forms)",
+            "purpose": "Stores the email you type into the newsletter or Hong Kong spam sign-up form, when you submit it.",
             "retention": "Provider-side"
           },
           {
@@ -3493,7 +3621,7 @@
       "locale": "pt",
       "translation_pending": true,
       "translation_note": "This section is shown in English while its translation is pending. The English text is the one that applies.",
-      "as_of": "2026-11-23",
+      "as_of": "2026-11-25",
       "privacy": {
         "groups": [
           {
@@ -3592,6 +3720,11 @@
                 "key": "supabase",
                 "name": "Supabase",
                 "text": "Supabase receives your city, your country, your email address, the domain of your email address, a scrambled fingerprint of your email address, your IP address, the text of your message, your name, your phone number, the page that sent you, your scan results, usernames you typed, the campaign tags on the link you came from. Why: Database that holds saved scans and sign-ups. Kept: Provider-side."
+              },
+              {
+                "key": "supabase-signups",
+                "name": "Supabase (sign-up forms)",
+                "text": "Supabase (sign-up forms) receives your email address, the campaign tags on the link you came from. Why: Stores the email you type into the newsletter or Hong Kong spam sign-up form, when you submit it. Kept: Provider-side."
               },
               {
                 "key": "resend",
@@ -3805,6 +3938,11 @@
             "text": "Google STUN servers receives your IP address. Why: Lets the WebRTC leak hexagon see your public IP; runs only inside the consented scan. Kept: Provider-side."
           },
           {
+            "key": "supabase-signups",
+            "name": "Supabase (sign-up forms)",
+            "text": "Supabase (sign-up forms) receives your email address, the campaign tags on the link you came from. Why: Stores the email you type into the newsletter or Hong Kong spam sign-up form, when you submit it. Kept: Provider-side."
+          },
+          {
             "key": "pwned-passwords",
             "name": "Have I Been Pwned (password check)",
             "text": "Have I Been Pwned (password check) receives a short lookup identifier made from your password (the first 5 characters of a one-way fingerprint of it), your IP address, your browser and device string. Why: Optional password exposure check in the browser: only the first 5 characters of a SHA-1 hash leave the page (k-anonymity), never the password. Kept: Provider-side."
@@ -3842,6 +3980,12 @@
             "key": "supabase",
             "name": "Supabase",
             "purpose": "Database that holds saved scans and sign-ups.",
+            "retention": "Provider-side"
+          },
+          {
+            "key": "supabase-signups",
+            "name": "Supabase (sign-up forms)",
+            "purpose": "Stores the email you type into the newsletter or Hong Kong spam sign-up form, when you submit it.",
             "retention": "Provider-side"
           },
           {
@@ -3929,7 +4073,7 @@
       "locale": "ar",
       "translation_pending": true,
       "translation_note": "This section is shown in English while its translation is pending. The English text is the one that applies.",
-      "as_of": "2026-11-23",
+      "as_of": "2026-11-25",
       "privacy": {
         "groups": [
           {
@@ -4028,6 +4172,11 @@
                 "key": "supabase",
                 "name": "Supabase",
                 "text": "Supabase receives your city, your country, your email address, the domain of your email address, a scrambled fingerprint of your email address, your IP address, the text of your message, your name, your phone number, the page that sent you, your scan results, usernames you typed, the campaign tags on the link you came from. Why: Database that holds saved scans and sign-ups. Kept: Provider-side."
+              },
+              {
+                "key": "supabase-signups",
+                "name": "Supabase (sign-up forms)",
+                "text": "Supabase (sign-up forms) receives your email address, the campaign tags on the link you came from. Why: Stores the email you type into the newsletter or Hong Kong spam sign-up form, when you submit it. Kept: Provider-side."
               },
               {
                 "key": "resend",
@@ -4241,6 +4390,11 @@
             "text": "Google STUN servers receives your IP address. Why: Lets the WebRTC leak hexagon see your public IP; runs only inside the consented scan. Kept: Provider-side."
           },
           {
+            "key": "supabase-signups",
+            "name": "Supabase (sign-up forms)",
+            "text": "Supabase (sign-up forms) receives your email address, the campaign tags on the link you came from. Why: Stores the email you type into the newsletter or Hong Kong spam sign-up form, when you submit it. Kept: Provider-side."
+          },
+          {
             "key": "pwned-passwords",
             "name": "Have I Been Pwned (password check)",
             "text": "Have I Been Pwned (password check) receives a short lookup identifier made from your password (the first 5 characters of a one-way fingerprint of it), your IP address, your browser and device string. Why: Optional password exposure check in the browser: only the first 5 characters of a SHA-1 hash leave the page (k-anonymity), never the password. Kept: Provider-side."
@@ -4278,6 +4432,12 @@
             "key": "supabase",
             "name": "Supabase",
             "purpose": "Database that holds saved scans and sign-ups.",
+            "retention": "Provider-side"
+          },
+          {
+            "key": "supabase-signups",
+            "name": "Supabase (sign-up forms)",
+            "purpose": "Stores the email you type into the newsletter or Hong Kong spam sign-up form, when you submit it.",
             "retention": "Provider-side"
           },
           {
