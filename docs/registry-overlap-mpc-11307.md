@@ -6,7 +6,12 @@ Chris's rule (2026-11-24): the same data point on several channels is **not** a 
 
 - **Evidence Key** (text): one snake_case name for the underlying fact (`phone_number`, `profile_photo`, `message_text`). Rows that share a key overlay each other. Platform IDs are platform-scoped (`numeric_telegram_id`) because an ID on one platform does not corroborate an ID on another.
 - **Overlap Channels** (number): how many different channels carry the same Evidence Key, the row itself counted. Empty means the fact is on one channel only. This is a **static snapshot**: it needs recounting when Evidence Keys or rows change.
-- **Overlap Confidence %** (formula): `round(100 * (1 - pow(0.4, max(1, Overlap Channels))))`. Assumes each channel alone is 60% reliable and channels are independent: 1 channel 60, 2 channels 84, 3 channels 94, 4 or more 97+. It does **not** replace the existing `Confidence %` and `Source Count` formulas (not readable through the Notion connector); compare them, then swap if Chris agrees. Change `0.4` to change the per-channel reliability.
+- **Confidence %** (formula, live): uses Overlap Channels since 2026-11-25 (MPC-11318, Chris approved; MPC-11388 checked it and kept it). Scale 0-100.
+  `if(prop("Source Count") >= 2, 100, if(prop("Overlap Channels") >= 2, min(97, round(100 * (1 - pow(0.4, prop("Overlap Channels"))))), 50))`
+  Two or more sources give 100. Otherwise 2 channels give 84, 3 give 94, 4 or more give 97 (capped: overlap alone is not certainty). No overlap stays 50. Old formula, to paste back if needed: `if(prop("Source Count") >= 2, 100, 50)`. The Notion connector cannot read formula code or values, so check it by eye (for example Hexagon ID 7 shows 84, ID 1 shows 50). The 0.4 (each channel alone 60% reliable, channels independent) and the 97 cap are the two numbers to change.
+  MPC-11388 proposed `1 - (1 - base) * 0.4^(n - 1)` on top of this. It was not applied: the live formula already counts overlap, so stacking would count it twice and lower some values (2 channels 84 to 80, 3 channels 94 to 92).
+- **Source Count** (formula): not readable through the connector; assumed to count the row's Data Sources. Confirm by eye.
+- **Overlap Confidence %** (formula, side column, superseded): `round(100 * (1 - pow(0.4, max(1, Overlap Channels))))`. Same idea as the live Confidence % without the Source Count and 97-cap branches (1 channel 60, 2 channels 84, 3 channels 94). Kept for now; hide or remove it when Chris agrees.
 - **View "Overlap by Evidence Key"**: grouped by key, rows with 2 or more channels. Live, no maintenance.
 
 ## How to recount (repeatable)
