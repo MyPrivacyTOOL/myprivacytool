@@ -9,6 +9,7 @@ import pageMeta from "@/data/pageMeta.json";
 import { businessTeamsEnabled } from "@/lib/businessTeam";
 import { submitHubSpotForm, consentFields } from "@/lib/hubspot";
 import ConsentCheckbox from "@/components/ConsentCheckbox";
+import { BUSINESS_CONSENT_LABEL } from "@/lib/consentWording";
 import { trackBusinessLead } from "@/lib/analytics";
 import { queueBusinessRequest } from "@/lib/businessRequest";
 
@@ -145,7 +146,7 @@ const Business = () => {
                   <option value="51-200">51–200 employees</option>
                   <option value="200+">200+ employees</option>
                 </select>
-                <ConsentCheckbox id="business-consent" checked={consent} onChange={setConsent} disabled={status === "loading"} labelClassName="text-muted-foreground" />
+                <ConsentCheckbox id="business-consent" label={BUSINESS_CONSENT_LABEL} checked={consent} onChange={setConsent} disabled={status === "loading"} labelClassName="text-muted-foreground" />
                 {status === "error" && (
                   <p role="alert" className="text-destructive text-xs">{errorMsg}</p>
                 )}

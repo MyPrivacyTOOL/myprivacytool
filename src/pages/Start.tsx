@@ -7,6 +7,7 @@ import Seo from "@/components/Seo";
 import pageMeta from "@/data/pageMeta.json";
 import { submitHubSpotForm, consentFields } from "@/lib/hubspot";
 import ConsentCheckbox from "@/components/ConsentCheckbox";
+import { START_CONSENT_LABEL } from "@/lib/consentWording";
 import SubmitButton from "@/components/SubmitButton";
 import { useExperiment } from "@/hooks/useExperiment";
 import { useLeadSubmit } from "@/hooks/useLeadSubmit";
@@ -231,6 +232,7 @@ export default function Start() {
               <div ref={consentRef}>
                 <ConsentCheckbox
                   id="start-consent"
+                  label={START_CONSENT_LABEL}
                   checked={consent}
                   onChange={(v) => {
                     setConsent(v);
