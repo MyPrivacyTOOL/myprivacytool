@@ -8,22 +8,52 @@ Endpoints:
   POST   /api/v1/scans/username  - Scan username for exposures
   POST   /api/v1/scans/domain    - Scan domain for exposures
   GET    /api/v1/scans/{scan_id} - Retrieve scan results
-  GET    /api/v1/health          - Health check
+  GET    /api/v1/health          - Health check (the only open route)
+
+Auth: every route except /health needs `Authorization: Bearer <EXPOSURE_API_TOKEN>`. If the
+variable is unset, protected routes refuse every request.
 """
 
+import hmac
+import os
 import uuid
 import asyncio
 import logging
 from datetime import datetime
 from typing import Optional, Dict, Any
 
-from fastapi import APIRouter, HTTPException, Query, BackgroundTasks
+from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Query
 from pydantic import BaseModel, EmailStr, Field
 
 from app.openosint_mcp_adapter import OpenOSINTAdapter, ToolPolicy, ExposureResult
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/v1", tags=["exposure"])
+
+
+TOKEN_ENV = "EXPOSURE_API_TOKEN"
+
+
+def require_token(authorization: Optional[str] = Header(default=None)) -> None:
+    """Bearer-token check for every route except /health.
+
+    The token comes from EXPOSURE_API_TOKEN, read per request. If it is unset or empty, every
+    protected request is refused (fail closed): the API never runs anonymously. Compared in
+    constant time. Neither the token nor the scan target is ever logged.
+    """
+    expected = os.environ.get(TOKEN_ENV, "")
+    scheme, _, supplied = (authorization or "").partition(" ")
+    ok = (
+        bool(expected)
+        and scheme.lower() == "bearer"
+        and hmac.compare_digest(supplied.encode("utf-8"), expected.encode("utf-8"))
+    )
+    if not ok:
+        if not expected:
+            logger.error("%s is not set: refusing protected requests", TOKEN_ENV)
+        raise HTTPException(
+            status_code=401, detail="unauthorized", headers={"WWW-Authenticate": "Bearer"}
+        )
 
 # Initialize adapter (would be dependency-injected in real app)
 adapter = OpenOSINTAdapter(
@@ -106,7 +136,7 @@ class ScanResultResponse(BaseModel):
 
 
 # Endpoints
-@router.post("/scans/email", response_model=ScanResponse)
+@router.post("/scans/email", response_model=ScanResponse, dependencies=[Depends(require_token)])
 async def scan_email(request: EmailScanRequest, background_tasks: BackgroundTasks) -> ScanResponse:
     """
     Initiate an exposure scan for an email address.
@@ -156,7 +186,7 @@ async def scan_email(request: EmailScanRequest, background_tasks: BackgroundTask
     )
 
 
-@router.post("/scans/username", response_model=ScanResponse)
+@router.post("/scans/username", response_model=ScanResponse, dependencies=[Depends(require_token)])
 async def scan_username(request: UsernameScanRequest, background_tasks: BackgroundTasks) -> ScanResponse:
     """
     Initiate an exposure scan for a username.
@@ -197,7 +227,7 @@ async def scan_username(request: UsernameScanRequest, background_tasks: Backgrou
     )
 
 
-@router.post("/scans/domain", response_model=ScanResponse)
+@router.post("/scans/domain", response_model=ScanResponse, dependencies=[Depends(require_token)])
 async def scan_domain(request: DomainScanRequest, background_tasks: BackgroundTasks) -> ScanResponse:
     """
     Initiate an exposure scan for a domain.
@@ -237,7 +267,7 @@ async def scan_domain(request: DomainScanRequest, background_tasks: BackgroundTa
     )
 
 
-@router.get("/scans/{scan_id}", response_model=ScanResultResponse)
+@router.get("/scans/{scan_id}", response_model=ScanResultResponse, dependencies=[Depends(require_token)])
 async def get_scan_result(scan_id: str) -> ScanResultResponse:
     """
     Retrieve scan results by scan_id.
