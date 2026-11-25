@@ -1,10 +1,14 @@
 # Exposure scan API (FastAPI) for the OpenOSINT POC, MPC-11203. Used by docker-compose.yml.
 # Build context is the repo root: docker build -f docker/Dockerfile.exposure-api .
+# OpenOSINT runs in its own venv (it pins mcp<2) and is spawned over stdio by the adapter.
 FROM python:3.11-slim
 WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
-RUN pip install --no-cache-dir "mcp>=2.3.0" "fastapi>=0.104" "uvicorn>=0.24" "pydantic>=2" email-validator
+RUN python -m venv /opt/openosint && /opt/openosint/bin/pip install --no-cache-dir "openosint==2.38.2"
+COPY shadow-audit-api/requirements-openosint.txt .
+RUN pip install --no-cache-dir -r requirements-openosint.txt
 COPY shadow-audit-api/app /app/app
-ENV PORT=8001
+ENV OPENOSINT_MCP_COMMAND=/opt/openosint/bin/openosint-mcp \
+    PORT=8001
 EXPOSE 8001
 CMD ["uvicorn", "app.exposure_app:app", "--host", "0.0.0.0", "--port", "8001"]

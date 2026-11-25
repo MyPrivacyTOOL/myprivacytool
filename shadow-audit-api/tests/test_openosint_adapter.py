@@ -1,29 +1,48 @@
 """MPC-11203: OpenOSINT adapter tests.
 
-The protocol tests run the adapter against an in-process MCP server (real MCP wire
-protocol, fake OpenOSINT tools). Nothing here talks to a real OpenOSINT server or network.
+tests/fixtures/openosint_samples.json holds real outputs captured from openosint 2.38.2
+(`openosint-mcp`, stdio, passive mode). Everything else uses fakes or an in-process MCP server;
+no test here needs network or a real OpenOSINT install, except the one opt-in live test
+(set OPENOSINT_MCP_COMMAND to the `openosint-mcp` binary to run it).
 """
 import asyncio
+import contextlib
 import json
+import os
 import time
 import unittest
+from pathlib import Path
 
 from app.openosint_mcp_adapter import (
-    ACTIVE_TOOLS, ERROR_API_KEY, ERROR_OTHER, ERROR_POLICY, ERROR_RATE_LIMIT, ERROR_TIMEOUT,
-    DOMAIN_TOOLS, EMAIL_TOOLS, USERNAME_TOOLS, MCPToolClient, OpenOSINTAdapter,
+    ERROR_API_KEY, ERROR_OTHER, ERROR_POLICY, ERROR_RATE_LIMIT, ERROR_TIMEOUT,
+    NON_PASSIVE_TOOLS, PASSIVE_TOOLS, PLANS, TOOLS, MCPToolClient, OpenOSINTAdapter,
     ProvenanceRecord, ToolError, ToolPolicy, classify_error_text,
 )
 
+SAMPLES = json.loads((Path(__file__).parent / "fixtures" / "openosint_samples.json").read_text())
+
+
+def out(*lines, error=None):
+    return {"tool": "x", "target": "t", "timestamp": "2026-11-24T00:00:00+00:00",
+            "results": list(lines), "error": error}
+
 
 class FakeClient:
-    """Scripted ToolClient: behaviours maps tool -> callable(arg) -> output | raises."""
+    """Scripted ToolClient: behaviours maps tool -> callable(arguments) -> output | raises."""
 
-    def __init__(self, behaviours=None, default=None):
+    def __init__(self, behaviours=None, default=None, fail_session=False):
         self.behaviours = behaviours or {}
-        self.default = default if default is not None else {"findings": []}
+        self.default = default if default is not None else out()
+        self.fail_session = fail_session
         self.inflight = 0
         self.max_inflight = 0
         self.calls = []
+
+    @contextlib.asynccontextmanager
+    async def session(self):
+        if self.fail_session:
+            raise RuntimeError("server did not start for jo@example.com")
+        yield self
 
     async def call_tool(self, name, arguments):
         self.calls.append((name, arguments))
@@ -39,64 +58,96 @@ class FakeClient:
             self.inflight -= 1
 
     async def list_tool_names(self):
-        return sorted({t for t, _ in EMAIL_TOOLS + USERNAME_TOOLS + DOMAIN_TOOLS})
+        return sorted({t for plan in PLANS.values() for t in plan})
 
 
 def run(coro):
     return asyncio.run(coro)
 
 
-def finding(text, source="hibp", conf=None):
-    d = {"finding": text, "source": source}
-    if conf is not None:
-        d["confidence"] = conf
-    return d
+def parse(sample_key, tool):
+    return OpenOSINTAdapter(client=FakeClient())._records(json.loads(SAMPLES[sample_key]["text"]), tool)
 
 
-class ProvenanceTests(unittest.TestCase):
-    def test_every_finding_traces_to_tool_source_timestamp(self):
-        c = FakeClient({"search_breach": lambda a: {"findings": [finding("Breach X", "hibp", 0.9)]},
-                        "search_email": lambda a: ["Listed on paste site"]})
-        r = run(OpenOSINTAdapter(client=c).scan_email("jo@example.com", "s1"))
-        self.assertEqual(r.total_findings, 2)
-        for f in r.findings:
-            self.assertTrue(f.tool_name and f.data_source and f.timestamp.endswith("Z"))
-            self.assertFalse(f.is_active)
-        by_tool = {f.tool_name: f for f in r.findings}
-        self.assertEqual(by_tool["search_breach"].data_source, "hibp")
-        self.assertEqual(by_tool["search_breach"].confidence, 0.9)
-        # tool reported no source -> falls back to the tool name, never invented
-        self.assertEqual(by_tool["search_email"].data_source, "search_email")
+class RealOutputTests(unittest.TestCase):
+    """Parsing of outputs captured from the real server."""
 
-    def test_email_scan_searches_local_part_as_username(self):
+    def test_dns_output_becomes_provenance_records(self):
+        recs = parse("dns_ok", "search_dns")
+        self.assertTrue(any("A:" in r.finding for r in recs))
+        for r in recs:
+            self.assertEqual((r.tool_name, r.data_source, r.tool_category),
+                             ("search_dns", "dns resolver", "dns_records"))
+            self.assertTrue(r.timestamp.endswith("Z"))
+            self.assertFalse(r.is_active)
+
+    def test_missing_key_is_classified(self):
+        with self.assertRaises(ToolError) as cm:
+            parse("breach_key_missing", "search_breach")
+        self.assertEqual(cm.exception.kind, ERROR_API_KEY)
+
+    def test_network_errors_are_not_missing_keys(self):
+        for key, tool in (("github_network_error", "search_github"),
+                          ("whois_network_error", "search_whois"),
+                          ("rdap_proxy_403", "search_rdap")):  # proxy says "403": not a key problem
+            with self.assertRaises(ToolError, msg=key) as cm:
+                parse(key, tool)
+            self.assertEqual(cm.exception.kind, ERROR_OTHER, key)
+
+    def test_server_refusal_of_noisy_tool_is_policy(self):
+        self.assertTrue(SAMPLES["noisy_blocked"]["is_error"])
+        self.assertEqual(classify_error_text(SAMPLES["noisy_blocked"]["text"]), ERROR_POLICY)
+
+    def test_adapter_tools_match_real_passive_tool_listing(self):
+        listed = set(SAMPLES["tool_names"])
+        self.assertTrue(PASSIVE_TOOLS <= listed, PASSIVE_TOOLS - listed)
+        self.assertTrue(all(t in listed for plan in PLANS.values() for t in plan))
+        self.assertFalse(NON_PASSIVE_TOOLS & listed)  # server hides them in passive mode
+        self.assertFalse(NON_PASSIVE_TOOLS & set(TOOLS))
+        for plan in PLANS.values():
+            self.assertTrue(set(plan) <= PASSIVE_TOOLS)
+
+    def test_classify_error_text(self):
+        self.assertEqual(classify_error_text("HIBP rate limit exceeded"), ERROR_RATE_LIMIT)
+        self.assertEqual(classify_error_text("[key_required] HIBP_API_KEY"), ERROR_API_KEY)
+        self.assertEqual(classify_error_text("Tunnel connection failed: 403 Forbidden"), ERROR_OTHER)
+
+
+class ScanTests(unittest.TestCase):
+    def test_tools_get_their_own_argument_names(self):
         c = FakeClient()
-        run(OpenOSINTAdapter(client=c).scan_email("jo.smith@example.com", "s1"))
-        self.assertIn(("search_username", {"target": "jo.smith"}), c.calls)
-        self.assertIn(("search_email", {"target": "jo.smith@example.com"}), c.calls)
+        run(OpenOSINTAdapter(client=c).scan_email("jo@example.com", "s1"))
+        run(OpenOSINTAdapter(client=c).scan_domain("example.com", "s2"))
+        calls = dict(c.calls)
+        self.assertEqual(calls["search_breach"], {"email": "jo@example.com", "json_output": True})
+        self.assertEqual(calls["search_paste"], {"query": "jo@example.com", "json_output": True})
+        self.assertEqual(calls["search_whois"], {"domain": "example.com", "json_output": True})
+        self.assertEqual(calls["search_virustotal"], {"target": "example.com", "json_output": True})
 
-    def test_dedup_keeps_highest_confidence_per_finding_and_source(self):
-        c = FakeClient({"search_email": lambda a: [finding("Breach X", "hibp", 0.4)],
-                        "search_breach": lambda a: [finding("Breach X", "hibp", 0.9),
-                                                    finding("Breach Y", "dehashed", 0.7)]})
-        r = run(OpenOSINTAdapter(client=c).scan_email("a@b.co", "s1"))
-        self.assertEqual([(f.finding, f.confidence) for f in r.findings],
-                         [("Breach X", 0.9), ("Breach Y", 0.7)])
+    def test_findings_have_full_provenance_and_dedup(self):
+        c = FakeClient({"search_whois": lambda a: out("Registrar: X", "Registrar: X", "Created: 2020"),
+                        "search_dns": lambda a: out("[DNS] A: 1.2.3.4")})
+        r = run(OpenOSINTAdapter(client=c).scan_domain("example.com", "s1"))
+        got = sorted((f.tool_name, f.finding, f.data_source) for f in r.findings)
+        self.assertEqual(got, [("search_dns", "[DNS] A: 1.2.3.4", "dns resolver"),
+                               ("search_whois", "Created: 2020", "whois registry"),
+                               ("search_whois", "Registrar: X", "whois registry")])
+        self.assertTrue(all(f.confidence == 0.5 for f in r.findings))
 
-    def test_confidence_clamped_and_defaulted(self):
-        c = FakeClient({"search_email": lambda a: [finding("a", "s1", 7), finding("b", "s2"),
-                                                   finding("c", "s3", "junk")]})
+    def test_no_result_lines_are_not_findings(self):
+        c = FakeClient({"search_breach": lambda a: out("No breaches found for 'a@b.co'."),
+                        "search_paste": lambda a: out("No pastes found mentioning 'a@b.co'.")})
         r = run(OpenOSINTAdapter(client=c).scan_email("a@b.co", "s1"))
-        conf = {f.finding: f.confidence for f in r.findings}
-        self.assertEqual(conf, {"a": 1.0, "b": 0.5, "c": 0.5})
+        self.assertEqual(r.total_findings, 0)
+        self.assertEqual(r.tools_failed, 0)
 
     def test_json_report_shape(self):
-        c = FakeClient({"search_breach": lambda a: [finding("Breach X", "hibp", 0.9)]})
+        c = FakeClient({"search_dns": lambda a: out("[DNS] A: 1.2.3.4")})
         a = OpenOSINTAdapter(client=c)
-        report = json.loads(a.to_json_report(run(a.scan_email("a@b.co", "s1"))))
+        report = json.loads(a.to_json_report(run(a.scan_domain("example.com", "s1"))))
         self.assertEqual(report["scan_id"], "s1")
         self.assertEqual(set(report["findings"][0]), set(ProvenanceRecord.__dataclass_fields__))
-        self.assertEqual(report["summary"]["tools_executed"], 3)
-        self.assertEqual(report["summary"]["tool_errors"], [])
+        self.assertEqual(report["summary"]["tools_executed"], 5)
 
 
 class ConcurrencyTests(unittest.TestCase):
@@ -106,7 +157,7 @@ class ConcurrencyTests(unittest.TestCase):
         r = run(OpenOSINTAdapter(client=c).scan_domain("example.com", "s1"))
         self.assertEqual(r.tools_executed, 5)
         self.assertEqual(c.max_inflight, 5)
-        self.assertLess(time.monotonic() - start, 0.05 * 5)  # not sequential
+        self.assertLess(time.monotonic() - start, 0.05 * 5)
 
     def test_concurrent_limit_is_enforced(self):
         c = FakeClient()
@@ -118,68 +169,64 @@ class ErrorHandlingTests(unittest.TestCase):
     def test_timeout_is_isolated_and_counted(self):
         async def slow(a):
             await asyncio.sleep(1)
-        c = FakeClient({"search_breach": slow, "search_email": lambda a: [finding("ok")]})
-        r = run(OpenOSINTAdapter(client=c, timeout_seconds=0.2).scan_email("a@b.co", "s1"))
-        self.assertEqual(r.tools_failed, 1)
-        self.assertEqual(r.tool_errors, [{"tool": "search_breach", "kind": ERROR_TIMEOUT}])
-        self.assertEqual([f.finding for f in r.findings], ["ok"])
+        c = FakeClient({"search_whois": slow, "search_dns": lambda a: out("[DNS] A: 1.2.3.4")})
+        r = run(OpenOSINTAdapter(client=c, timeout_seconds=0.2).scan_domain("example.com", "s1"))
+        self.assertIn({"tool": "search_whois", "kind": ERROR_TIMEOUT}, r.tool_errors)
+        self.assertEqual([f.finding for f in r.findings], ["[DNS] A: 1.2.3.4"])
 
-    def test_missing_api_key_and_rate_limit_are_classified(self):
-        def no_key(a):
-            raise ToolError(ERROR_API_KEY)
-
-        def limited(a):
-            raise ToolError(ERROR_RATE_LIMIT)
-        c = FakeClient({"search_whois": no_key, "search_dns": limited})
-        r = run(OpenOSINTAdapter(client=c).scan_domain("example.com", "s1"))
-        self.assertEqual({(e["tool"], e["kind"]) for e in r.tool_errors},
-                         {("search_whois", ERROR_API_KEY), ("search_dns", ERROR_RATE_LIMIT)})
-        self.assertEqual(r.tools_failed, 2)
-
-    def test_unexpected_exception_and_bad_shape_do_not_fail_scan(self):
-        def boom(a):
-            raise RuntimeError("secret detail jo@example.com")
-        c = FakeClient({"search_email": boom, "search_breach": lambda a: {"nope": 1}})
+    def test_error_kinds_from_real_style_output(self):
+        c = FakeClient({
+            "search_breach": lambda a: out("Scan error: HIBP API key not set.", "[key_required] HIBP_API_KEY"),
+            "search_paste": lambda a: out("Scan error: HTTP 429 rate limit exceeded"),
+            "search_github": lambda a: (_ for _ in ()).throw(RuntimeError("boom jo@example.com")),
+        })
         r = run(OpenOSINTAdapter(client=c).scan_email("jo@example.com", "s1"))
-        self.assertEqual(r.tools_failed, 2)
-        self.assertTrue(all(e["kind"] == ERROR_OTHER for e in r.tool_errors))
+        self.assertEqual({(e["tool"], e["kind"]) for e in r.tool_errors},
+                         {("search_breach", ERROR_API_KEY), ("search_paste", ERROR_RATE_LIMIT),
+                          ("search_github", ERROR_OTHER)})
         self.assertNotIn("jo@example.com", json.dumps(r.tool_errors))
+        self.assertEqual(r.tools_failed, 3)
 
-    def test_classify_error_text(self):
-        self.assertEqual(classify_error_text("HTTP 429 Too Many Requests"), ERROR_RATE_LIMIT)
-        self.assertEqual(classify_error_text("SHODAN_API_KEY not set (api key missing)"), ERROR_API_KEY)
-        self.assertEqual(classify_error_text("connection reset"), ERROR_OTHER)
+    def test_unexpected_shape_does_not_fail_scan(self):
+        c = FakeClient(default={"nope": 1})
+        r = run(OpenOSINTAdapter(client=c).scan_username("someone", "s1"))
+        self.assertEqual(r.tools_failed, 3)
+        self.assertEqual(r.total_findings, 0)
+
+    def test_server_that_cannot_start_fails_every_tool_not_the_scan(self):
+        r = run(OpenOSINTAdapter(client=FakeClient(fail_session=True)).scan_email("jo@example.com", "s1"))
+        self.assertEqual(r.tools_failed, 3)
+        self.assertNotIn("jo@example.com", json.dumps(r.tool_errors))
 
 
 class PolicyTests(unittest.TestCase):
-    def test_active_tool_blocked_when_passive_only(self):
-        c = FakeClient()
-        a = OpenOSINTAdapter(client=c)
-        out = run(self._call(a, "scrape_url"))
-        self.assertIsInstance(out, ToolError)
-        self.assertEqual(out.kind, ERROR_POLICY)
-        self.assertEqual(c.calls, [])
-
-    def test_active_tool_allowed_when_policy_allows_and_flagged(self):
-        c = FakeClient({"scrape_url": lambda a: [finding("page", "web")]})
-        a = OpenOSINTAdapter(client=c, policy=ToolPolicy.ALLOW_ACTIVE)
-        out = run(self._call(a, "scrape_url"))
-        self.assertTrue(out[0].is_active)
-
-    def test_default_scan_plans_are_passive_only(self):
-        for tool, _ in EMAIL_TOOLS + USERNAME_TOOLS + DOMAIN_TOOLS:
-            self.assertNotIn(tool, ACTIVE_TOOLS)
-
     @staticmethod
-    async def _call(adapter, tool):
-        return await adapter._call(tool, "x", "cat", "s1", asyncio.Semaphore(1))
+    async def _call(adapter, client, tool):
+        return await adapter._call(client, tool, "x", "s1", asyncio.Semaphore(1))
+
+    def test_noisy_tool_blocked_when_passive_only(self):
+        for tool in ("search_email", "search_username", "search_domain"):
+            c = FakeClient()
+            out_ = run(self._call(OpenOSINTAdapter(client=c), c, tool))
+            self.assertIsInstance(out_, ToolError)
+            self.assertEqual(out_.kind, ERROR_POLICY)
+            self.assertEqual(c.calls, [])
+
+    def test_noisy_tool_allowed_only_with_allow_active_and_flagged(self):
+        c = FakeClient({"search_email": lambda a: out("Account found on site")})
+        a = OpenOSINTAdapter(client=c, policy=ToolPolicy.ALLOW_ACTIVE)
+        recs = run(self._call(a, c, "search_email"))
+        self.assertTrue(recs[0].is_active)
+
+    def test_default_plans_are_passive(self):
+        for plan in PLANS.values():
+            self.assertTrue(set(plan) <= PASSIVE_TOOLS)
 
 
 class LoggingTests(unittest.TestCase):
     def test_targets_never_logged(self):
-        def boom(a):
-            raise RuntimeError("x")
-        c = FakeClient({"search_email": boom})
+        c = FakeClient({"search_github": lambda a: (_ for _ in ()).throw(RuntimeError("x"))},
+                       fail_session=False)
         with self.assertLogs("app.openosint_mcp_adapter", level="DEBUG") as cm:
             run(OpenOSINTAdapter(client=c).scan_email("jo.smith@example.com", "s1"))
         joined = "\n".join(cm.output)
@@ -194,40 +241,50 @@ class MCPProtocolTests(unittest.TestCase):
     def setUpClass(cls):
         try:
             from mcp.server.mcpserver import MCPServer
-            from mcp.server.mcpserver.exceptions import ToolError as ServerToolError
         except ImportError:
-            raise unittest.SkipTest("mcp SDK with MCPServer not installed")
+            raise unittest.SkipTest("mcp>=2 SDK with MCPServer not installed")
         s = MCPServer("fake-openosint")
-        names = {t for t, _ in EMAIL_TOOLS + USERNAME_TOOLS + DOMAIN_TOOLS}
+        arg_of = {t: v[0] for t, v in TOOLS.items()}
 
-        for n in names:
-            def make(name):
-                def tool(target: str) -> dict:
-                    if name == "search_whois":
-                        raise ServerToolError("WHOIS_API_KEY not set: api key missing")
-                    return {"findings": [{"finding": f"{name}:hit", "source": "fake", "confidence": 0.8}]}
-                tool.__name__ = name
-                return tool
-            s.tool()(make(n))
+        def register(name):
+            argname = arg_of[name]
+            ns = {}
+            exec(f"def tool({argname}: str, json_output: bool = False) -> dict:\n"
+                 f"    return RESULT({name!r}, {argname})\n", {"RESULT": cls._result}, ns)
+            fn = ns["tool"]
+            fn.__name__ = name
+            s.tool()(fn)
+        for name in TOOLS:
+            register(name)
         cls.server = s
 
+    @staticmethod
+    def _result(tool, target):
+        if tool == "search_whois":
+            return out("Scan error: WHOIS query failed: [Errno -2] Name or service not known")
+        if tool == "search_virustotal":
+            return out("Scan error: cannot run: key missing", "[key_required] VIRUSTOTAL_API_KEY")
+        return out(f"{tool} saw {target}")
+
     def test_scan_over_mcp_protocol(self):
-        a = OpenOSINTAdapter(client=MCPToolClient(self.server))
+        a = OpenOSINTAdapter(client=MCPToolClient(server=self.server))
         self.assertEqual(run(a.missing_tools()), [])
         r = run(a.scan_domain("example.com", "s1"))
         self.assertEqual(r.tools_executed, 5)
-        self.assertEqual(r.tool_errors, [{"tool": "search_whois", "kind": ERROR_API_KEY}])
+        self.assertEqual({(e["tool"], e["kind"]) for e in r.tool_errors},
+                         {("search_whois", ERROR_OTHER), ("search_virustotal", ERROR_API_KEY)})
         self.assertEqual({f.tool_name for f in r.findings},
-                         {"search_domain", "search_dns", "search_rdap", "search_footprint"})
-        self.assertTrue(all(f.confidence == 0.8 and f.data_source == "fake" for f in r.findings))
+                         {"search_rdap", "search_dns", "search_footprint"})
 
-    def test_missing_tools_reports_gaps(self):
-        class Partial(FakeClient):
-            async def list_tool_names(self):
-                return ["search_email"]
-        missing = run(OpenOSINTAdapter(client=Partial()).missing_tools())
-        self.assertIn("search_breach", missing)
-        self.assertNotIn("search_email", missing)
+
+@unittest.skipUnless(os.getenv("OPENOSINT_MCP_COMMAND"), "set OPENOSINT_MCP_COMMAND to run against a real openosint-mcp")
+class LiveServerTests(unittest.TestCase):
+    def test_real_server_has_every_tool_the_adapter_uses(self):
+        self.assertEqual(run(OpenOSINTAdapter().missing_tools()), [])
+
+    def test_real_domain_scan_returns_dns_provenance(self):
+        r = run(OpenOSINTAdapter().scan_domain("example.com", "live"))
+        self.assertTrue(any(f.tool_name == "search_dns" for f in r.findings))
 
 
 if __name__ == "__main__":

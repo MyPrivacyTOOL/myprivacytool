@@ -27,10 +27,8 @@ router = APIRouter(prefix="/api/v1", tags=["exposure"])
 
 # Initialize adapter (would be dependency-injected in real app)
 adapter = OpenOSINTAdapter(
-    mcp_port=8000,
     policy=ToolPolicy.PASSIVE_ONLY,
     concurrent_limit=5,
-    timeout_seconds=5.0,
     enable_provenance=True,
 )
 
@@ -300,7 +298,7 @@ async def health_check() -> Dict[str, Any]:
     return {
         "status": "healthy",
         "component": "exposure-api",
-        "mcp_server": "connected" if adapter.mcp_client else "disconnected",
+        "mcp_server": "stdio (spawned per scan)",
         "scans_in_cache": len(_scan_cache),
         "timestamp": datetime.utcnow().isoformat() + "Z",
     }
