@@ -120,7 +120,7 @@ class ScanTests(unittest.TestCase):
         run(OpenOSINTAdapter(client=c).scan_domain("example.com", "s2"))
         calls = dict(c.calls)
         self.assertEqual(calls["search_breach"], {"email": "jo@example.com", "json_output": True})
-        self.assertEqual(calls["search_paste"], {"query": "jo@example.com", "json_output": True})
+        self.assertEqual(calls["search_github"], {"query": "jo@example.com", "json_output": True})
         self.assertEqual(calls["search_whois"], {"domain": "example.com", "json_output": True})
         self.assertEqual(calls["search_virustotal"], {"target": "example.com", "json_output": True})
 
@@ -136,10 +136,18 @@ class ScanTests(unittest.TestCase):
 
     def test_no_result_lines_are_not_findings(self):
         c = FakeClient({"search_breach": lambda a: out("No breaches found for 'a@b.co'."),
-                        "search_paste": lambda a: out("No pastes found mentioning 'a@b.co'.")})
+                        "search_github": lambda a: out("[GitHub] No users found for query: 'a@b.co'.")})
         r = run(OpenOSINTAdapter(client=c).scan_email("a@b.co", "s1"))
         self.assertEqual(r.total_findings, 0)
         self.assertEqual(r.tools_failed, 0)
+
+    def test_dns_warnings_are_findings_not_empty_results(self):
+        c = FakeClient({"search_dns": lambda a: out("[!] No SPF record found - anyone can spoof email")})
+        r = run(OpenOSINTAdapter(client=c).scan_domain("example.com", "s1"))
+        self.assertEqual(r.total_findings, 1)
+
+    def test_paste_search_is_not_in_any_plan(self):
+        self.assertTrue(all("search_paste" not in plan for plan in PLANS.values()))
 
     def test_json_report_shape(self):
         c = FakeClient({"search_dns": lambda a: out("[DNS] A: 1.2.3.4")})
@@ -176,26 +184,26 @@ class ErrorHandlingTests(unittest.TestCase):
 
     def test_error_kinds_from_real_style_output(self):
         c = FakeClient({
-            "search_breach": lambda a: out("Scan error: HIBP API key not set.", "[key_required] HIBP_API_KEY"),
-            "search_paste": lambda a: out("Scan error: HTTP 429 rate limit exceeded"),
-            "search_github": lambda a: (_ for _ in ()).throw(RuntimeError("boom jo@example.com")),
+            "search_whois": lambda a: out("Scan error: whois key not set.", "[key_required] WHOIS_API_KEY"),
+            "search_rdap": lambda a: out("Scan error: HTTP 429 rate limit exceeded"),
+            "search_dns": lambda a: (_ for _ in ()).throw(RuntimeError("boom jo@example.com")),
         })
-        r = run(OpenOSINTAdapter(client=c).scan_email("jo@example.com", "s1"))
+        r = run(OpenOSINTAdapter(client=c).scan_domain("example.com", "s1"))
         self.assertEqual({(e["tool"], e["kind"]) for e in r.tool_errors},
-                         {("search_breach", ERROR_API_KEY), ("search_paste", ERROR_RATE_LIMIT),
-                          ("search_github", ERROR_OTHER)})
+                         {("search_whois", ERROR_API_KEY), ("search_rdap", ERROR_RATE_LIMIT),
+                          ("search_dns", ERROR_OTHER)})
         self.assertNotIn("jo@example.com", json.dumps(r.tool_errors))
         self.assertEqual(r.tools_failed, 3)
 
     def test_unexpected_shape_does_not_fail_scan(self):
         c = FakeClient(default={"nope": 1})
         r = run(OpenOSINTAdapter(client=c).scan_username("someone", "s1"))
-        self.assertEqual(r.tools_failed, 3)
+        self.assertEqual(r.tools_failed, 2)
         self.assertEqual(r.total_findings, 0)
 
     def test_server_that_cannot_start_fails_every_tool_not_the_scan(self):
         r = run(OpenOSINTAdapter(client=FakeClient(fail_session=True)).scan_email("jo@example.com", "s1"))
-        self.assertEqual(r.tools_failed, 3)
+        self.assertEqual(r.tools_failed, 2)
         self.assertNotIn("jo@example.com", json.dumps(r.tool_errors))
 
 
