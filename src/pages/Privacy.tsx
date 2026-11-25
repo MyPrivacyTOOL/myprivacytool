@@ -98,12 +98,21 @@ const Privacy = () => {
                 2.0 What Stays in Your Browser
               </h3>
               <p className="text-muted-foreground">
-                The free scan on our homepage detects device, browser and network
-                characteristics directly in your browser, and shows them to you
-                there. The finished result stays in your browser. It is not sent
-                to us unless you ask for your report and choose to save it (see
-                section 2.4). If you leave without giving us an email address,
-                nothing from the scan is saved. The other information described
+                The free scan on our homepage reads device, browser and network
+                characteristics in your browser and shows them to you there. Two
+                parts of it use a server. Your IP address and approximate
+                location come from a lookup on our own servers, which stores
+                nothing. When you press Scan me, your browser sends us a record
+                of your agreement (a random scan ID, the version of the wording
+                and a hash of the text you saw), and the network leak check asks an
+                outside service for the public address your connection shows (the
+                services are named in section 5). The finished result stays in
+                your browser. It is not sent to us unless you ask for your report
+                and choose to save it (see section 2.4). If you give us details to
+                look up, such as an email address, they go to our servers to run
+                the lookups (see section 2.1). If you leave without giving us an
+                email address, we keep no copy of your scan result, only the
+                record that you pressed Scan me. The other information described
                 below is stored only when you take an action that submits it (for
                 example, entering your email address, messaging our bot, or
                 requesting a scan of a social handle).
@@ -330,14 +339,14 @@ const Privacy = () => {
               </h3>
               <p className="text-muted-foreground">
                 The free scan runs in your browser and shows you the results
-                there. We do not save it unless you ask for your report. When you
-                enter your email address and tick the box to save your scan
+                there. We do not save the result unless you ask for your report.
+                When you enter your email address and tick the box to save your scan
                 result, we save the full result, meaning the technical details
                 your browser reported such as IP address, device, browser,
                 language, screen and fingerprint-style values, together with your
                 email address, for 12 months, so your report can show it. If you
-                leave without giving an email address, nothing from the scan is
-                saved. We only count, without personal data, how many visitors
+                leave without giving an email address, we do not save the result
+                (see section 2.0 for what pressing Scan me sends). We only count, without personal data, how many visitors
                 finish a scan and how many ask for a report, through our analytics
                 if you accepted analytics cookies.
               </p>
@@ -718,6 +727,34 @@ const Privacy = () => {
               </p>
 
               <h3 className="mt-6 text-xl font-semibold text-foreground">
+                6B. Connected accounts (GitHub, Reddit, Google)
+              </h3>
+              <ul className="list-inside list-disc space-y-2 text-muted-foreground" data-testid="connected-accounts">
+                <li>
+                  <strong>GitHub:</strong> when you connect, we ask GitHub for the <code>read:user</code> permission only and read your public profile
+                  activity. We keep your GitHub account number and an encrypted access token (and refresh token) until you disconnect, and we stop using the token 90 days after you
+                  connected, until you connect again; a copy of the
+                  snapshot we derive for 24 hours; and a signed session cookie in your browser for 7 days. The snapshot holds derived values only
+                  (languages, topics, counts and a role label), not your email address, name, username, location, company or picture.
+                </li>
+                <li>
+                  <strong>Reddit:</strong> works the same way: encrypted token until you disconnect (not used after 90 days without connecting again), a 24-hour copy of the derived snapshot and a 7-day
+                  session cookie.
+                </li>
+                <li>
+                  <strong>Google:</strong> after you agree, we use Google&rsquo;s token to read your verified email address and then revoke it. We keep only a
+                  signed session cookie for 1 hour. Nothing is stored on our servers.
+                </li>
+                <li>
+                  <strong>Your controls:</strong> disconnecting GitHub or Reddit deletes the stored token, revokes our access at the provider, clears the
+                  24-hour copy and ends the session. If your 7-day session has ended, you can still remove the stored connection: sign in with the provider
+                  again on the Connect page (or its &ldquo;remove&rdquo; link) and we delete the token and the copy and revoke our access, without
+                  reading your profile, saving anything new or signing you in. If the provider tells us you revoked access, we delete our copy of the
+                  token. The cookies are named in the Cookie Policy.
+                </li>
+              </ul>
+
+              <h3 className="mt-6 text-xl font-semibold text-foreground">
                 6A. Retention by Relationship
               </h3>
               <p className="text-muted-foreground">
@@ -863,19 +900,23 @@ const Privacy = () => {
                 </li>
                 <li>
                   <strong>At-Rest Encryption:</strong> Sensitive data encrypted
-                  in our databases
+                  in our databases (the database provider encrypts stored data
+                  at platform level)
                 </li>
                 <li>
                   <strong>Access Controls:</strong> Role-based access to
                   sensitive data
                 </li>
                 <li>
-                  <strong>Regular Audits:</strong> Security assessments and
-                  vulnerability testing
+                  <strong>Security Review:</strong> We reviewed our servers and
+                  database settings in October 2026 and fixed what we found. We
+                  have no fixed audit schedule
                 </li>
                 <li>
-                  <strong>Incident Response:</strong> Procedures to detect and
-                  respond to breaches
+                  <strong>Incident Response:</strong> We keep a short written
+                  checklist for investigating a problem and rolling back a bad
+                  release. We do not yet have a full incident response plan or
+                  run practice drills
                 </li>
               </ul>
               <p className="mt-4 text-muted-foreground">
@@ -1016,11 +1057,11 @@ const Privacy = () => {
                 </p>
                 <h3 className="mt-4 text-xl font-semibold text-foreground">If you ask us to email a friend</h3>
                 <p className="text-muted-foreground">
-                  You give us the address. We send that person one email saying someone who uses MyPrivacyTOOL asked us to, without saying who. We keep only a SHA-256 hash of the address, never the address itself, so we can tell if you invite the same person twice and match them if they later sign up through your link. We check it against our opt-out and suppression lists first, send no reminders, and the email has an unsubscribe link that stops us ever emailing that address. You may invite up to 10 people in total. Only invite people who would expect to hear from you.
+                  You give us the address. We send that person one email saying someone who uses MyPrivacyTOOL asked us to, without saying who. On our servers we keep only a SHA-256 hash of the address, not the address itself, so we can tell if you invite the same person twice and match them if they later sign up through your link. The hash is a lookup code, not anonymous: anyone who already has a guess of an address can check it against the hash. To send the email we pass the address to our email provider, which keeps delivery records under its own retention (section 5). The unsubscribe link in the email contains the address, so it can appear in request logs when that person uses it. We check it against our opt-out and suppression lists first, send no reminders, and the email has an unsubscribe link that stops us ever emailing that address. You may invite up to 10 people in total. Only invite people who would expect to hear from you.
                 </p>
                 <h3 className="mt-4 text-xl font-semibold text-foreground">If someone invites you</h3>
                 <p className="text-muted-foreground">
-                  Using a friend&apos;s link is your choice. If you run a scan through it, your friend learns only that you completed one, and earns a free month of Pro. You can ask us to delete your data at any time, which also removes the link between you and your friend.
+                  Using a friend&apos;s link is your choice. If you run a scan through it, the person who invited you is emailed that a friend they invited got their first report, and earns a free month of Pro. Their invite page shows only counts: how many friends signed up and how many got their first report. They are not told who you are or anything about your results. You can ask us to delete your data at any time, which also removes the link between you and your friend.
                 </p>
                 <p className="text-muted-foreground">We keep referral records for as long as the accounts they belong to, and delete them with the account. Write to privacy@myprivacytool.io to see or delete yours.</p>
               </section>

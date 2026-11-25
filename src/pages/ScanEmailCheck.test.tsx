@@ -9,7 +9,7 @@ import { BAD_EMAIL_MESSAGE, REPORT_FAILED_MESSAGE } from "@/lib/scanReport";
 beforeEach(() => { window.scrollTo = vi.fn() as unknown as typeof window.scrollTo; sessionStorage.clear(); localStorage.clear(); });
 afterEach(() => { vi.unstubAllGlobals(); });
 
-const MARKETING = /email me my results and occasional privacy tips/i;
+const MARKETING = /email me my results and follow-ups about them/i;
 const setup = (worker: () => Response) => {
   const f = vi.fn(async (url: unknown) => (String(url).endsWith("/api/scan") ? worker() : jsonResponse({ inlineMessage: "ok" })));
   vi.stubGlobal("fetch", f);

@@ -1062,7 +1062,7 @@ export const HEXAGON_CATALOGUE = [
   "arrival": "A",
   "risk": "medium",
   "label": "Display and accessibility preferences",
-  "reveals": "Dark mode, reduced motion, high contrast, forced colours; can hint at a disability",
+  "reveals": "Dark mode, reduced motion, high contrast, forced colours. Some of these are accessibility settings, so treat them as sensitive",
   "field": "CSS prefers-* media queries",
   "status": "new",
   "access": "Verify",

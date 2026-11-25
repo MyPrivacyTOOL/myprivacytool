@@ -9,23 +9,35 @@ export const GITHUB_CHANNEL_URL: string =
   "https://channels.myprivacytool.io";
 
 export const GITHUB_START_URL = `${GITHUB_CHANNEL_URL}/oauth/github/start`;
+/**
+ * MPC-10825: remove a stored connection when the 7-day browser session has ended. A plain link: the Worker sends the
+ * person through the same GitHub sign-in, and that sign-in is the proof it is their account. It stores nothing and
+ * signs nobody in; it comes back to /connect/github?channel_removed=github.
+ */
+export const GITHUB_REMOVE_URL = `${GITHUB_CHANNEL_URL}/oauth/github/remove`;
 
 export interface PapitProfile {
   version: "1.0";
   generated_at: string;
+  expires_at?: string; // absent on profiles issued before MPC-10833; treat as generated_at + 30 days
   source_channel: "github";
   cryptographic_receipt: string;
   core_identity: {
     career: { skills: string[]; primary_role: string; public_projects_count: number };
   };
   behavioral: { interests: string[]; activity_level: "low" | "medium" | "high" };
+  data_coverage?: { repos_sampled: boolean | null; starred_sampled: boolean | null; events_capped: boolean | null; interests: "found" | "no_stars" | "stars_without_topics" };
   privacy_boundaries: { data_retention_days: number; revocable: boolean };
 }
 
 export type ProfileResult =
   | { status: "connected"; profile: PapitProfile }
-  | { status: "disconnected" }
-  | { status: "error" };
+  // MPC-9796 (UX-040/041/042): the four ways "not connected" really differ, so the page can say which one it is.
+  | { status: "session_ended" }   // 401 unauthenticated: no browser session (it lasts 7 days). A stored connection may still exist until the person disconnects.
+  | { status: "reconsent" }       // 401 reconsent_required (MPC-10833): connected more than 90 days ago; we no longer use the stored token. Connect again.
+  | { status: "reauthorize" }     // 401 reauthorize: GitHub no longer accepts the token (revoked or expired); the Worker already deleted its copy.
+  | { status: "disconnected" }    // 404 not_connected: a live session, nothing connected.
+  | { status: "error" };          // 5xx or network: an outage, says nothing about the connection.
 
 type FetchFn = typeof fetch;
 
@@ -33,8 +45,12 @@ export async function fetchGithubProfile(fetchFn?: FetchFn): Promise<ProfileResu
   try {
     const res = await recipientFetch("github-channel", `${GITHUB_CHANNEL_URL}/channels/github/profile`, { credentials: "include" }, ["username"], fetchFn ? { fetchImpl: fetchFn } : {});
     if (res.ok) return { status: "connected", profile: (await res.json()) as PapitProfile };
-    // 401 = no session or token revoked/expired (`reauthorize`), 404 = never connected: both mean "show Connect".
-    if (res.status === 401 || res.status === 404) return { status: "disconnected" };
+    if (res.status === 401) {
+      const body = (await res.json().catch(() => null)) as { error?: string } | null;
+      if (body?.error === "reconsent_required") return { status: "reconsent" };
+      return { status: body?.error === "reauthorize" ? "reauthorize" : "session_ended" };
+    }
+    if (res.status === 404) return { status: "disconnected" };
     return { status: "error" };
   } catch {
     return { status: "error" };
@@ -58,8 +74,18 @@ export function friendlyChannelError(code: string | null): string | null {
       return "You cancelled the GitHub connection. Nothing was saved.";
     case "invalid_state":
     case "missing_code":
-      return "That sign-in link expired. Please try connecting again.";
+      return "That sign-in link expired. Please try again.";
+    case "remove_access_denied":
+      return "You cancelled the GitHub sign-in. Nothing was removed.";
+    case "remove_failed":
+      return "We couldn't remove the stored connection just now. Please try again.";
     default:
       return "We couldn't finish connecting to GitHub. Please try again.";
   }
+}
+
+/** Reads the Worker's `?channel_removed=github&revoked=1|0` redirect after a remove-without-session sign-in. */
+export function removalNotice(channelRemoved: string | null, revoked: string | null): { revokedAtGithub: boolean } | null {
+  if (channelRemoved !== "github") return null;
+  return { revokedAtGithub: revoked === "1" };
 }

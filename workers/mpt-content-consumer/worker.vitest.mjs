@@ -10,12 +10,12 @@ const schedule = { date: DATE, items: { x: [{ text: 'Thread: exposure', qualifie
 const brand = { sections: [{ heading: 'Voice & tone', text: 'Empowering Detective' }, { heading: 'Logo', text: 'big' }] };
 
 const goodFor = (platform) => ({
-  x: { copy: 'one\n---\ntwo' },
-  linkedin: { copy: 'pro post' },
-  instagram: { copy: 'cap', slides: ['s1', 's2'] },
-  facebook: { copy: 'fb post' },
-  pinterest: { title: 'Pin title', copy: 'pin desc' },
-  youtube: { title: 'Video title', copy: 'video desc', script: 'spoken script' },
+  x: { copy: 'one\n---\ntwo myprivacytool.io/scan' },
+  linkedin: { copy: 'pro post myprivacytool.io/scan' },
+  instagram: { copy: 'cap myprivacytool.io/scan', slides: ['s1', 's2'] },
+  facebook: { copy: 'fb post myprivacytool.io/scan' },
+  pinterest: { title: 'Pin title', copy: 'pin desc myprivacytool.io/scan' },
+  youtube: { title: 'Video title', copy: 'video desc myprivacytool.io/scan', script: 'spoken script' },
 })[platform];
 
 /** Stateful D1 stub: INSERT into agent_execution_logs, SELECT by (task_id, status). */

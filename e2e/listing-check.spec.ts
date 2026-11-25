@@ -133,7 +133,7 @@ test("F1: nothing is read before the click; after it, the pasted page is verifie
   await expect(spokeo.getByRole("link", { name: /how to remove it/i })).toHaveAttribute("href", "/opt-out-guides/spokeo");
   await expect(block.locator("li")).toHaveCount(9);                                   // still all nine, registry order
   await expect(block.locator("li[data-state='not_checked']")).toHaveCount(8);          // the other eight stay honest
-  await expect(block.getByTestId("broker-region-note")).toContainText(/Hong Kong and Singapore/);
+  await expect(block.getByTestId("broker-region-note")).toHaveCount(0);   // MPC-10827: no HK/SG region note
   expect(be.fixtureReads).toEqual([FIXTURE_URL]);
 
   // the report now goes out and carries the same block

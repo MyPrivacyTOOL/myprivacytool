@@ -13,10 +13,10 @@ describe("Privacy: saved scan", () => {
     expect(screen.getByRole("heading", { name: "2.4 Your Saved Scan Result" })).toBeInTheDocument();
     const text = flat(document.body.textContent ?? "");
     expect(text).toContain(
-      "The free scan runs in your browser and shows you the results there. We do not save it unless you ask for your report. " +
+      "The free scan runs in your browser and shows you the results there. We do not save the result unless you ask for your report. " +
         "When you enter your email address and tick the box to save your scan result, we save the full result, meaning the technical details your browser reported " +
         "such as IP address, device, browser, language, screen and fingerprint-style values, together with your email address, for 12 months, so your report can show it. " +
-        "If you leave without giving an email address, nothing from the scan is saved. We only count, without personal data, how many visitors finish a scan and how many ask for a report, " +
+        "If you leave without giving an email address, we do not save the result (see section 2.0 for what pressing Scan me sends). We only count, without personal data, how many visitors finish a scan and how many ask for a report, " +
         "through our analytics if you accepted analytics cookies.",
     );
   });
@@ -134,7 +134,7 @@ describe("Privacy: referral programme section", () => {
     renderPage(<Privacy />);
     expect(screen.getByRole("heading", { name: "16. Inviting Friends (Referral Programme)" })).toBeInTheDocument();
     const t = flat(document.getElementById("referrals")?.textContent ?? "");
-    expect(t).toContain("We keep only a SHA-256 hash of the address, never the address itself");
+    expect(t).toContain("On our servers we keep only a SHA-256 hash of the address, not the address itself");
     expect(t).toContain("send no reminders");
     expect(t).toContain("unsubscribe link");
     expect(t).toContain("up to 10 people in total");
@@ -207,5 +207,14 @@ describe("Privacy: report delivery record retention (CK-9848)", () => {
     const text = (document.body.textContent ?? "").replace(/\s+/g, " ");
     expect(text).toContain("is kept 7 days after your report is delivered, then deleted, unless you keep your scan");
     expect(text).not.toMatch(/kept 30 days|after 30 days; the rest/);
+  });
+});
+
+describe("Privacy: security section (MPC-10805)", () => {
+  it("claims only the incident checklist that exists, not a breach detection and response process", () => {
+    renderPage(<Privacy />);
+    const text = flat(document.body.textContent ?? "");
+    expect(text).toContain("Incident Response: We keep a short written checklist for investigating a problem and rolling back a bad release. We do not yet have a full incident response plan or run practice drills");
+    expect(text).not.toContain("Procedures to detect and respond to breaches");
   });
 });

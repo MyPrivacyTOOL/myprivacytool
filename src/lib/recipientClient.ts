@@ -3,11 +3,9 @@
 //
 // Two things this module does that a bare call to the wrapper would not, both to keep today's behaviour exactly as it is until MPC-9888:
 //
-// 1. INTERIM_CONSENT_ID. The wrapper refuses a post_click recipient without a consent id (check 4). The consent gate that produces that id is
-//    MPC-9887 (server) and MPC-9888 (UI); it does not exist yet, and this task must not change consent behaviour. Until then every call this site
-//    already made on its own authority (a form submit, the analytics banner, the device scan) still carries the one fixed marker below. It is NOT
-//    evidence of consent and nothing server-side may read it as such: it only lets the call proceed exactly as it did before. MPC-9888 replaces
-//    it with the id returned by the Scan me click. Grep for INTERIM_CONSENT_ID to find every place that changes.
+// 1. USER_ACTION_MARKER. The wrapper refuses a post_click recipient without a consent id (check 4). The id comes from the Scan me click (MPC-9887 /
+//    MPC-9888). A recipient whose registry basis is user_action (a form submit, a connect button) may carry the fixed marker below INSTEAD, but only after
+//    a real user action on the page (MPC-10790); scan_consent and analytics_consent recipients never get the marker. It is NOT evidence of scan consent.
 //
 // 2. Own-origin calls. A relative path such as /api/hk-geo is a call to the page's own origin. The registry names the production hosts, but a
 //    developer's machine (localhost / 127.0.0.1) and a Cloudflare preview (*.pages.dev) are the same site. For a first-party key only, the host
@@ -26,12 +24,49 @@ import { isLoopbackHost } from "../../shared/recipients/outbound";
 import { recordRecipient } from "@/lib/recipientLog";
 
 /**
- * MPC-9888: the interim marker is gone for scan-consent recipients. A recipient whose basis is scan_consent (STUN, the password range check) gets ONLY the
- * real consent id the server issued at the Scan me click (src/lib/scanConsent.ts); with none, the wrapper refuses it. Recipients whose basis is a user's own
- * action or the analytics choice (a form submit, the analytics banner) are not covered by the scan consent; they still carry this fixed marker, which is
- * NOT evidence of consent and which nothing server-side may read as such.
+ * MPC-9888 / MPC-10790: what proves a call may go, by the recipient's own registry entry (browserContext below):
+ *   pre_click                      nothing (the registry names these as the exceptions: first-party service calls, Turnstile at its own click, fonts)
+ *   scan_consent, analytics_consent  ONLY the real consent id the server issued at the Scan me click (src/lib/scanConsent.ts); with none, the wrapper refuses
+ *   user_action                    the real id if there is one, else this fixed marker, but ONLY once a real person has acted on this page (a trusted
+ *                                  click, tap, key press or submit, hasUserAction below). The marker is NOT evidence of scan consent and nothing
+ *                                  server-side may read it as such: it only records that the call follows a person's own action.
+ * Before 2026-11-24 every browser key except google-stun carried the marker from page load, so a ga4 / pwned-passwords / Turnstile-class call passed the
+ * wrapper's consent check with no click at all.
  */
 export const USER_ACTION_MARKER = "user-action:no-scan-consent";
+
+/**
+ * Which post_click recipients may carry the marker after a user action: the ones whose basis is the person's own action (user_action) or the service they asked
+ * for (service: scan-report calls from the unsubscribe page, a Deep Research form, ...). Not scan_consent, not analytics_consent.
+ * One named exception: "supabase" is registered as scan_consent (the Workers' database), but the browser also writes the /newsletter sign-up and the hk-spam
+ * registration to it directly, each its own form submit. Those keep working on a trusted submit; the registry basis for browser-direct Supabase writes is
+ * flagged on MPC-10790 for a decision, so this stays one line, not a pattern.
+ */
+const FORM_SUBMIT_KEYS = new Set(["supabase"]);
+const markerBases = (r: { key: string; consent_basis: string }): boolean => r.consent_basis === "user_action" || r.consent_basis === "service" || FORM_SUBMIT_KEYS.has(r.key);
+
+// A real user action on this page: a TRUSTED pointer, touch, click, Enter/Space or submit event (script-dispatched events are not trusted). Listens from the
+// moment this module loads, capture phase and passive, so it sees the gesture before any handler that then makes the call.
+let userActed = false;
+const waiters: Array<() => void> = [];
+const GESTURE_EVENTS = ["pointerdown", "click", "touchend", "submit", "keydown"] as const;
+function noteGesture(e: Event): void {
+  if (!e.isTrusted || userActed) return;
+  if (e.type === "keydown") { const k = (e as KeyboardEvent).key; if (k !== "Enter" && k !== " ") return; }
+  userActed = true;
+  for (const w of waiters.splice(0)) w();
+}
+if (typeof window !== "undefined") for (const t of GESTURE_EVENTS) window.addEventListener(t, noteGesture, { capture: true, passive: true });
+
+/** True once a real person has acted on this page (see above), or this journey holds the scan consent (the Scan me click is itself such an action). */
+export const hasUserAction = (): boolean => userActed || getConsentId() !== null;
+/** Resolves at once if hasUserAction(), else at the first real user action. For calls a page starts on arrival that need a person's action first. */
+export function afterUserAction(): Promise<void> {
+  if (hasUserAction()) return Promise.resolve();
+  return new Promise((resolve) => { waiters.push(resolve); });
+}
+/** Tests only. */
+export function __setUserActionForTests(v: boolean): void { userActed = v; if (v) for (const w of waiters.splice(0)) w(); }
 
 const pageHost = (): string => (typeof window !== "undefined" ? window.location.hostname.toLowerCase() : "");
 
@@ -51,11 +86,12 @@ function withOwnHost(key: string, host: string, registry: RecipientRegistry): Re
 /** Build-time flags (VITE_*), so a registry entry's `flag` (check 2) reads the same variable the feature itself reads. */
 const buildFlag = (name: string): unknown => (import.meta.env as Record<string, unknown>)[name];
 
-export function browserContext(extra: Partial<RecipientContext> = {}, key?: string): RecipientContext {
+export function browserContext(extra: Partial<RecipientContext> = {}, key?: string, registry: RecipientRegistry = RECIPIENTS): RecipientContext {
   const real = getConsentId();
-  // Only the scan's own outside-server checks need the real id. google-stun is the one such recipient the browser calls on its own; pwned-passwords is
-  // a separate, flag-gated feature the visitor starts by typing, so it keeps the marker (its behaviour is unchanged by this task).
-  const consentId = real ?? (key === "google-stun" ? null : USER_ACTION_MARKER);
+  // MPC-10790: the proof each recipient may carry comes from ITS registry entry, not from the caller. An unknown key carries nothing (the wrapper refuses it anyway).
+  const entry = key ? registry.recipients.find((r) => r.key === key) : undefined;
+  let consentId: string | null = real;
+  if (!real && userActed && entry?.phase === "post_click" && markerBases(entry)) consentId = USER_ACTION_MARKER;
   // MPC-9893: every browser call also lands in the in-tab record the per-scan "who saw what" panel renders (item names only, memory only).
   return { consentId, ...(real ? { scanId: getScanId() } : {}), flags: buildFlag, log: recordRecipient, ...extra };
 }

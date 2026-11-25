@@ -1,3 +1,4 @@
+import ListingCoverageNote from "@/components/ListingCoverageNote";
 import { useEffect, useRef, useState } from "react";
 import FeatureStatus, { ChannelStatus } from "@/components/FeatureStatus";
 import { CHANNEL_STATUS, type ChannelId } from "@/config/featureStatus";
@@ -6,6 +7,7 @@ import Seo from "@/components/Seo";
 import pageMeta from "@/data/pageMeta.json";
 import { submitHubSpotForm, consentFields } from "@/lib/hubspot";
 import ConsentCheckbox from "@/components/ConsentCheckbox";
+import { START_CONSENT_LABEL } from "@/lib/consentWording";
 import SubmitButton from "@/components/SubmitButton";
 import { useExperiment } from "@/hooks/useExperiment";
 import { useLeadSubmit } from "@/hooks/useLeadSubmit";
@@ -131,6 +133,7 @@ export default function Start() {
           <p className="text-muted-foreground text-sm leading-relaxed">
             A free check of what your browser tells websites about you, plus what your email address reveals. We don't search broker sites for you yet — paste any page that lists you and we'll verify it. Paid plans will add coverage.<FeatureStatus feature="F1" />
           </p>
+          <ListingCoverageNote className="mt-4" />
         </div>
 
         {/* Hexagon Grid */}
@@ -229,6 +232,7 @@ export default function Start() {
               <div ref={consentRef}>
                 <ConsentCheckbox
                   id="start-consent"
+                  label={START_CONSENT_LABEL}
                   checked={consent}
                   onChange={(v) => {
                     setConsent(v);

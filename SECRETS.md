@@ -98,6 +98,23 @@ GitHub Actions also holds: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `SUP
 `SUPABASE_DB_PASSWORD`, `SUPABASE_ACCESS_TOKEN`, `SCAN_REPORT_SUPABASE_SERVICE_ROLE_KEY`,
 `SCAN_REPORT_RESEND_API_KEY`, `SCAN_REPORT_HUBSPOT_TOKEN`, `SCAN_REPORT_HIBP_API_KEY`.
 
+### Optional and feature-gated names (added 2026-11-23, MPC-10736 R3)
+
+Read in Worker code but deliberately left out of `EXPECTED_SECRETS.txt` (a missing name fails several deploy
+workflows); each feature switches itself off while its name is unset. Names only. Enforced by
+`scripts/ci/check-secret-inventory.mjs`: a new secret name in Worker code must be added here or to that Worker's
+`EXPECTED_SECRETS.txt`, or CI fails.
+
+| Worker | Names |
+|---|---|
+| social-listeners | `DISCORD_BOT_TOKEN`, `DISCORD_PUBLIC_KEY`, `GITHUB_WEBHOOK_SECRET`, `KAKAO_SKILL_SECRET`, `LINE_CHANNEL_ACCESS_TOKEN`, `LINE_CHANNEL_SECRET`, `QQ_BOT_SECRET`, `TELEGRAM_ID_HMAC_KEY`, `VIBER_AUTH_TOKEN`, `WECHAT_ACCESS_TOKEN`, `WECHAT_TOKEN`, `YOUTUBE_EXTRAS_SECRET`, `ZALO_OA_ACCESS_TOKEN`, `ZALO_WEBHOOK_SECRET` |
+| scan-report | `DEEP_RESEARCH_HMAC_KEY`, `GITHUB_SEARCH_TOKEN`, `SUPABASE_PUBLISHABLE_KEY` (public by design, not a secret) |
+| mpt-leads | `SUPABASE_PUBLISHABLE_KEY` (public by design, not a secret) |
+| mpt-metrics-collector | `FACEBOOK_PAGE_TOKEN` |
+| mpt-cairn-blackboard | `CAIRN_TOKEN` |
+| mpt-content-approval | `MAKE_API_KEY`, `DEFAULT_IMAGE_KEY` (an object key, not a secret) |
+| shared `workers/lib`, `shared/ga4-server-events.ts` | `GA4_API_SECRET` (read by Workers that pass their env in; MPC-11111 server-side GA4 events in scan-report and core-brain, off unless `GA4_SERVER_EVENTS_ENABLED` is `true`, the registry entry `ga4-measurement-protocol` is enabled, and the secret is set; created by Chris only) |
+
 ## 5. Rotation checklist
 
 Revoke and reissue at the provider, then update **both** the Worker (`wrangler secret put`) and the GitHub Actions secret.

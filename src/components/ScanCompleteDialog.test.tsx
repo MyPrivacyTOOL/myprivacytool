@@ -69,7 +69,7 @@ describe('scan-complete dialog (EmailCaptureModal)', () => {
   it('keeps the consent controls: unticked box, report wording, No thanks, unsubscribe line', () => {
     open();
     expect(screen.getByRole('checkbox')).not.toBeChecked();
-    expect(screen.getByText('Email me my results and occasional privacy tips. I can unsubscribe at any time.')).toBeInTheDocument();
+    expect(screen.getByText('Email me my results and follow-ups about them. I can unsubscribe at any time; that is the only choice we offer, and there is no separate marketing opt-in.')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /no thanks/i })).toBeInTheDocument();
     expect(screen.getByText(/Unsubscribe in one click/)).toBeInTheDocument();
   });

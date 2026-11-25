@@ -37,4 +37,18 @@ describe("home page consent block", () => {
     expect(screen.queryByTestId("scan-me")).toBeNull();
     expect(screen.queryByTestId("scan-consent-text")).toBeNull();
   });
+
+  // MPC-10790 (decision A): "Accept analytics" alone sends nothing; the device profile (city, country, ISP) goes to GA4 once, after the Scan me click.
+  it("device profile: not sent on Accept analytics alone, sent once after Scan me", async () => {
+    const gtag = vi.fn();
+    (window as unknown as { gtag: unknown }).gtag = gtag;
+    localStorage.setItem("mpt_cookie_consent", JSON.stringify({ v: 1, analytics: true, at: "2026-11-24T00:00:00.000Z" }));
+    __resetScanConsentForTests();
+    renderPage(<Index />);
+    await waitFor(() => expect(gtag.mock.calls.some((c) => c[1] === "funnel_step" && (c[2] as { step_name: string }).step_name === "hexagons_visible")).toBe(true), { timeout: 15000 });
+    expect(gtag.mock.calls.some((c) => c[1] === "device_profile")).toBe(false);
+    await userEvent.setup().click(screen.getByTestId("scan-me"));
+    await waitFor(() => expect(gtag.mock.calls.filter((c) => c[1] === "device_profile")).toHaveLength(1), { timeout: 5000 });
+    delete (window as unknown as { gtag?: unknown }).gtag;
+  }, 25000);
 });

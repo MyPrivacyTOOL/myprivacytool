@@ -41,3 +41,19 @@ test('fetch is called unbound (Workers throws "Illegal invocation" if fetch gets
   const raw = await new GitHubAdapter({ token: 'T', fetchFn: strictFetch }).fetchIdentity();
   assert.equal(raw.profile.login, 'octo');
 });
+
+test('MPC-9795: coverage says a list was cut short only when the last allowed page was still full', async () => {
+  const full = () => ok(Array(100).fill({ language: 'Go', topics: [], created_at: '2026-10-01T00:00:00Z' }));
+  const fetchFn = async (u) => {
+    u = String(u);
+    if (u.endsWith('/user')) return ok({ login: 'octo', public_repos: 400 });
+    if (u.includes('/user/repos')) return full();            // 3 full pages: capped
+    if (u.includes('/user/starred')) return ok(u.endsWith('&page=1') ? Array(100).fill({}) : Array(5).fill({}));  // ends short: not capped
+    if (u.includes('/events/public')) return full();         // 3 full pages: capped
+    throw new Error('unexpected ' + u);
+  };
+  const raw = await new GitHubAdapter({ token: 'T', fetchFn }).fetchIdentity();
+  assert.equal(raw.repos.length, 300);
+  assert.equal(raw.events.length, 300);
+  assert.deepEqual(raw.coverage, { repos_capped: true, starred_capped: false, events_capped: true });
+});

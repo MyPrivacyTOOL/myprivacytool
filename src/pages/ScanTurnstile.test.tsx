@@ -17,7 +17,7 @@ vi.mock("@/lib/turnstile", async (orig) => ({
 
 import Scan from "./Scan";
 
-const MARKETING = /email me my results and occasional privacy tips/i;
+const MARKETING = /email me my results and follow-ups about them/i;
 const mount = () => renderPage(<Scan />);
 const submit = async () => {
   const user = userEvent.setup();

@@ -80,7 +80,7 @@ export default function FederatedLearningModal({
               Thank you
             </h3>
             <p className="text-muted-foreground text-sm">
-              Your device will help improve language predictions for everyone—while keeping your data completely private.
+              Your choice is saved in this browser. Nothing is sent to us today, and if that ever changes we will ask you again and update our privacy policy.
             </p>
             <div className="mt-4 flex items-center gap-2 text-xs text-muted-foreground">
               <Globe className="w-4 h-4" />
@@ -123,7 +123,7 @@ export default function FederatedLearningModal({
           <div className="bg-brand-soft border border-brand/30 rounded-xl p-4">
             <h4 className="text-brand text-sm font-semibold mb-3 flex items-center gap-2">
               <Shield className="w-4 h-4" />
-              What's Shared vs. Protected
+              What stays on your device
             </h4>
             
             <div className="grid grid-cols-1 gap-2">
@@ -131,15 +131,15 @@ export default function FederatedLearningModal({
               <div className="flex items-start gap-3 p-2 rounded-lg bg-risk-low-soft border border-risk-low/30">
                 <Check className="w-4 h-4 text-risk-low mt-0.5 flex-shrink-0" />
                 <div>
-                  <span className="text-risk-low text-xs font-medium">Anonymous model improvements</span>
-                  <p className="text-muted-foreground text-[10px]">Mathematical gradients only</p>
+                  <span className="text-risk-low text-xs font-medium">Model improvements</span>
+                  <p className="text-muted-foreground text-[10px]">Computed and kept in this browser; nothing is sent to us today</p>
                 </div>
               </div>
               <div className="flex items-start gap-3 p-2 rounded-lg bg-risk-low-soft border border-risk-low/30">
                 <Check className="w-4 h-4 text-risk-low mt-0.5 flex-shrink-0" />
                 <div>
                   <span className="text-risk-low text-xs font-medium">Accuracy signals</span>
-                  <p className="text-muted-foreground text-[10px]">Did predictions help? (yes/no)</p>
+                  <p className="text-muted-foreground text-[10px]">Did predictions help? (yes/no) Counted in our analytics only if you allow analytics cookies</p>
                 </div>
               </div>
 
@@ -196,15 +196,15 @@ export default function FederatedLearningModal({
                   </li>
                   <li className="flex items-start gap-2 text-muted-foreground text-xs">
                     <div className="w-1.5 h-1.5 rounded-full bg-primary mt-1.5 flex-shrink-0" />
-                    Only mathematical updates (gradients) are shared
+                    Nothing is sent to us today; the updates are kept in this browser
                   </li>
                   <li className="flex items-start gap-2 text-muted-foreground text-xs">
                     <div className="w-1.5 h-1.5 rounded-full bg-primary mt-1.5 flex-shrink-0" />
-                    These are combined with others to improve the global model
+                    If we ever share them, we will ask you again first
                   </li>
                   <li className="flex items-start gap-2 text-muted-foreground text-xs">
                     <div className="w-1.5 h-1.5 rounded-full bg-primary mt-1.5 flex-shrink-0" />
-                    <span className="font-medium text-brand">Your individual data never leaves your device</span>
+                    <span className="font-medium text-brand">Your individual data is not sent to us</span>
                   </li>
                 </ul>
                 <a
@@ -250,11 +250,11 @@ export default function FederatedLearningModal({
           <div className="flex items-center justify-center gap-4 pt-2 border-t border-brand/30">
             <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
               <Lock className="w-3 h-3" />
-              <span>End-to-end privacy</span>
+              <span>Kept on this device</span>
             </div>
             <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
               <Shield className="w-3 h-3" />
-              <span>No data collection</span>
+              <span>Nothing sent to us today</span>
             </div>
             <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
               <Globe className="w-3 h-3" />

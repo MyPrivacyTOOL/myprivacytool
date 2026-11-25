@@ -41,6 +41,19 @@ jobs:
             if [ -z "$val" ]; then echo "::error::secret $v is not set"; exit 1; fi
             echo "::add-mask::$val"
           done
+          # A pasted secret can carry a trailing space or newline. Report (yes/no only, never the value) and strip it.
+          if [ "$(printf %s "$SUPABASE_DB_PASSWORD" | tr -d '[:space:]')" != "$SUPABASE_DB_PASSWORD" ]; then
+            echo "::warning::SUPABASE_DB_PASSWORD contained whitespace or a line break; stripped for this run. Re-save the secret without it."
+          else
+            echo "SUPABASE_DB_PASSWORD has no stray whitespace."
+          fi
+          clean="$(printf %s "$SUPABASE_DB_PASSWORD" | tr -d '[:space:]')"
+          echo "::add-mask::$clean"
+          {
+            echo "SUPABASE_DB_PASSWORD<<__EOF_PW__"
+            printf '%s\n' "$clean"
+            echo "__EOF_PW__"
+          } >> "$GITHUB_ENV"
 
       - uses: supabase/setup-cli@v1
         with:

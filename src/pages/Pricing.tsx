@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import Seo from "@/components/Seo";
 import ConsentCheckbox from "@/components/ConsentCheckbox";
+import { WAITLIST_CONSENT_LABEL } from "@/lib/consentWording";
 import SubmitButton from "@/components/SubmitButton";
 import pageMeta from "@/data/pageMeta.json";
 import { useExperiment } from "@/hooks/useExperiment";
@@ -272,6 +273,7 @@ const Pricing = () => {
             <div ref={consentRef}>
               <ConsentCheckbox
                 id="waitlist-consent"
+                label={WAITLIST_CONSENT_LABEL}
                 checked={consent}
                 onChange={(v) => {
                   setConsent(v);
@@ -320,6 +322,9 @@ const Pricing = () => {
         <p className="mt-8 text-xs text-muted-foreground">
           Prices are in US dollars. See our <Link to="/terms" className="underline">Terms</Link> and{" "}
           <Link to="/privacy" className="underline">Privacy Policy</Link>.
+        </p>
+        <p className="text-muted-foreground text-sm mt-2" data-testid="pricing-eligibility">
+          You must be at least 16 to use the service (Terms, section 2). Paid plans are not on sale yet. Who can buy, and in which countries, will be stated here before they open.
         </p>
       </div>
     </main>

@@ -196,6 +196,7 @@ curl ${BASES.github}/channels/github/profile \\
         body: `{
   "version": "1.0",
   "generated_at": "2026-10-06T09:00:00.000Z",
+  "expires_at": "2026-11-05T09:00:00.000Z",
   "source_channel": "github",
   "cryptographic_receipt": "9f2c…64 hex chars…",
   "core_identity": { "career": { "skills": ["TypeScript", "Go"], "primary_role": "Backend Developer", "public_projects_count": 31 } },
@@ -205,11 +206,39 @@ curl ${BASES.github}/channels/github/profile \\
       },
       { status: "401", description: "No valid session.", body: `{ "error": "unauthenticated" }` },
       { status: "401", description: "The token was revoked at GitHub. MPT deletes its copy; send the user through /oauth/github/start again.", body: `{ "error": "reauthorize" }` },
+      { status: "401", description: "The user last connected more than 90 days ago. MPT does not use the stored token any more and does not delete it; send the user through /oauth/github/start again.", body: `{ "error": "reconsent_required" }` },
       { status: "404", description: "Signed in, but no stored connection.", body: `{ "error": "not_connected" }` },
       { status: "502", description: "GitHub or storage failed.", body: `{ "error": "upstream_error" }` },
     ],
     notes: [
       "The Worker is served from channels.myprivacytool.io, the same site as www.myprivacytool.io, so browsers send its session cookie from the site (Safari and Firefox block it on third-party hosts). Calls from other origins are rejected by CORS (see docs/channels/github.md).",
+    ],
+  },
+  {
+    id: "papit-verify-profile",
+    service: "GitHub channel (myprivacytool-github-channel)",
+    method: "POST",
+    path: "/papit/verify",
+    base: BASES.github,
+    status: "preview",
+    summary:
+      "Checks a PaPIT profile you hold: is its receipt intact and has it expired? Stateless: nothing is stored or logged, and no session is needed. Works for GitHub and Reddit profiles.",
+    auth: "None. Server to server; there is no CORS for browsers.",
+    source: "workers/github-channel/lib/verify.js",
+    curl: `curl -X POST ${BASES.github}/papit/verify \\
+  -H 'Content-Type: application/json' \\
+  --data @profile.json`,
+    responses: [
+      { status: "200", description: "The receipt matches and the profile has not expired.", body: `{ "valid": true, "expires_at": "2026-11-05T09:00:00.000Z" }` },
+      { status: "410", description: "The profile has expired (expires_at has passed, or 30 days after generated_at for a profile issued before expires_at existed). Refused.", body: `{ "error": "profile_expired", "expires_at": "2026-11-05T09:00:00.000Z" }` },
+      { status: "422", description: "Not a PaPIT v1 profile, the receipt does not match, or expires_at is before generated_at or more than 30 days after it.", body: `{ "error": "invalid_profile" }` },
+      { status: "400", description: "The body is not a JSON object.", body: `{ "error": "bad_request" }` },
+      { status: "413", description: "The body is larger than 32 KB.", body: `{ "error": "too_large" }` },
+      { status: "429", description: "Too many requests from your IP address. This answer comes from Cloudflare's rate-limiting rule in front of the Worker, not from our code, so do not expect our JSON body. Wait 10 seconds and retry." },
+    ],
+    notes: [
+      "A 200 means the profile is unchanged since it was produced, as far as an unkeyed checksum can tell. It does not prove who produced it.",
+      "Rate limit: one Cloudflare rule at the edge blocks an IP address for 10 seconds after about 5 POSTs in 10 seconds (counted per Cloudflare location, so approximate). It is set in Cloudflare, not in the Worker's code, and it slows abuse rather than being a hard cap. Send profiles one at a time, not in bursts.",
     ],
   },
   {
@@ -229,6 +258,29 @@ curl ${BASES.github}/channels/github/profile \\
       { status: "200", description: "Disconnected. revoked_at_github is false if GitHub could not be reached; the local copy is deleted either way.", body: `{ "ok": true, "revoked_at_github": true }` },
       { status: "401", description: "No valid session.", body: `{ "error": "unauthenticated" }` },
       { status: "403", description: "Origin not allowed.", body: `{ "error": "forbidden_origin" }` },
+    ],
+  },
+  {
+    id: "github-remove",
+    service: "GitHub channel (myprivacytool-github-channel)",
+    method: "GET",
+    path: "/oauth/github/remove",
+    base: BASES.github,
+    status: "preview",
+    summary:
+      "Removes a stored GitHub connection without a live session. The browser goes through the same GitHub sign-in; the signed state cookie carries intent=remove, so the callback deletes that account's stored token and cached copy and revokes the grant at GitHub instead of connecting.",
+    auth: "None to start. The proof of ownership is completing the GitHub sign-in as that account. Send the user's browser here; do not call it with fetch.",
+    source: "workers/github-channel/index.js",
+    curl: `# Open in a browser:
+${BASES.github}/oauth/github/remove`,
+    responses: [
+      { status: "302", description: "Redirect to github.com. Sets a signed, HttpOnly, 10-minute mpt_gh_oauth cookie holding the state, PKCE verifier and intent=remove." },
+      { status: "302", description: "After the sign-in (at /oauth/github/callback): redirect to SUCCESS_REDIRECT with ?channel_removed=github&revoked=1 (or revoked=0 if GitHub could not be reached; the local copy is deleted either way). The session cookie is cleared." },
+      { status: "302", description: "Failure: ?channel_error=<code>. Codes: remove_access_denied (cancelled at GitHub), invalid_state, missing_code, remove_failed (the stored copy could not be deleted, so nothing was removed; the page says so)." },
+    ],
+    notes: [
+      "It never stores the new token, never issues a session and reads no profile data. The token from this sign-in is revoked at GitHub in the same step.",
+      "Starting it needs no session, so a link to it can be followed by anyone. The worst case is that someone who is signed in to GitHub is sent through a sign-in that removes their own connection; it cannot read anything and cannot remove anyone else's.",
     ],
   },
   {
@@ -424,7 +476,7 @@ func RequestScan(email string, userConsented bool) (*ScanResult, error) {
     id: "papit-verify",
     title: "Verify a PaPIT receipt",
     description:
-      "cryptographic_receipt is the SHA-256 of the profile without that field, serialised as compact JSON with object keys sorted at every depth. Recompute it to detect any edit.",
+      "cryptographic_receipt is the SHA-256 of the profile without that field, serialised as compact JSON with object keys sorted at every depth. Recompute it and compare it with a receipt you got by a separate trusted channel to see whether the profile has changed. It is a checksum, not a signature: anyone who edits a profile can recompute the receipt, so it does not prove who produced the profile.",
     code: {
       typescript: `const sortKeys = (v: unknown): unknown =>
   Array.isArray(v)
@@ -540,11 +592,12 @@ export const QUICK_START_STEPS = [
 export const PAPIT_SCHEMA = `interface PaPITProfile {
   version: "1.0";
   generated_at: string;                 // ISO 8601, UTC
+  expires_at: string;                   // ISO 8601, UTC: generated_at + 30 days. Absent on profiles issued before 2026-11-24 (treat as generated_at + 30 days)
   source_channel: "github";             // later: "reddit", ...
   cryptographic_receipt: string;        // lowercase hex SHA-256
   core_identity: {
     career: {
-      skills: string[];                 // top <=10 languages, by repo count
+      skills: string[];                 // the field name is historical: top <=10 languages of the repos we read, by repo count. Not an assessment of skill.
       primary_role: string;             // fixed keyword rules, "Unspecified" if none
       public_projects_count: number;
     };
@@ -553,11 +606,33 @@ export const PAPIT_SCHEMA = `interface PaPITProfile {
     interests: string[];                // top <=15 topic slugs ([a-z0-9-]) from starred repos
     activity_level: "low" | "medium" | "high";
   };
+  data_coverage?: {                     // added within v1.0; absent on older cached profiles
+    repos_sampled: boolean | null;      // true: more than the 300 repos we read may exist
+    starred_sampled: boolean | null;    // true: more than the 200 stars we read may exist
+    events_capped: boolean | null;      // true: the 300-event feed limit was reached
+    interests: "found" | "no_stars" | "stars_without_topics";
+  };
   privacy_boundaries: {
-    data_retention_days: 30;            // validity of this snapshot, not token retention
-    revocable: true;
+    data_retention_days: 30;            // the validity period in days: expires_at is generated_at plus this. Not token retention
+    revocable: true;                    // the user can disconnect; an issued copy cannot be recalled (see limits)
   };
 }`;
+
+// MPC-9794 (CRYPTO-001, PRIVACY-023): the lifetimes and limits of a PaPIT profile, stated one by one. Each row is what the code does today.
+export const PAPIT_LIMITS = [
+  { item: "Activity window", detail: "activity_level counts public events from the last 90 days. GitHub's public events feed returns at most 300 events from that window, which is enough to cross the 50-event threshold; it is not a full history." },
+  { item: "How much we read", detail: "At most 300 of your own public repos (most recently pushed first), 200 of your most recently starred repos and 300 events, 100 per request. data_coverage says when a list was cut short. A large account is therefore a sample, not a full count." },
+  { item: "skills", detail: "The field name is historical. It holds the top 10 programming languages by number of your own, non-fork, public repos among those we read. It does not measure skill. public_projects_count is GitHub's total of public repos, forks included, so the two can differ." },
+  { item: "Empty interests", detail: "interests is empty for two different reasons, told apart by data_coverage.interests: no_stars (you have starred nothing) or stars_without_topics (the repos you starred have no topics). A failed or unavailable GitHub request is never an empty list: the profile call returns an error instead (401 reauthorize, or 5xx)." },
+  { item: "Receipt", detail: "An unkeyed SHA-256 checksum (workers/github-channel/lib/papit.js). It shows a profile has not changed only if the receipt reached you by a separate trusted channel. It does not prove who produced it: an editor can recompute it. Signing is planned, not built." },
+  { item: "Sanitization receipt", detail: "Also a hash, not a signature and not a zero-knowledge proof. It records which rules ran and ties the output to the profile's receipt." },
+  { item: "Snapshot validity", detail: "Every profile carries expires_at, 30 days after generated_at (data_retention_days: 30 says the same). POST /papit/verify refuses a profile past it with 410 profile_expired, and we never serve a cached copy past it. Nothing else checks it: if you keep a profile, check expires_at yourself or send it to /papit/verify. A profile issued before expires_at existed counts as valid until 30 days after generated_at. expires_at is covered by the receipt, but the receipt is an unkeyed checksum, so someone who edits the dates and recomputes it is not caught; signing is planned, not built." },
+  { item: "Cache", detail: "We keep a copy of the derived profile for 24 hours, then fetch it again." },
+  { item: "Browser session", detail: "The mpt_gh_session cookie lasts 7 days." },
+  { item: "Access token", detail: "Kept (encrypted) until the user disconnects or connects again. We do not use it more than 90 days after the user last connected: the profile call then answers 401 reconsent_required until they connect again. A token refresh does not restart the 90 days. We do not delete the stored token automatically at 90 days; that is not built. Person-facing pages say \"until you disconnect\"; the 30 in data_retention_days is the validity of a profile (expires_at), not how long we keep the connection." },
+  { item: "Revocation", detail: "A user can disconnect (DELETE /channels/github): the token is deleted, our access is revoked at GitHub and the cached copy is cleared. A profile that was already issued cannot be recalled and there is no revocation list yet." },
+  { item: "Revocation without a session", detail: "After the 7-day session ends, GET /oauth/github/remove (Reddit: /oauth/reddit/remove) runs the same provider sign-in; the signed state cookie carries intent=remove. A successful sign-in proves the account, and the Worker deletes that account's stored token and cached copy and revokes the grant. It stores nothing new, issues no session and reads no profile data. It redirects to /connect/github?channel_removed=github&revoked=1|0." },
+];
 
 export const INTERNAL_SERVICES = [
   { name: "webhook-receiver", note: "Multi-channel inbound webhooks. Source only; not deployed on either Cloudflare account." },

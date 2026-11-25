@@ -172,6 +172,8 @@ jobs:
           # The full-screen device reveal is ON in production. Most E2E specs load "/" and would be covered by it, so this CI build turns it
           # off; e2e/device-reveal.spec.ts opens it with ?view=device.
           VITE_DEVICE_HERO: "false"
+          # MPC-10790: production has the Deep Research email form on; the registry crawl visits /deep-research and asserts Turnstile does not load until the click.
+          VITE_DEEP_RESEARCH: "true"
         run: npm run build
       - name: Verify build output
         run: |

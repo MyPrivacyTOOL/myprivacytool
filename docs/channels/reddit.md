@@ -15,6 +15,7 @@ it shares the AES-256-GCM encryption, the `public.channel_tokens` table (rows wi
 | `GET /oauth/reddit/callback` | Verify state, exchange the code (HTTP Basic client credentials), store encrypted tokens, set the `mpt_rd_session` cookie, redirect to `REDDIT_SUCCESS_REDIRECT` (or return `{ok:true}`). Failures redirect with `?channel_error=...&stage=exchange\|reddit_user\|store`; a token that could not be stored is revoked at Reddit. |
 | `GET /channels/reddit/behavior` | `200` PaPIT JSON, header `X-Cache: HIT\|MISS` and `X-PaPIT-Sanitization-Receipt`. `401 unauthenticated`, `401 reauthorize`, `404 not_connected`, `502 upstream_error`. |
 | `DELETE /channels/reddit` | Deletes the token row first, clears the cache, then revokes the token at Reddit. `Origin` must be an allowed site origin (CSRF). |
+| `GET /oauth/reddit/remove` | MPC-10825: revoke **without a session**. Same Reddit sign-in as `/start`, with `intent: "remove"` in the signed state cookie. The callback reads only `/api/v1/me` `id`, deletes that account's row and cache, revokes the **stored** refresh token and the one just issued (Reddit revokes per token, not per grant), stores nothing and issues no session. Success: 302 to `REDDIT_SUCCESS_REDIRECT?channel_removed=reddit&revoked=1\|0` (JSON `{ok,removed,revoked_at_reddit}` if unset). Failure: `?channel_error=remove_access_denied\|invalid_state\|missing_code\|remove_failed`. There is no Reddit page in the SPA yet, so this has no UI. 503 until Reddit is configured, like the other Reddit routes. |
 
 Until `REDDIT_CLIENT_ID`, `REDDIT_REDIRECT_URI` and `REDDIT_CLIENT_SECRET` are all set, these routes answer `503 reddit_not_configured` and the GitHub channel is unaffected.
 
@@ -41,3 +42,7 @@ Everything above is covered by mocked tests (`test/reddit-core.test.mjs`, `test/
 ## Rollback
 Revert the commit and redeploy. Remove the rows: `delete from public.channel_tokens where provider = 'reddit';`. Revoke the app at
 reddit.com/prefs/apps and delete the `REDDIT_CLIENT_SECRET` secret.
+
+## Expiry and consent age (MPC-10833)
+
+Reddit profiles carry `expires_at` (generated_at + 30 days) like GitHub ones, and `POST /papit/verify` accepts them. `GET /channels/reddit/behavior` answers `401 reconsent_required` when the stored token's `consented_at` is 90 or more days old (same rule and same caveats as `docs/channels/github.md`, "Consent age").

@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { ArrowRight, Bot, Eye, Lock, ScanLine, ShieldCheck } from "lucide-react";
 import { submitHubSpotForm, consentFields } from "@/lib/hubspot";
 import ConsentCheckbox from "@/components/ConsentCheckbox";
+import { AI_CHECK_CONSENT_LABEL } from "@/lib/consentWording";
 import Seo from "@/components/Seo";
 import pageMeta from "@/data/pageMeta.json";
 import FeatureStatus from "@/components/FeatureStatus";
@@ -198,6 +199,7 @@ export default function AIAccessCheck() {
             <div ref={consentRef}>
               <ConsentCheckbox
                 id="ai-check-consent"
+                label={AI_CHECK_CONSENT_LABEL}
                 checked={consent}
                 onChange={(v) => {
                   setConsent(v);

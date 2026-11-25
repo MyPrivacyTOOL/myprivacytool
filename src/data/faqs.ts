@@ -14,7 +14,7 @@ export const FAQS: { q: string; a: string }[] = [
   },
   {
     q: "Does the scan send my results to your servers?",
-    a: "The detection runs in your browser and the results are shown to you there. The scan code does not send them to a server we operate, unless you choose to save your scan with your email, in which case we keep it for 12 months, then delete it automatically. Separately, where your cookie choices allow analytics, the site reports a summary of the scan to our analytics service: device type, operating system, browser, approximate city and country, ISP, screen resolution, timezone and which hexagons you confirm. We also receive information you submit yourself, for example your email address to get a fix guide or join the newsletter.",
+    a: "The detection runs in your browser and the results are shown to you there. The finished result is not sent to us unless you choose to save your scan with your email, in which case we keep it for 12 months, then delete it automatically. Some parts of the scan do use a server. Your IP address and approximate location come from a lookup on our own servers, which stores nothing, and when you press Scan me your browser sends us a record of your agreement and the network leak check asks an outside service for the public address your connection shows. Separately, where your cookie choices allow analytics, the site reports a summary of the scan to our analytics service: device type, operating system, browser, approximate city and country, ISP, screen resolution, timezone and which hexagons you confirm. We also receive information you submit yourself, for example your email address to get a fix guide or join the newsletter.",
   },
   {
     q: "Does the scan contact any third parties?",
@@ -54,7 +54,7 @@ export const FAQS: { q: string; a: string }[] = [
   },
   {
     q: "How can I check the scan stays in my browser?",
-    a: "Open your browser's developer tools, go to the Network tab and run the scan: you can watch which requests the page makes. Our source code is public to read at https://github.com/MyPrivacyTOOL/myprivacytool.",
+    a: "Open your browser's developer tools, go to the Network tab and run the scan. You will see the requests the page makes, including the ones to our servers for your IP address and your agreement record, and the one to an outside service for the leak check. You will not see your scan result sent anywhere unless you choose to save it. Our source code is public to read at https://github.com/MyPrivacyTOOL/myprivacytool.",
   },
   {
     q: "Who or what is Alice?",
@@ -100,7 +100,7 @@ export const FAQS: { q: string; a: string }[] = [
   },
   {
     q: "What is the JSON file?",
-    a: "It is attached to your report. It holds every hexagon with its full value and the technical detail that did not fit in the email, so you can open it, search it and analyse it yourself. It is your own data.",
+    a: "It is attached to your report. It holds every hexagon with its full value and the technical detail that did not fit in the email, so you can open it, search it and analyse it yourself. It is your own data and the full record, not a redacted copy: it can include your IP address and device details. Do not forward or post it, and delete it from your inbox when done.",
   },
   {
     q: "Why did I get this email, and how do I stop them?",

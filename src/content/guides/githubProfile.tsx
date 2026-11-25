@@ -22,11 +22,11 @@ export const faqs: { q: string; a: string }[] = [
   },
   {
     q: "How long is my data kept?",
-    a: "The profile snapshot is marked valid for 30 days and is cached for 24 hours so we do not call GitHub repeatedly. Your GitHub connection token is kept, encrypted, until you disconnect. Disconnecting deletes the token and revokes our access at GitHub.",
+    a: "The profile snapshot carries an expiry date 30 days after it was made, and our check refuses it after that. It is cached for 24 hours so we do not call GitHub repeatedly. We keep your GitHub connection token, encrypted, until you disconnect, but we stop using it 90 days after you connected and ask you to connect again. Disconnecting deletes the token and revokes our access at GitHub.",
   },
   {
     q: "How do I disconnect?",
-    a: "Open the Connect GitHub page and choose Disconnect GitHub. We delete our stored token first, clear the cached profile, and then revoke the grant at GitHub. You can also revoke us yourself in GitHub under Settings, Applications.",
+    a: "Open the Connect GitHub page and choose Disconnect GitHub. We delete our stored token first, clear the cached profile, and then revoke the grant at GitHub. If your browser session has ended (it lasts 7 days), the page offers Remove my stored connection instead: you sign in with GitHub, and we delete the stored token and the cached copy and revoke our access, without reading your profile or saving anything new. You can also revoke us yourself in GitHub under Settings, Applications.",
   },
   {
     q: "What is the integrity receipt?",
@@ -116,25 +116,32 @@ const Content = () => (
         more than 50.
       </li>
       <li>
-        <strong>Integrity receipt.</strong> A SHA-256 fingerprint of the whole profile, so any later edit is
-        detectable.
+        <strong>Checksum receipt.</strong> A SHA-256 fingerprint of the whole profile. It shows the profile has not
+        changed if you got the receipt by a separate trusted channel. It is not a signature and does not prove who
+        produced the profile.
       </li>
     </ul>
     <p>
-      The profile also states its own limits in plain data: it is valid for 30 days and it is revocable.
+      The profile also states its own limits in plain data: it carries an expiry date 30 days after it was made (our verify check refuses it after that; a system that keeps a copy has to check it too), and you can disconnect at any time. A copy you already shared cannot be recalled.
     </p>
 
     <h2 id="storage-and-control">Step 5: How your token is stored, and how to leave</h2>
     <p>
       Your GitHub connection token is encrypted with AES-256-GCM before it is stored, so the database holds ciphertext
       only. The finished profile is cached for 24 hours to avoid calling GitHub repeatedly; the cache never contains
-      tokens or raw GitHub responses. The profile snapshot is valid for 30 days, but the token itself is kept until you
-      disconnect.
+      tokens or raw GitHub responses. The profile snapshot expires after 30 days. The token itself is kept until you
+      disconnect, but we stop using it 90 days after you connected and ask you to connect again.
     </p>
     <p>
       To leave, choose Disconnect GitHub on the connect page. We delete the stored token first, clear the cached
       profile, and then revoke our access at GitHub. You can also revoke access yourself at any time in GitHub under
       Settings, Applications.
+    </p>
+    <p>
+      If your browser session has ended (it lasts 7 days), the connect page shows Remove my stored connection instead. It
+      sends you through the same GitHub sign-in, which is how we know the account is yours. We then delete the stored
+      token and the cached copy and revoke our access, exactly as Disconnect does. This sign-in only removes: it reads
+      nothing from your profile, saves nothing new and does not sign you in.
     </p>
 
     <h2 id="limits">What this profile can and cannot tell you</h2>

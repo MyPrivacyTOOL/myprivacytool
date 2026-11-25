@@ -1,0 +1,29 @@
+# MyPrivacyTOOL exposure scan POC (MPC-11203): one service, local use only.
+#
+#   docker compose up --build
+#   curl http://127.0.0.1:8001/api/v1/health
+#
+# OpenOSINT is not a separate service: its MCP server is stdio-only, so the API spawns it
+# (OPENOSINT_MCP_COMMAND) inside the same container. The routes have no auth, so the port is
+# bound to 127.0.0.1 only; add bearer auth before exposing it anywhere else.
+# API keys are optional. Without them the keyed tools report api_key_missing and are skipped.
+services:
+  shadow-audit-api:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.exposure-api
+    ports:
+      - "127.0.0.1:8001:8001"
+    environment:
+      OPENOSINT_LOG_LEVEL: ${OPENOSINT_LOG_LEVEL:-INFO}
+      HIBP_API_KEY: ${HIBP_API_KEY:-}
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+      VIRUSTOTAL_API_KEY: ${VIRUSTOTAL_API_KEY:-}
+      BRIGHTDATA_API_KEY: ${BRIGHTDATA_API_KEY:-}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    restart: unless-stopped

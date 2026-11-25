@@ -7,12 +7,14 @@ import Seo from "@/components/Seo";
 import pageMeta from "@/data/pageMeta.json";
 import { submitHubSpotForm, consentFields } from "@/lib/hubspot";
 import ConsentCheckbox from "@/components/ConsentCheckbox";
+import { REPORT_CONSENT_LABEL } from "@/lib/consentWording";
 import SaveScanConsentCheckbox from "@/components/SaveScanConsentCheckbox";
 import RecogniseConsentCheckbox from "@/components/RecogniseConsentCheckbox";
 import ScanSavingNotice from "@/components/ScanSavingNotice";
 import TurnstileBox from "@/components/TurnstileBox";
 import { SCAN_TURNSTILE_SITE_KEY, loadTurnstile } from "@/lib/turnstile";
 import ScanConsentText from "@/components/ScanConsentText";
+import ListingCoverageNote from "@/components/ListingCoverageNote";
 import { ConsentError, giveScanConsent, hasScanConsent } from "@/lib/scanConsent";
 import { setChoice } from "@/lib/cookieConsent";
 import LiveScanPanel from "@/components/LiveScanPanel";
@@ -181,7 +183,7 @@ const Scan = () => {
         resetSignal={tsReset}
         armed={tsArmed}
       />
-      <ConsentCheckbox id={`scan-consent-${idSuffix}`} checked={consent} onChange={setConsent} disabled={submitting} />
+      <ConsentCheckbox id={`scan-consent-${idSuffix}`} checked={consent} onChange={setConsent} disabled={submitting} label={REPORT_CONSENT_LABEL} />
       {offerSave && <ListingCheckFields idSuffix={idSuffix} value={listingFields} onChange={setListingFields} disabled={submitting} />}
       {offerSave && (
         <>
@@ -227,9 +229,10 @@ const Scan = () => {
           Data brokers and people-search sites can list your name, address and phone number without you knowing.
         </p>
         <p className="text-muted-foreground text-base mb-12 max-w-xl mx-auto">
-          Check your exposure to see where your information may be listed, then follow our step-by-step guides to remove it.<FeatureStatus feature="F1" />
+          We do not search broker sites for you yet. If you show us a page that lists you, we check it, and our step-by-step guides show how to have it removed.<FeatureStatus feature="F1" />
         </p>
 
+        {!submitted && <ListingCoverageNote className="max-w-md mx-auto mb-6" />}
         {!submitted ? renderForm("top") : thanks}
         {waitingForToken && <p role="status" className="text-muted-foreground text-sm mt-3 text-left">Verifying you are human, this takes a moment. Your request is sent automatically as soon as it is done. If a box appears, please tick it.</p>}
         {errorMsg && <p role="alert" className="text-foreground text-sm mt-3 border-l-4 border-destructive pl-3 text-left">{errorMsg}</p>}

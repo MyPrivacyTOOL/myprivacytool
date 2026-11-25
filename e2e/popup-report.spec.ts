@@ -111,7 +111,7 @@ async function finishScan(page: Page) {
 
 const fill = async (page: Page, email: string, { save }: { save: boolean }) => {
   await page.getByPlaceholder("your@email.com").fill(email);
-  await page.getByLabel(/email me my results and occasional privacy tips/i).check();
+  await page.getByLabel(/email me my results and follow-ups about them/i).check();
   const saveBox = page.getByLabel(/(save my scan result with my email|keep my scan and create my free account)/i);   // MPC-9817: the production build carries the one-step wording while VITE_ACCOUNTS_ENABLED is on
   await expect(saveBox).not.toBeChecked();                     // unticked by default
   if (save) await saveBox.check();

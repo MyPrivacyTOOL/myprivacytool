@@ -18,7 +18,7 @@ const none = buildBrokerPanel(null);
 check(none.rows.length === 9 && none.rows.map((r) => r.key).join() === BROKER_SITES.map((b) => b.key).join(), 'all nine shortlist brokers, in registry order, even with nothing pasted');
 check(none.rows.every((r) => r.state === 'not_checked' && r.guide?.slug && r.confidence === null && r.evidence_url === null), 'each is not_checked with its guide, no confidence, no evidence');
 check(none.rows.filter((r) => r.text === NOT_CHECKED_DEFAULT).length === 8 && /sign in/.test(none.rows[8].text), 'eight read the exact "we don\'t search... paste a page... paid coverage (coming)" sentence; Truecaller says why it cannot be read');
-check(/Hong Kong and Singapore/.test(none.region_note) && /not live yet/.test(none.coverage_note), 'HK/SG honest line and the paid-coverage-not-live line travel with the panel');
+check(!none.region_note && !/Hong Kong|Singapore/.test(JSON.stringify(none)) && /not live yet/.test(none.coverage_note), 'no HK/SG region wording (MPC-10827); the paid-coverage-not-live line travels with the panel');
 check(!buildBrokerPanel(null, { pasteAvailable: false }).rows.some((r) => /paste/i.test(r.text)), 'paste check switched off: no row invites a paste');
 
 // ---- states

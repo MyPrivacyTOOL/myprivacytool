@@ -14,7 +14,7 @@ const hex = (): HexagonData[] =>
 beforeEach(() => { window.scrollTo = vi.fn() as unknown as typeof window.scrollTo; sessionStorage.clear(); localStorage.clear(); });
 afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
 
-const MARKETING = /email me my results and occasional privacy tips/i;
+const MARKETING = /email me my results and follow-ups about them/i;
 const saveBox = () => screen.queryAllByLabelText(SAVE_CONSENT_LABEL)[0] as HTMLInputElement | undefined;
 const recogniseBox = () => screen.queryAllByLabelText(RECOGNISE_CONSENT_LABEL)[0] as HTMLInputElement | undefined;
 const flags = (save: boolean, rec: boolean) => {

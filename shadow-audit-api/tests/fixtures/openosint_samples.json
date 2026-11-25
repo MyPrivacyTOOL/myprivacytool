@@ -1,0 +1,54 @@
+{
+ "dns_ok": {
+  "tool": "search_dns",
+  "is_error": false,
+  "text": "{\n  \"tool\": \"search_dns\",\n  \"target\": \"myprivacytool.io\",\n  \"timestamp\": \"2026-11-24T08:00:13.672413+00:00\",\n  \"results\": [\n    \"[DNS] Domain: myprivacytool.io\",\n    \"[DNS] A: 172.67.207.102, 104.21.69.100\",\n    \"[!] No SPF record found \\u2014 anyone can spoof email from this domain.\",\n    \"[!] No DMARC policy found \\u2014 no enforcement of SPF/DKIM failures.\",\n    \"[DNS] DKIM not checked: selector probing is enumeration (needs --allow-active).\"\n  ],\n  \"error\": null\n}"
+ },
+ "breach_key_missing": {
+  "tool": "search_breach",
+  "is_error": false,
+  "text": "{\n  \"tool\": \"search_breach\",\n  \"target\": \"x@example.com\",\n  \"timestamp\": \"2026-11-24T08:00:13.678091+00:00\",\n  \"results\": [\n    \"Scan error: search_breach cannot run: Have I Been Pwned API key not set.\",\n    \"[key_required] HIBP_API_KEY\",\n    \"Get one: https://haveibeenpwned.com/API/Key \\u2014 Paid subscription.\",\n    \"Add it: put HIBP_API_KEY in the \\\"env\\\" block of the openosint server in your MCP client config, or in /root/.openosint/config.env \\u2014 then restart the MCP server and run this again.\"\n  ],\n  \"error\": null\n}"
+ },
+ "github_network_error": {
+  "tool": "search_github",
+  "is_error": false,
+  "text": "{\n  \"tool\": \"search_github\",\n  \"target\": \"myprivacytool\",\n  \"timestamp\": \"2026-11-24T08:00:13.681596+00:00\",\n  \"results\": [\n    \"Scan error: Network error querying GitHub: Cannot connect to host api.github.com:443 ssl:default [Name or service not known]\"\n  ],\n  \"error\": null\n}"
+ },
+ "rdap_proxy_403": {
+  "tool": "search_rdap",
+  "is_error": false,
+  "text": "{\n  \"tool\": \"search_rdap\",\n  \"target\": \"myprivacytool.io\",\n  \"timestamp\": \"2026-11-24T08:00:13.897358+00:00\",\n  \"results\": [\n    \"Scan error: Failed to fetch IANA RDAP bootstrap registry: HTTPSConnectionPool(host='data.iana.org', port=443): Max retries exceeded with url: /rdap/dns.json (Caused by ProxyError('Unable to connect to proxy', OSError('Tunnel connection failed: 403 Forbidden (agent proxy: no rule or network setting allows this host)')))\"\n  ],\n  \"error\": null\n}"
+ },
+ "whois_network_error": {
+  "tool": "search_whois",
+  "is_error": false,
+  "text": "{\n  \"tool\": \"search_whois\",\n  \"target\": \"myprivacytool.io\",\n  \"timestamp\": \"2026-11-24T08:00:13.924768+00:00\",\n  \"results\": [\n    \"Scan error: WHOIS query failed for 'myprivacytool.io': [Errno -2] Name or service not known\"\n  ],\n  \"error\": null\n}"
+ },
+ "noisy_blocked": {
+  "tool": "search_email",
+  "is_error": true,
+  "text": "{\"status\": \"disabled_in_passive_mode\", \"tool\": \"search_email\", \"noise\": \"noisy\", \"reason\": \"holehe probes many sites' sign-up/reset flows with the email from your IP; may notify the account owner or trigger security alerts.\", \"how_to_enable\": \"Enable with --allow-active, OPENOSINT_ALLOW_ACTIVE=1, the web Settings toggle, or the MCP server's --allow-active option. Active tools are noisy and may leave traces in third-party and target logs.\"}"
+ },
+ "tool_names": [
+  "generate_dorks",
+  "graph_export",
+  "graph_neighbors",
+  "graph_review_candidates",
+  "investigate_multi",
+  "search_abuseipdb",
+  "search_breach",
+  "search_censys",
+  "search_dns",
+  "search_dorks_live",
+  "search_footprint",
+  "search_gdelt_geo",
+  "search_github",
+  "search_ip",
+  "search_ip2location",
+  "search_paste",
+  "search_rdap",
+  "search_shodan",
+  "search_virustotal",
+  "search_whois"
+ ]
+}

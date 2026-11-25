@@ -8,12 +8,12 @@ interface TurnstileBoxProps {
   onRendered?: (rendered: boolean) => void;
   /** Change this number to reset the widget (a token is single use). */
   resetSignal?: number;
-  /** MPC-9888: false = do not load Cloudflare's script yet (the scan form arms it at the button click, so nothing third-party runs before it). Default true. */
+  /** MPC-9888: false = do not load Cloudflare's script yet (the scan form arms it at the button click, so nothing third-party runs before it). Default false (MPC-10790): a caller that forgets the prop loads nothing. */
   armed?: boolean;
 }
 
 /** MPC-8430: Cloudflare Turnstile widget ("interaction-only": shows nothing unless Cloudflare needs the visitor). If the script is blocked it renders nothing. */
-export default function TurnstileBox({ sitekey, onToken, onRendered, resetSignal = 0, armed = true }: TurnstileBoxProps) {
+export default function TurnstileBox({ sitekey, onToken, onRendered, resetSignal = 0, armed = false }: TurnstileBoxProps) {
   const box = useRef<HTMLDivElement>(null);
   const api = useRef<TurnstileApi>();
   const widget = useRef<string>();

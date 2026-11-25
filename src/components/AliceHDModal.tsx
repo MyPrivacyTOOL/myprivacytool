@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils';
 import { trackUpgradeModalClosed, trackWaitlistEmailSubmitted, trackAliceHDWaitlistSignup } from '@/lib/analytics';
 import { submitHubSpotForm, consentFields } from '@/lib/hubspot';
 import ConsentCheckbox from '@/components/ConsentCheckbox';
+import { ALICE_CONSENT_LABEL } from "@/lib/consentWording";
 import { z } from 'zod';
 
 // Reuses the public HubSpot "Start Scan" form (email + source_tag + consent fields); segment by source_tag.
@@ -201,7 +202,7 @@ export default function AliceHDModal({ isOpen, onClose, showRateLimitMessage = f
                 <p className="text-foreground text-xs mt-1">{emailError}</p>
               )}
             </div>
-            <ConsentCheckbox id="alice-hd-consent" checked={consent} onChange={setConsent} disabled={submitting} />
+            <ConsentCheckbox id="alice-hd-consent" label={ALICE_CONSENT_LABEL} checked={consent} onChange={setConsent} disabled={submitting} />
             <button
               type="submit"
               disabled={submitting}

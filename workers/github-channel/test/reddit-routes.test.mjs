@@ -46,7 +46,7 @@ function fakeNetwork({ refreshResponse } = {}) {
     }
     if (u === 'https://www.reddit.com/api/v1/revoke_token') { seen.revokeCalls.push(String(init.body)); return new Response(null, { status: 204 }); }
     if (u.startsWith('https://x.supabase.co/rest/v1/channel_tokens')) {
-      if (init.method === 'POST') { const r = JSON.parse(init.body); rows.set(`${r.provider}|${r.user_id}`, r); return new Response(null, { status: 201 }); }
+      if (init.method === 'POST') { const r = JSON.parse(init.body); const k = `${r.provider}|${r.user_id}`; rows.set(k, { created_at: new Date().toISOString(), ...rows.get(k), ...r }); return new Response(null, { status: 201 }); }
       const key = () => `${/provider=eq\.([^&]+)/.exec(u)[1]}|${decodeURIComponent(/user_id=eq\.([^&]+)/.exec(u)[1])}`;
       if (init.method === 'GET') return ok(rows.has(key()) ? [rows.get(key())] : []);
       if (init.method === 'DELETE') { rows.delete(key()); return new Response(null, { status: 204 }); }
@@ -213,7 +213,7 @@ test('GitHub and Reddit share one token table without interfering, even with the
   const env = baseEnv(); const rows = new Map();
   const fetchFn = async (u, init = {}) => {
     u = String(u);
-    if (init.method === 'POST') { const r = JSON.parse(init.body); rows.set(`${r.provider}|${r.user_id}`, r); return new Response(null, { status: 201 }); }
+    if (init.method === 'POST') { const r = JSON.parse(init.body); const k = `${r.provider}|${r.user_id}`; rows.set(k, { created_at: new Date().toISOString(), ...rows.get(k), ...r }); return new Response(null, { status: 201 }); }
     const k = `${/provider=eq\.([^&]+)/.exec(u)[1]}|${/user_id=eq\.([^&]+)/.exec(u)[1]}`;
     if (init.method === 'GET') return new Response(JSON.stringify(rows.has(k) ? [rows.get(k)] : []), { status: 200 });
     rows.delete(k); return new Response(null, { status: 204 });
@@ -250,4 +250,113 @@ test('connect failure at the store step revokes the freshly issued Reddit token 
   const loc = new URL(res.headers.get('Location'));
   assert.equal(loc.searchParams.get('channel_error'), 'connect_failed'); assert.equal(loc.searchParams.get('stage'), 'store');
   assert.equal(net.seen.revokeCalls.length, 1);
+});
+
+// MPC-10833: same 90-day re-consent rule as the GitHub channel.
+test('re-consent (Reddit): day 89 reads Reddit with expires_at; day 91 gets 401 reconsent_required, no Reddit call, token row kept; connecting again works', async () => {
+  const env = baseEnv(); const net = fakeNetwork();
+  const t0 = clock.t;
+  await connect(env, net);
+  // The real cookie lasts 7 days; forge one that outlives the 90 days to exercise the backstop.
+  const session = await sign({ sub: 'r3dd1t', exp: t0 + 400 * 86_400_000 }, env.STATE_SIGNING_KEY);
+  assert.equal(net.rows.get('reddit|r3dd1t').consented_at, new Date(t0).toISOString());
+  clock.t = t0 + 89 * 86_400_000;
+  net.state.validToken = ACCESS;
+  const ok = await get(env, net, behaviorReq(session));
+  assert.equal(ok.status, 200);
+  assert.equal((await ok.json()).expires_at, new Date(clock.t + 30 * 86_400_000).toISOString());
+
+  clock.t = t0 + 91 * 86_400_000;
+  const calls = net.seen.redditAuth.length;
+  const res = await get(env, net, behaviorReq(session));
+  assert.equal(res.status, 401);
+  assert.deepEqual(await res.json(), { error: 'reconsent_required' });
+  assert.equal(net.seen.redditAuth.length, calls, 'the old token is not used');
+  assert.ok(net.rows.has('reddit|r3dd1t'));
+  assert.equal(env.PROFILE_CACHE._store.size, 0);
+
+  const again = await connect(env, net);
+  assert.equal((await get(env, net, behaviorReq(again.session))).status, 200);
+  assert.equal(net.rows.get('reddit|r3dd1t').consented_at, new Date(clock.t).toISOString());
+  clock.t = t0;
+});
+
+// ---- MPC-10825: remove a stored connection without a live session --------------------------------------------------
+import { verify } from '../lib/oauth.js';
+
+async function removeCallback(env, fetchFn, { state = 'rd-rm', query = `code=c&state=${state}`, cookieState = state, key } = {}) {
+  const cookie = await sign({ state: cookieState, exp: clock.t + 60_000, intent: 'remove' }, key ?? env.STATE_SIGNING_KEY);
+  return handle(new Request(`https://w.test/oauth/reddit/callback?${query}`, { headers: { Cookie: `mpt_rd_oauth=${cookie}` } }), env, { fetchFn, now, limiter: noLimit });
+}
+
+test('MPC-10825 reddit remove/start: Reddit sign-in with the signed intent in the state cookie only; 503 when not configured', async () => {
+  const env = baseEnv();
+  const res = await get(env, fakeNetwork(), new Request('https://w.test/oauth/reddit/remove'));
+  assert.equal(res.status, 302);
+  const loc = new URL(res.headers.get('Location'));
+  assert.equal(loc.origin + loc.pathname, 'https://www.reddit.com/api/v1/authorize');
+  assert.equal(loc.searchParams.get('scope'), 'identity read history');
+  assert.ok(![...loc.searchParams.keys()].some((k) => /intent|remove/i.test(k)));
+  const cookie = /mpt_rd_oauth=([^;]+)/.exec(res.headers.get('Set-Cookie'))[1];
+  assert.equal((await verify(cookie, env.STATE_SIGNING_KEY, clock.t)).intent, 'remove');
+  const off = { ...env, REDDIT_CLIENT_ID: '' };
+  assert.equal((await get(off, fakeNetwork(), new Request('https://w.test/oauth/reddit/remove'))).status, 503);
+  assert.equal((await get(env, fakeNetwork(), new Request('https://w.test/oauth/reddit/remove', { method: 'POST' }))).status, 404);
+});
+
+test('MPC-10825 reddit remove callback with NO session: row and cache gone, BOTH the stored and the fresh token revoked, nothing stored', async () => {
+  const env = baseEnv(); const net = fakeNetwork();
+  const { session } = await connect(env, net);
+  await get(env, net, behaviorReq(session)); // warm the cache
+  assert.equal(net.rows.size, 1); assert.equal(env.PROFILE_CACHE._store.size, 1);
+  net.rows.set('reddit|other', { user_id: 'other', provider: 'reddit' });
+  net.seen.revokeCalls.length = 0; net.seen.bodies.length = 0;
+
+  const res = await removeCallback(env, net.fetchFn);
+  assert.equal(res.status, 302);
+  const loc = new URL(res.headers.get('Location'));
+  assert.equal(loc.origin + loc.pathname, 'https://app.test/connect/reddit');
+  assert.equal(loc.searchParams.get('channel_removed'), 'reddit');
+  assert.equal(loc.searchParams.get('revoked'), '1');
+  assert.deepEqual([...net.rows.keys()], ['reddit|other']);
+  assert.equal(env.PROFILE_CACHE._store.size, 0);
+  assert.equal(net.seen.revokeCalls.length, 2, 'stored token and the sign-in token');
+  assert.ok(net.seen.revokeCalls.every((b) => /token_type_hint=refresh_token/.test(b)));
+  assert.ok(!net.seen.bodies.some((b) => b.includes('user_id')), 'nothing was written to channel_tokens');
+  const cookies = res.headers.getSetCookie().join('\n');
+  assert.match(cookies, /mpt_rd_session=; Max-Age=0/);
+  assert.doesNotMatch(cookies, /mpt_rd_session=[^;]/);
+});
+
+test('MPC-10825 reddit remove callback: nothing stored still ends cleanly; cancel, forged cookie and delete failure are reported honestly', async () => {
+  const env = baseEnv(); const net = fakeNetwork();
+  const none = await removeCallback(env, net.fetchFn);
+  assert.equal(new URL(none.headers.get('Location')).searchParams.get('channel_removed'), 'reddit');
+  assert.equal(net.seen.revokeCalls.length, 1);
+
+  await connect(env, net);
+  const never = async () => { throw new Error('must not be called'); };
+  assert.match((await removeCallback(env, never, { query: 'error=access_denied&state=rd-rm' })).headers.get('Location'), /channel_error=remove_access_denied/);
+  assert.match((await removeCallback(env, never, { key: 'attacker'.repeat(6) })).headers.get('Location'), /channel_error=invalid_state/);
+  assert.match((await removeCallback(env, never, { query: 'code=c&state=other' })).headers.get('Location'), /channel_error=invalid_state/);
+  assert.equal(net.rows.size, 1, 'none of those removed anything');
+
+  const failingDelete = async (u, init = {}) => (String(u).startsWith('https://x.supabase.co') && init.method === 'DELETE' ? new Response('{}', { status: 500 }) : net.fetchFn(u, init));
+  net.seen.revokeCalls.length = 0;
+  const res = await removeCallback(env, failingDelete);
+  const loc = new URL(res.headers.get('Location'));
+  assert.equal(loc.searchParams.get('channel_error'), 'remove_failed'); assert.equal(loc.searchParams.get('stage'), 'delete');
+  assert.equal(loc.searchParams.get('channel_removed'), null);
+  assert.equal(net.rows.size, 1);
+  assert.equal(net.seen.revokeCalls.length, 1, 'the sign-in token is still revoked, the stored one is kept so the person can retry');
+});
+
+test('MPC-10825 reddit remove callback: logs hold event names only', async () => {
+  const env = baseEnv(); const net = fakeNetwork();
+  await connect(env, net);
+  const lines = []; const orig = console.log; console.log = (...a) => lines.push(a.join(' '));
+  try { await removeCallback(env, net.fetchFn); } finally { console.log = orig; }
+  const all = lines.join('\n');
+  assert.match(all, /reddit_removed_without_session/);
+  for (const s of [ACCESS, REFRESH, SECRET_HANDLE, 'r3dd1t', 'rsec']) assert.ok(!all.includes(s), s);
 });
