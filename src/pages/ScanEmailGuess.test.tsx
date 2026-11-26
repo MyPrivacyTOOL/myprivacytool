@@ -69,11 +69,14 @@ describe("Scan page: the magic guess (MPC-11111)", () => {
     beforeEach(() => { vi.stubEnv("VITE_EMAIL_GUESS_ENABLED", "true"); setChoice(true); restore = setBundledRegistryForTests(registryWithEntry(true)); });
     afterEach(() => { restore?.(); restore = null; });
 
-    it("opens the token, shows the address, and removes the token from the address bar", async () => {
+    it("opens the token, shows the address, brings the card into view, and removes the token from the address bar", async () => {
+      const scrollIntoView = vi.fn();
+      Element.prototype.scrollIntoView = scrollIntoView as unknown as typeof Element.prototype.scrollIntoView;
       const f = worker(() => jsonResponse(found));
       window.history.replaceState(null, "", `/scan?utm_source=x&utm_medium=channel_osint#g=${TOKEN}`);
       renderPage(<Scan />);
       expect(await screen.findByTestId("email-guess-card")).toHaveTextContent(ADDRESS);
+      expect(scrollIntoView).toHaveBeenCalledTimes(1);
       expect(guessCalls(f)).toHaveLength(1);
       expect(JSON.parse(String((guessCalls(f)[0][1] as RequestInit).body))).toEqual({ token: TOKEN });
       expect(window.location.hash).toBe("");

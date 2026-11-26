@@ -40,10 +40,11 @@ Expect it to fire rarely: most X bios hold no address. That is the honest result
 `email_guess_shown` and `magic_guess_submitted` (`answer` yes or no). Both carry `basis: bio_email` and `source: scan_page`, never the address, and are sent only for a visitor who
 accepted analytics. `magic_guess_submitted` is stage 3 of the MPC-11111 flow check. The bridge click is already measurable as a GA4 session with medium `channel_osint`.
 
-## The three gates (all needed; any one missing = off)
+## The four gates (all needed; any one missing = off)
 
 | Gate | Where | Who |
 |---|---|---|
+| Registry entry `email-guess-service` set to `enabled: true` | `shared/recipients/recipients.json` (ships `false`), then `npm run recipients:module` and `npm run legal-blocks` | a PR, with the privacy owner's sign-off (rule 7) |
 | `EMAIL_GUESS_ENABLED = "true"` | wrangler.toml of scan-report AND social-listeners (ships `"false"`) | a PR, after the copy is approved |
 | `EMAIL_GUESS_KEY` Worker secret, the same value on both Workers | `wrangler secret put` | Chris only |
 | `VITE_EMAIL_GUESS_ENABLED=true` | Cloudflare Pages build variable | Chris |
@@ -55,13 +56,20 @@ Rollback: set `EMAIL_GUESS_ENABLED = "false"` and deploy. Tokens already sent st
 1. DM notice (`GUESS_NOTICE` in workers/social-listeners/src/mirror-bot.ts): "I noticed an email address in your public bio. When you open the link, I'll offer it back to you for the scan so you don't have to type it. I don't store it."
 2. Card (src/components/EmailGuessCard.tsx): "Is this your main email?" / "Your public X bio lists {address}. This is only a guess, and we have not stored it." / "Yes, use this one" / "No, I will type another".
 3. The Mirror consent message says what is read (bio, location, link, join date, counts). Reading an address out of the bio is within "bio", but the owner may want one more clause there.
-4. Privacy page: nothing new leaves our systems and nothing new is stored, so no new recipient or retention entry is needed; confirm with the privacy owner.
+4. Registry and Privacy page. Nothing new leaves our systems and nothing new is stored, but the browser call to our own Worker happens BEFORE the visitor's scan consent click, so it needs its own first-party `pre_click` entry (`email-guess-service`, ships disabled). When that entry is enabled it is listed on /what-we-see and in the generated privacy blocks, so the privacy owner must approve it first. (An earlier version of this doc said no registry entry was needed. That was wrong; see the rehearsal below.)
 
 ## Not built, on purpose (recommendations)
 
 - **Telegram.** A Telegram profile carries no email, and reading a Telegram bio needs a `getChat` call the consent text does not mention. Recommended: leave it out until the owner wants it and the wording changes.
 - **A single-use token.** That would need a store of used tokens, which is a new personal-data store (CK-8502 constraint). The 24 hour expiry and fragment placement are the substitute.
 - **Guessing from the web visit alone** (cookies, device) or from other platforms. That is identity matching.
+
+## Local rehearsal, 2026-11-26 (synthetic data, nothing in production touched)
+
+A real Chromium was driven through the whole chain on a local production build with the switch on: the real Mirror code built the DM from a fake X profile, the real scan-report Worker ran locally with a throwaway key, and the page opened the sealed link. It found two real defects, both fixed in the follow-up PR:
+1. The registry wrapper refused the page's call to the Worker with `CONSENT_REQUIRED` (the `scan-report` entry is `post_click`; a bridge-link visitor has not clicked yet). As first merged, the card could never have appeared on the live site. Unit tests missed it because they stubbed that rule. Fix: the dedicated `email-guess-service` pre_click entry above.
+2. On a 390px phone the card sat two screens below the top of the page. It now scrolls itself into view once (instant if the visitor prefers reduced motion).
+Result after the fixes: 19 of 19 checks pass (sealed link in the DM, no readable address in the link, card shown and on screen, token removed from the address bar, Worker asked once with the token in the body, Yes fills the box and sends nothing, No leaves it empty, damaged token and no token show no card, GA4 events queued without the address, desktop width). This is NOT GA4 DebugView evidence and NOT a real X account: those still need a person (MPC-11111 steps 4 and 5).
 
 ## Tests
 
