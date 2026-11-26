@@ -12,9 +12,9 @@ on:
         required: false
         default: ''
       keep_mode:
-        description: 'normal = the full check, everything removed at the end. keep = send ONE real invitation to a testingnt69+biz-keep alias, prove it (incl. 30-day expiry and a real browser opening the link) and KEEP it. clean = remove every kept invitation.'
+        description: 'normal = the full check, everything removed at the end. keep = send ONE real invitation to a testingnt69+biz-keep alias, prove it (incl. 30-day expiry and a real browser opening the link) and KEEP it. journey = like keep, but a real browser walks the whole employee journey (open, authorise, reload, withdraw, reload), logs every call status, then removes everything. clean = remove every kept invitation.'
         type: choice
-        options: [normal, keep, clean]
+        options: [normal, keep, journey, clean]
         default: normal
   push:
     branches: ['business-check/**']
@@ -43,17 +43,19 @@ jobs:
         with:
           node-version: 22
       - name: Run the check
-        if: ${{ inputs.keep_mode != 'keep' && inputs.keep_mode != 'clean' }}
+        if: ${{ inputs.keep_mode != 'keep' && inputs.keep_mode != 'journey' && inputs.keep_mode != 'clean' }}
         run: node scripts/business-live-check/run.mjs
       # MPC-10612: keep mode. The invitation it sends is NOT deleted, so a person can open the email and follow the link. It needs a browser for the page check.
-      - name: Install the browser (keep mode only)
-        if: ${{ inputs.keep_mode == 'keep' }}
+      - name: Install the browser (keep and journey modes only)
+        if: ${{ inputs.keep_mode == 'keep' || inputs.keep_mode == 'journey' }}
         run: npm ci --no-audit --no-fund && npx playwright install --with-deps chromium
       - name: Send and keep one invitation, prove it, open the link in a real browser
-        if: ${{ inputs.keep_mode == 'keep' }}
+        if: ${{ inputs.keep_mode == 'keep' || inputs.keep_mode == 'journey' }}
+        env:
+          JOURNEY: ${{ inputs.keep_mode == 'journey' && '1' || '' }}
         run: node scripts/business-live-check/keep.mjs
       - name: Keep-mode screenshot
-        if: ${{ always() && inputs.keep_mode == 'keep' }}
+        if: ${{ always() && (inputs.keep_mode == 'keep' || inputs.keep_mode == 'journey') }}
         uses: actions/upload-artifact@v4
         with:
           name: keep-invitation-evidence
