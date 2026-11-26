@@ -138,6 +138,7 @@ describe("PaPIT limits wording", () => {
     const guide = read("src/content/guides/githubProfile.tsx");
     expect(guide).not.toMatch(/valid for 30 days|30 days of validity/);
     expect(guide).toMatch(/until you disconnect/);
+    expect(guide.replace(/\s+/g, " ").match(/We delete a stored token automatically if it is not used for 90 days\./g)).toHaveLength(2);
     expect(guide).toMatch(/Remove my stored connection/);
     expect(read("src/components/ConnectGitHub.tsx")).not.toMatch(/data_retention_days/);
     expect(read("src/pages/Privacy.tsx")).toMatch(/If your 7-day session has ended, you can still remove the stored connection/);

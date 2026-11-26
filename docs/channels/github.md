@@ -4,7 +4,7 @@ A Cloudflare Worker (`workers/github-channel`) that connects a user's GitHub acc
 sanitized PaPIT v1 profile ([schema](../papit/schema-v1.md)) and caches it for 24h.
 
 Decisions recorded on the MPC-115 Notion task (2026-10-05): Worker not Next.js (A), Cloudflare is the
-host (B), Workers KV cache (C), `read:user` only (D), tokens kept until the user revokes (E), fixed activity
+host (B), Workers KV cache (C), `read:user` only (D), tokens kept until the user revokes (E; since MPC-11258 also deleted after 90 days unused), fixed activity
 and role rules (F, G), sorted-key canonical receipt (H), `key_version` column (I), RLS service-role only (J).
 
 ## Flow
@@ -66,7 +66,7 @@ The button is a plain link to the Worker's `/oauth/github/start`; after the GitH
 `credentials: "include"`, shows the sanitized profile, and offers **Disconnect** (`DELETE /channels/github`). `?channel_error=`
 codes are mapped to friendly copy and the raw code is never shown. When the 7-day session has ended (`401 unauthenticated`) the page offers
 **Remove my stored connection**, a plain link to `/oauth/github/remove` (MPC-10825); on return it reads `?channel_removed=github&revoked=` and says what was removed.
-The Connect page's snapshot row reads "Connection kept: Until you disconnect" (MPC-10825). The `data_retention_days: 30` field stays in the PaPIT JSON as a declared
+The Connect page's snapshot row reads "Connection kept: Until you disconnect, or until the token goes unused for 90 days and we delete it automatically" (MPC-10825, MPC-11258). The `data_retention_days: 30` field stays in the PaPIT JSON as a declared
 snapshot validity (see [MPC-10833](../papit-limits-mpc-9794.md)); person-facing pages no longer present it as how long we keep the connection.
 
 - **Unlisted on purpose:** `noindex`, not in the sitemap or nav. Link to it when the channel is ready to launch.

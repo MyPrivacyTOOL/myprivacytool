@@ -216,6 +216,13 @@ describe("Privacy: unused connection tokens (MPC-11258)", () => {
     const text = flat(screen.getByTestId("connected-accounts").textContent ?? "");
     expect(text).toContain("Even if you do not disconnect, we automatically delete a stored GitHub or Reddit token that has not been used for 90 days.");
   });
+
+  it("the GitHub and Reddit bullets do not say 'until you disconnect' without the 90-day delete", () => {
+    renderPage(<Privacy />);
+    const text = flat(screen.getByTestId("connected-accounts").textContent ?? "");
+    expect(text).toContain("until you disconnect (we delete them automatically if the token is not used for 90 days)");
+    expect(text).toContain("until you disconnect (not used after 90 days without connecting again, and deleted automatically if not used for 90 days)");
+  });
 });
 
 describe("Privacy: security section (MPC-10805)", () => {

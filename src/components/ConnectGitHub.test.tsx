@@ -98,7 +98,7 @@ describe("<ConnectGitHub />", () => {
   it("a session that ended says the stored connection remains until disconnected, and offers Connect", async () => {
     vi.mocked(api.fetchGithubProfile).mockResolvedValue({ status: "session_ended" });
     renderAt();
-    expect(await screen.findByTestId("session-ended")).toHaveTextContent(/we may still hold that connection until you remove it/i);
+    expect(await screen.findByTestId("session-ended")).toHaveTextContent(/we may still hold that connection until you remove it\. we delete a stored token automatically if it is not used for 90 days\./i);
     expect(screen.getByRole("link", { name: /connect github/i })).toBeInTheDocument();
   });
 
@@ -159,7 +159,7 @@ describe("<ConnectGitHub />", () => {
     vi.mocked(api.fetchGithubProfile).mockResolvedValue({ status: "connected", profile });
     renderAt();
     expect(await screen.findByText("Connection kept")).toBeInTheDocument();
-    expect(screen.getByText("Until you disconnect")).toBeInTheDocument();
+    expect(screen.getByText("Until you disconnect, or until the token goes unused for 90 days and we delete it automatically")).toBeInTheDocument();
     expect(screen.queryByText(/declared validity/i)).toBeNull();
     expect(document.body.textContent).not.toMatch(/30 days/);
   });
@@ -186,7 +186,7 @@ describe("<ConnectGitHub />", () => {
   it("when connected it says what is kept and for how long", async () => {
     vi.mocked(api.fetchGithubProfile).mockResolvedValue({ status: "connected", profile });
     renderAt();
-    expect(await screen.findByTestId("what-we-keep")).toHaveTextContent(/encrypted access token until you disconnect.*24 hours.*7 days/i);
+    expect(await screen.findByTestId("what-we-keep")).toHaveTextContent(/encrypted access token until you disconnect.*delete it automatically if it is not used for 90 days.*24 hours.*7 days/i);
   });
 
   // MPC-10833: the profile shows the date it stops being valid, and a token past 90 days asks to connect again.

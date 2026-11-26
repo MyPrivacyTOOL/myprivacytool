@@ -308,7 +308,7 @@ export default {
       "party": "first",
       "retention": {
         "days": null,
-        "text": "Until you disconnect"
+        "text": "Until you disconnect; a stored token not used for 90 days is deleted automatically"
       },
       "consent_basis": "user_action",
       "phase": "post_click",
