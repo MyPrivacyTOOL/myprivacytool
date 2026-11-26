@@ -6,7 +6,7 @@
 import { callRecipient } from "../../../shared/recipients/outbound";
 import { isDeleteCommandText } from "./delete-my-data";
 import type { Logger } from "./logger";
-import { telegramSender } from "./probe-reader";
+import { eraseProbeCaptures, telegramSender } from "./probe-reader";
 import { senderKey } from "./sender-key";
 import { rpc } from "./social";
 import type { Env } from "./shared";
@@ -78,7 +78,7 @@ export async function captureTelegram(env: Env, update: unknown, log: Logger): P
   }
 }
 
-/** Removes everything captured for this sender (under the HMAC key and the plain id) and core-brain's conversation row. True when nothing failed. */
+/** Removes everything captured for this sender (under the HMAC key and the plain id), core-brain's conversation row and the sender's probe-log rows. True when nothing failed. */
 export async function eraseTelegramCapture(env: Env, update: unknown, log: Logger): Promise<boolean> {
   const sender = telegramSender(update);
   if (!sender) return false;
@@ -91,6 +91,7 @@ export async function eraseTelegramCapture(env: Env, update: unknown, log: Logge
     }
     const state = await rpc(env, "mpt_erase_chat_sender", { p_channel: "telegram", p_sender_id: sender.id });
     if (state && !state.ok) ok = false;
+    if ((await eraseProbeCaptures(env, sender.id)) === null) ok = false;
   } catch (err) {
     log.warn("telegram_capture_erase_failed", { error: err instanceof Error ? err.name : "unknown" });
     ok = false;

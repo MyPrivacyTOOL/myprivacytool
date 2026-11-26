@@ -45,10 +45,11 @@ service = "core-brain"
 # in the PROBE_TELEGRAM_IDS secret, and the Worker also needs the deep_jobs tables. Rollback: set "off" (or delete this block) and deploy.
 # TELEGRAM_BASELINE_SCAN (MPC-7891): see the line below; it used to be managed only by the flags workflow, which every later deploy wiped.
 [vars]
-# Channel probe reader, mode "all" (decision D-A; docs/channel-probe.md). Captures the raw update and the public profile lookups of EVERY non-bot Telegram sender into
-# channel_probe_captures, kept until the person asks for deletion (PROBE_RETENTION_DAYS deliberately unset). Wording approved by the owner, privacy owner and legal
-# (recorded on Notion task TID-7873 on 2026-11-02/03). Kept here so a deploy does not wipe it. ROLLBACK: delete this line (or set "off") and deploy.
-PROBE_MODE = "all"
+# Channel probe reader: OFF (MPC-9907, option A, approved 2026-11-26). Mode "all" (decision D-A, on from 2026-11-03) saved every sender's raw
+# update and public profile lookups before anyone had answered the 19-or-over question, which /privacy says does not happen. Capture after the Y
+# (TELEGRAM_CAPTURE_HEXAGONS) is separate and stays on. STOP removes the sender's earlier probe rows. Do not set "all" again unless /privacy and
+# the bot wording change first (workers/social-listeners/probe-erase.vitest.ts fails if this line changes).
+PROBE_MODE = "off"
 TELEGRAM_DEEP_SCAN = "on"
 # MPC-11111 (the magic guess, built OFF): "the Mirror seals an email found in the person's own X bio into the bridge link". Needs ALL THREE: this switch exactly "true", the Worker secret EMAIL_GUESS_KEY (the SAME value on mpt-scan-report and
 # social-listeners; only Chris creates it), and the site flag VITE_EMAIL_GUESS_ENABLED. Anything but the exact string "true" is off. Wording is DRAFT until Chris approves it.
