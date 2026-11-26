@@ -69,7 +69,7 @@ const Enterprise = () => {
             <p className="text-muted-foreground text-lg mb-4 leading-relaxed">
               Home addresses, personal numbers and family details listed by data brokers give attackers
               material for targeted phishing and impersonation. We find that exposure across your organisation
-              and remove it.<FeatureStatus feature="F6" />
+              and remove it.<FeatureStatus feature="F6" state="in_build" />
             </p>
             <p className="text-muted-foreground text-base mb-8">
               Built for security and risk teams who need coverage, reporting and a named contact, not a

@@ -36,8 +36,10 @@ describe("/business 48-hour line (MPC-9825)", () => {
     expect(inBlurb).toHaveLength(1);
     expect(inBlurb[0].getAttribute("data-feature-status")).toBe("planned");
     expect(blurb.textContent).toMatch(/data-broker coverage is\s*Planned/);
-    // everything else keeps its markers (monthly scan, removals, alerts, API, SSO and the scan/removal/monitoring steps)
-    expect(container.querySelectorAll('[data-feature="F6"]').length).toBeGreaterThanOrEqual(8);
+    // everything not built keeps its marker, pinned In build (monthly scan, removals, alerts, API, SSO and the removal/monitoring steps); the team-scan step is live and has none
+    const f6 = container.querySelectorAll('[data-feature="F6"]');
+    expect(f6.length).toBeGreaterThanOrEqual(7);
+    f6.forEach((el) => expect(el.getAttribute("data-feature-status")).toBe("in_build"));
   });
 });
 

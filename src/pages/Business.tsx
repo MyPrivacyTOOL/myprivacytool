@@ -228,14 +228,14 @@ const Business = () => {
               { step: "01", title: "Invite your team", desc: "Give us your employees' work emails and we send each person an invitation. Nothing is checked about anyone until that person agrees for themselves. A list of emails from you is not their consent." },
               { step: "02", title: "We run the full scan", desc: "For each person who agrees, we check data brokers: addresses, phone numbers, family, social profiles.", feature: "F6" as const },
               { step: "03", title: "You get a team summary", desc: "Within 48 hours we send you counts for the people who agreed: how many were checked and how many have a listing that may be theirs. Each person sees their own results first. You see one person's detail only if that person chooses to share it with you." },
-              { step: "04", title: "We remove your team", desc: "On your approval, we send removal requests across all brokers. Most removals complete within 7–14 days.", feature: "F6" as const },
-              { step: "05", title: "Monthly monitoring", desc: "Brokers re-add data over time. We scan monthly and send new removal requests, so your team stays in control of its footprint.", feature: "F6" as const },
-            ].map(({ step, title, desc, feature }: { step: string; title: string; desc: string; feature?: "F6" }) => (
+              { step: "04", title: "We remove your team", desc: "On your approval, we send removal requests across all brokers. Most removals complete within 7–14 days.", feature: "F6" as const, pin: "in_build" as const },
+              { step: "05", title: "Monthly monitoring", desc: "Brokers re-add data over time. We scan monthly and send new removal requests, so your team stays in control of its footprint.", feature: "F6" as const, pin: "in_build" as const },
+            ].map(({ step, title, desc, feature, pin }: { step: string; title: string; desc: string; feature?: "F6"; pin?: "in_build" }) => (
               <div key={step} className="flex gap-6 items-start">
                 <div className="text-brand font-bold text-2xl w-10 flex-shrink-0">{step}</div>
                 <div>
                   <div className="font-semibold text-foreground mb-1">{title}</div>
-                  <div className="text-muted-foreground text-sm leading-relaxed">{desc}{feature && <FeatureStatus feature={feature} />}</div>
+                  <div className="text-muted-foreground text-sm leading-relaxed">{desc}{feature && <FeatureStatus feature={feature} state={pin} />}</div>
                 </div>
               </div>
             ))}
@@ -269,7 +269,7 @@ const Business = () => {
                 <ul className="space-y-2 mb-6">
                   {features.map((f) => (
                     <li key={f} className="flex items-start gap-2 text-sm text-muted-foreground">
-                      <span className="text-brand flex-shrink-0 mt-0.5">✓</span> <span>{f}{F6_FEATURES.includes(f) && <FeatureStatus feature="F6" />}</span>
+                      <span className="text-brand flex-shrink-0 mt-0.5">✓</span> <span>{f}{F6_FEATURES.includes(f) && <FeatureStatus feature="F6" state="in_build" />}</span>
                     </li>
                   ))}
                 </ul>
@@ -291,7 +291,7 @@ const Business = () => {
   );
 };
 
-// MPC-9836: tier features that are not built yet (F6). "Company report" and support are staffed, so unmarked.
+// MPC-9836: tier features that are not built yet (F6). MPC-10612: pinned "In build" (state prop) so they keep their marker after F6 (team scanning) goes live. "Company report" and support are staffed, so unmarked.
 const F6_FEATURES = ["Monthly scan", "Automated removals", "Slack/Teams alerts", "API access", "SSO / SCIM"];
 
 export default Business;
