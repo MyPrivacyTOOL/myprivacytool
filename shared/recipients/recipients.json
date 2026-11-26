@@ -160,11 +160,11 @@
       "data_items": [
         "email"
       ],
-      "purpose": "Emails you a sign-in link and keeps the scans you choose to keep in your account until you delete it.",
+      "purpose": "Emails you a sign-in link and keeps the scans you choose to keep in your account.",
       "party": "first",
       "retention": {
         "days": null,
-        "text": "Kept until you delete your account; deleting it removes the account and every scan in it"
+        "text": "Kept until you delete your account, which removes the account and every scan in it; a saved scan result is deleted 12 months after the scan"
       },
       "consent_basis": "user_action",
       "phase": "pre_click",
