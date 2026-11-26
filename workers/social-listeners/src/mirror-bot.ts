@@ -11,10 +11,16 @@ import { uploadDmVideo } from "./x-media";
 import { classifyTheme, recordXDm } from "./funnel";
 import { type EventOrigin, eraseContact, touchContact } from "./social";
 import { cleanData, eventTime, userFields } from "./x-hexagons";
+import { emailGuessOn, guessFromProfile, sealGuess } from "../../../shared/email-guess";
 
 // Tagging convention for channel bots (MPC-7641): utm_source=<platform>&utm_medium=channel_osint&utm_campaign=bot_reply.
 // Short link (public/x.html): clean in the DM, shows a preview card, then forwards to /scan with the same utm tracking.
 const SCAN_URL = "https://myprivacytool.io/x";
+// MPC-11111 (the magic guess, off by default): when the person's own public bio holds exactly one email address, the Mirror's bridge link goes straight to /scan
+// with the same utm tags /x adds, plus a sealed token in the URL FRAGMENT (never sent to any server) that lets the page offer that address back. See shared/email-guess.ts.
+const GUESS_SCAN_URL = "https://myprivacytool.io/scan?utm_source=x&utm_medium=channel_osint&utm_campaign=bot_reply";
+// DRAFT wording, needs Chris's approval before EMAIL_GUESS_ENABLED is turned on (PR checklist: copy change).
+export const GUESS_NOTICE = "I noticed an email address in your public bio. When you open the link, I'll offer it back to you for the scan so you don't have to type it. I don't store it.";
 const X_API = "https://api.x.com/2";
 const X_TIMEOUT_MS = 5000;
 
@@ -204,8 +210,23 @@ export const ERROR_MESSAGE =
 
 const yesNo = (b: boolean) => (b ? "visible" : "not set");
 
-/** Builds the educational mirror text from public profile fields only. Pure: no I/O. */
-export function buildMirrorMessage(p: XProfile): string {
+/**
+ * The bridge link for one Mirror DM. Normally the plain /x short link. With the magic guess ON (EMAIL_GUESS_ENABLED "true" and a key) and exactly one email address
+ * in the person's own public bio, a link to /scan carrying the sealed guess in its fragment. Never throws: any problem means the plain link.
+ */
+export async function bridgeFor(env: Env, p: XProfile): Promise<{ url: string; notice?: string }> {
+  try {
+    if (!emailGuessOn(env)) return { url: SCAN_URL };
+    const guess = guessFromProfile({ bio: p.description });
+    const token = guess ? await sealGuess(env.EMAIL_GUESS_KEY, guess, "x") : null;
+    return token ? { url: `${GUESS_SCAN_URL}#g=${token}`, notice: GUESS_NOTICE } : { url: SCAN_URL };
+  } catch {
+    return { url: SCAN_URL };
+  }
+}
+
+/** Builds the educational mirror text from public profile fields only. Pure: no I/O. `bridge` is only set when the magic guess is on and found an address. */
+export function buildMirrorMessage(p: XProfile, bridge: { url?: string; notice?: string } = {}): string {
   const visible: string[] = [];
   if (p.description) visible.push(`• Bio: "${p.description.slice(0, 160)}" (may reveal job, location, interests)`);
   else visible.push(`• Bio: ${yesNo(false)}`);
@@ -226,7 +247,8 @@ export function buildMirrorMessage(p: XProfile): string {
     `${head}\n\nWhat anyone can see:\n${visible.join("\n")}\n\n` +
     "What stays protected (I never saw it): your DMs, email address, phone number, IP address, login history and who you message.\n\n" +
     "Why it matters: combining small public details is how people get profiled, doxxed or targeted by scams.\n\n" +
-    `Next step: run a free full scan at ${SCAN_URL}\n\n` +
+    `Next step: run a free full scan at ${bridge.url ?? SCAN_URL}\n\n` +
+    (bridge.notice ? `${bridge.notice}\n\n` : "") +
     "I stored nothing from this scan. Your data was discarded when this message was sent."
   );
 }
@@ -391,7 +413,8 @@ export async function handleMirrorDm(env: Env, dm: MirrorDm, log: Logger): Promi
       return;
     }
     log.info("mirror_scan_complete");
-    const sent = await sendXDm(env, dm.senderId, branded(profile.username, "Thank you for saying yes.\n\n" + buildMirrorMessage(profile) + `\n\n${FOLLOW_LINE}`), log, { video: true });
+    const bridge = await bridgeFor(env, profile);   // MPC-11111: the plain /x link unless the magic guess is on and the bio holds one address
+    const sent = await sendXDm(env, dm.senderId, branded(profile.username, "Thank you for saying yes.\n\n" + buildMirrorMessage(profile, bridge) + `\n\n${FOLLOW_LINE}`), log, { video: true });
     log.info(sent ? "mirror_delivered" : "mirror_delivery_failed");
     await noteContact(env, dm.senderId, profile.username, "mirror_consent", log, dm.origin);
   } catch (err) {

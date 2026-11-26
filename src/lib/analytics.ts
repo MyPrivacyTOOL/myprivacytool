@@ -533,6 +533,13 @@ export const trackStartSignup = (params?: Record<string, string>) => {
 };
 
 // ---------------------------------------------------------------------------
+// The magic guess on /scan (MPC-11111). Off until VITE_EMAIL_GUESS_ENABLED is "true". Never carries the address: only that a guess was shown, and the answer.
+// ---------------------------------------------------------------------------
+// Each checks the visitor's analytics choice itself (like the password-check events above): window.gtag exists before consent and only queues, and a queued event could be sent later.
+export const trackEmailGuessShown = () => { if (hasConsent()) attributedEvent('email_guess_shown', { basis: 'bio_email', source: 'scan_page' }); };
+export const trackMagicGuessSubmitted = (answer: 'yes' | 'no') => { if (hasConsent()) attributedEvent('magic_guess_submitted', { answer, basis: 'bio_email', source: 'scan_page' }); };
+
+// ---------------------------------------------------------------------------
 // Alice HD voice waitlist (MPC-6977 site-wide form wiring). Fire only after a
 // confirmed successful HubSpot submit.
 // ---------------------------------------------------------------------------

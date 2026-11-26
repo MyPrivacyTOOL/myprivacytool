@@ -108,7 +108,7 @@ workflows); each feature switches itself off while its name is unset. Names only
 | Worker | Names |
 |---|---|
 | social-listeners | `DISCORD_BOT_TOKEN`, `DISCORD_PUBLIC_KEY`, `GITHUB_WEBHOOK_SECRET`, `KAKAO_SKILL_SECRET`, `LINE_CHANNEL_ACCESS_TOKEN`, `LINE_CHANNEL_SECRET`, `QQ_BOT_SECRET`, `TELEGRAM_ID_HMAC_KEY`, `VIBER_AUTH_TOKEN`, `WECHAT_ACCESS_TOKEN`, `WECHAT_TOKEN`, `YOUTUBE_EXTRAS_SECRET`, `ZALO_OA_ACCESS_TOKEN`, `ZALO_WEBHOOK_SECRET` |
-| scan-report | `DEEP_RESEARCH_HMAC_KEY`, `GITHUB_SEARCH_TOKEN`, `SUPABASE_PUBLISHABLE_KEY` (public by design, not a secret) |
+| scan-report | `DEEP_RESEARCH_HMAC_KEY`, `GITHUB_SEARCH_TOKEN`, `SUPABASE_PUBLISHABLE_KEY` (public by design, not a secret), `EMAIL_GUESS_KEY` (MPC-11111, optional: the key that seals and opens the magic-guess token; the SAME value must be set on scan-report and social-listeners; 32 or more random characters; created by Chris only; with it missing the feature is off and nothing is issued) |
 | mpt-leads | `SUPABASE_PUBLISHABLE_KEY` (public by design, not a secret) |
 | mpt-metrics-collector | `FACEBOOK_PAGE_TOKEN` |
 | mpt-cairn-blackboard | `CAIRN_TOKEN` |
