@@ -113,7 +113,7 @@ workflows); each feature switches itself off while its name is unset. Names only
 | mpt-metrics-collector | `FACEBOOK_PAGE_TOKEN` |
 | mpt-cairn-blackboard | `CAIRN_TOKEN` |
 | mpt-content-approval | `MAKE_API_KEY`, `DEFAULT_IMAGE_KEY` (an object key, not a secret) |
-| shared `workers/lib`, `shared/ga4-server-events.ts` | `GA4_API_SECRET` (read by Workers that pass their env in; MPC-11111 server-side GA4 events in scan-report and core-brain, off unless `GA4_SERVER_EVENTS_ENABLED` is `true`, the registry entry `ga4-measurement-protocol` is enabled, and the secret is set; created by Chris only) |
+| shared `workers/lib`, `shared/ga4-server-events.ts` | `GA4_API_SECRET` (read by Workers that pass their env in; MPC-11111 server-side GA4 events in scan-report, core-brain and social-listeners (the X bot's DMs never reach core-brain, so social-listeners sends dm_received for them), off unless `GA4_SERVER_EVENTS_ENABLED` is `true`, the registry entry `ga4-measurement-protocol` is enabled, and the secret is set; created by Chris only) |
 
 ## 5. Rotation checklist
 
