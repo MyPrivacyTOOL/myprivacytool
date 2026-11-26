@@ -111,7 +111,16 @@ const DPA = () => {
                 <li>Keep access limited to people who need it and who are bound by confidentiality</li>
                 <li>Use appropriate technical and organisational measures. Data is encrypted in transit (HTTPS); access to our systems is restricted by credentials held by our team</li>
                 <li>Help you answer data-subject requests (access, correction, deletion, objection) within a reasonable time</li>
-                <li>Tell you without undue delay, and within 72 hours where we can, after confirming a personal data breach affecting your data</li>
+                <li>
+                  We will tell you without undue delay after we confirm a personal data breach affecting your data. We aim to do so within 72 hours of confirming it. If we cannot, we will tell you why. We will email the contact named in your agreement with us, or{" "}
+                  <a
+                    href="mailto:privacy@myprivacytool.io"
+                    className="text-brand underline hover:text-foreground"
+                  >
+                    privacy@myprivacytool.io
+                  </a>{" "}
+                  if none is named.
+                </li>
                 <li>Impose data protection terms on sub-processors and stay responsible for them</li>
                 <li>Make available the information reasonably needed to show compliance, and allow reasonable audits on notice</li>
               </ul>

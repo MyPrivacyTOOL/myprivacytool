@@ -19,7 +19,7 @@ export default function Newsletter() {
     setErrorMsg("");
 
     try {
-      const res = await recipientFetch("supabase", `${SUPABASE_URL}/rest/v1/subscribers`, {
+      const res = await recipientFetch("supabase-signups", `${SUPABASE_URL}/rest/v1/subscribers`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

@@ -8,16 +8,21 @@ Endpoints:
   POST   /api/v1/scans/username  - Scan username for exposures
   POST   /api/v1/scans/domain    - Scan domain for exposures
   GET    /api/v1/scans/{scan_id} - Retrieve scan results
-  GET    /api/v1/health          - Health check
+  GET    /api/v1/health          - Health check (the only open route)
+
+Auth: every route except /health needs `Authorization: Bearer <EXPOSURE_API_TOKEN>`. If the
+variable is unset, protected routes refuse every request.
 """
 
+import hmac
+import os
 import uuid
 import asyncio
 import logging
 from datetime import datetime
 from typing import Optional, Dict, Any
 
-from fastapi import APIRouter, HTTPException, Query, BackgroundTasks
+from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Query
 from pydantic import BaseModel, EmailStr, Field
 
 from app.openosint_mcp_adapter import OpenOSINTAdapter, ToolPolicy, ExposureResult
@@ -25,12 +30,35 @@ from app.openosint_mcp_adapter import OpenOSINTAdapter, ToolPolicy, ExposureResu
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/v1", tags=["exposure"])
 
+
+TOKEN_ENV = "EXPOSURE_API_TOKEN"
+
+
+def require_token(authorization: Optional[str] = Header(default=None)) -> None:
+    """Bearer-token check for every route except /health.
+
+    The token comes from EXPOSURE_API_TOKEN, read per request. If it is unset or empty, every
+    protected request is refused (fail closed): the API never runs anonymously. Compared in
+    constant time. Neither the token nor the scan target is ever logged.
+    """
+    expected = os.environ.get(TOKEN_ENV, "")
+    scheme, _, supplied = (authorization or "").partition(" ")
+    ok = (
+        bool(expected)
+        and scheme.lower() == "bearer"
+        and hmac.compare_digest(supplied.encode("utf-8"), expected.encode("utf-8"))
+    )
+    if not ok:
+        if not expected:
+            logger.error("%s is not set: refusing protected requests", TOKEN_ENV)
+        raise HTTPException(
+            status_code=401, detail="unauthorized", headers={"WWW-Authenticate": "Bearer"}
+        )
+
 # Initialize adapter (would be dependency-injected in real app)
 adapter = OpenOSINTAdapter(
-    mcp_port=8000,
     policy=ToolPolicy.PASSIVE_ONLY,
     concurrent_limit=5,
-    timeout_seconds=5.0,
     enable_provenance=True,
 )
 
@@ -45,7 +73,7 @@ class EmailScanRequest(BaseModel):
     priority: Optional[str] = Field(
         default="normal",
         description="Scan priority: normal, high, urgent",
-        regex="^(normal|high|urgent)$"
+        pattern="^(normal|high|urgent)$"
     )
 
 
@@ -60,7 +88,7 @@ class UsernameScanRequest(BaseModel):
     priority: Optional[str] = Field(
         default="normal",
         description="Scan priority: normal, high, urgent",
-        regex="^(normal|high|urgent)$"
+        pattern="^(normal|high|urgent)$"
     )
 
 
@@ -75,7 +103,7 @@ class DomainScanRequest(BaseModel):
     priority: Optional[str] = Field(
         default="normal",
         description="Scan priority: normal, high, urgent",
-        regex="^(normal|high|urgent)$"
+        pattern="^(normal|high|urgent)$"
     )
 
 
@@ -108,15 +136,15 @@ class ScanResultResponse(BaseModel):
 
 
 # Endpoints
-@router.post("/scans/email", response_model=ScanResponse)
+@router.post("/scans/email", response_model=ScanResponse, dependencies=[Depends(require_token)])
 async def scan_email(request: EmailScanRequest, background_tasks: BackgroundTasks) -> ScanResponse:
     """
     Initiate an exposure scan for an email address.
     
     OpenOSINT tools executed:
     - search_email: Check breach databases
-    - search_username: Extract & search username
-    - domain_lookup: Analyze domain registration
+    - search_breach: Breach exposure
+    - search_username: Search the address's local part as a username
     
     Args:
         request: EmailScanRequest with email and optional priority
@@ -132,7 +160,7 @@ async def scan_email(request: EmailScanRequest, background_tasks: BackgroundTask
     """
     scan_id = str(uuid.uuid4())
     
-    logger.info(f"Email scan initiated: {scan_id} for {request.email}")
+    logger.info(f"Email scan initiated: {scan_id}")
     
     # Create placeholder result (will be updated when scan completes)
     placeholder = ExposureResult(
@@ -158,14 +186,14 @@ async def scan_email(request: EmailScanRequest, background_tasks: BackgroundTask
     )
 
 
-@router.post("/scans/username", response_model=ScanResponse)
+@router.post("/scans/username", response_model=ScanResponse, dependencies=[Depends(require_token)])
 async def scan_username(request: UsernameScanRequest, background_tasks: BackgroundTasks) -> ScanResponse:
     """
     Initiate an exposure scan for a username.
     
     OpenOSINT tools executed:
     - search_username: Cross-platform username search
-    - social_profile: Extract profile URLs
+    - search_footprint: Public footprint
     
     Args:
         request: UsernameScanRequest with username and optional priority
@@ -175,7 +203,7 @@ async def scan_username(request: UsernameScanRequest, background_tasks: Backgrou
     """
     scan_id = str(uuid.uuid4())
     
-    logger.info(f"Username scan initiated: {scan_id} for {request.username}")
+    logger.info(f"Username scan initiated: {scan_id}")
     
     placeholder = ExposureResult(
         target=request.username,
@@ -199,15 +227,13 @@ async def scan_username(request: UsernameScanRequest, background_tasks: Backgrou
     )
 
 
-@router.post("/scans/domain", response_model=ScanResponse)
+@router.post("/scans/domain", response_model=ScanResponse, dependencies=[Depends(require_token)])
 async def scan_domain(request: DomainScanRequest, background_tasks: BackgroundTasks) -> ScanResponse:
     """
     Initiate an exposure scan for a domain.
     
     OpenOSINT tools executed:
-    - domain_lookup: WHOIS, DNS, MX records
-    - subdomain_enum: Certificate transparency, common subdomains
-    - reputation_check: Blocklists, threat intelligence
+    - search_domain, search_whois, search_dns, search_rdap, search_footprint
     
     Args:
         request: DomainScanRequest with domain and optional priority
@@ -217,7 +243,7 @@ async def scan_domain(request: DomainScanRequest, background_tasks: BackgroundTa
     """
     scan_id = str(uuid.uuid4())
     
-    logger.info(f"Domain scan initiated: {scan_id} for {request.domain}")
+    logger.info(f"Domain scan initiated: {scan_id}")
     
     placeholder = ExposureResult(
         target=request.domain,
@@ -241,7 +267,7 @@ async def scan_domain(request: DomainScanRequest, background_tasks: BackgroundTa
     )
 
 
-@router.get("/scans/{scan_id}", response_model=ScanResultResponse)
+@router.get("/scans/{scan_id}", response_model=ScanResultResponse, dependencies=[Depends(require_token)])
 async def get_scan_result(scan_id: str) -> ScanResultResponse:
     """
     Retrieve scan results by scan_id.
@@ -286,6 +312,7 @@ async def get_scan_result(scan_id: str) -> ScanResultResponse:
             "tools_executed": result.tools_executed,
             "tools_failed": result.tools_failed,
             "execution_time_seconds": result.execution_time_seconds,
+            "tool_errors": result.tool_errors,
         },
     )
 
@@ -301,7 +328,7 @@ async def health_check() -> Dict[str, Any]:
     return {
         "status": "healthy",
         "component": "exposure-api",
-        "mcp_server": "connected" if adapter.mcp_client else "disconnected",
+        "mcp_server": "stdio (spawned per scan)",
         "scans_in_cache": len(_scan_cache),
         "timestamp": datetime.utcnow().isoformat() + "Z",
     }

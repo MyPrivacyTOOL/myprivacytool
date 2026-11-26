@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -9,7 +9,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import TurnstileBox from "@/components/TurnstileBox";
-import { SCAN_TURNSTILE_SITE_KEY } from "@/lib/turnstile";
+import { SCAN_TURNSTILE_SITE_KEY, loadTurnstile } from "@/lib/turnstile";
+import { hasScanConsent, onScanConsent } from "@/lib/scanConsent";
 import { DEEP_HEXAGONS } from "@/config/deepResearch";
 import { deepResearchEnabled, deleteMyData, loadResults, startCheck, verifyCode, type DeepFinding } from "@/lib/deepResearchApi";
 
@@ -33,7 +34,36 @@ export default function DeepResearchVerify() {
   const [turnstileToken, setTurnstileToken] = useState("");
   const [turnstileRendered, setTurnstileRendered] = useState(false);
   const [resetSignal, setResetSignal] = useState(0);
+  // MPC-10790: Cloudflare's script does not load when the page opens. It loads at the visitor's own click: the Scan me click (a journey that already holds
+  // the scan consent starts armed) or, on this form, the "Email me a code" click (design 8.2, the registry's pre_click exception for Turnstile).
+  const [turnstileArmed, setTurnstileArmed] = useState(() => hasScanConsent());
+  const [waitingForToken, setWaitingForToken] = useState(false);
+  useEffect(() => onScanConsent(() => { if (hasScanConsent()) setTurnstileArmed(true); }), []);
   const [smsPopup, setSmsPopup] = useState(false);
+
+  const sendCheck = async (cfToken: string) => {
+    setBusy(true);
+    setMessage("");
+    const r = await startCheck(email.trim(), cfToken);
+    setBusy(false);
+    setTurnstileToken("");
+    setResetSignal((n) => n + 1);   // a Turnstile token is single use
+    if (!r.ok) {
+      setMessage(r.error);
+      return;
+    }
+    setChallengeId(r.data.challenge_id);
+    setStep("code");
+    setMessage("If that address can receive mail, a code is on its way. It works for 10 minutes.");
+  };
+
+  useEffect(() => {
+    if (waitingForToken && turnstileToken) {
+      setWaitingForToken(false);
+      void sendCheck(turnstileToken);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [waitingForToken, turnstileToken]);
 
   if (!deepResearchEnabled()) {
     return (
@@ -46,23 +76,21 @@ export default function DeepResearchVerify() {
 
   const sendCode = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (turnstileRendered && !turnstileToken) {
+    if (busy || waitingForToken) return;
+    if (!turnstileArmed) {
+      // The click is what loads Cloudflare's script. A blocked or slow script never holds the form (the Worker decides what to do without a token).
+      const ts = await Promise.race([loadTurnstile(), new Promise<undefined>((r) => setTimeout(() => r(undefined), 4000))]);
+      if (ts) {
+        setTurnstileArmed(true);
+        setWaitingForToken(true);   // the effect below sends the code request the moment the token arrives
+        setMessage("Checking you are a person, this takes a moment. Your code is sent automatically as soon as it is done. If a box appears, please tick it.");
+        return;
+      }
+    } else if (turnstileRendered && !turnstileToken) {
       setMessage("Please wait a moment while we check you are a person, then try again.");
       return;
     }
-    setBusy(true);
-    setMessage("");
-    const r = await startCheck(email.trim(), turnstileToken);
-    setBusy(false);
-    setTurnstileToken("");
-    setResetSignal((n) => n + 1);   // a Turnstile token is single use
-    if (!r.ok) {
-      setMessage(r.error);
-      return;
-    }
-    setChallengeId(r.data.challenge_id);
-    setStep("code");
-    setMessage("If that address can receive mail, a code is on its way. It works for 10 minutes.");
+    await sendCheck(turnstileToken);
   };
 
   const checkCode = async (e: React.FormEvent) => {
@@ -123,8 +151,8 @@ export default function DeepResearchVerify() {
             onChange={(e) => setEmail(e.target.value)}
             className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
           />
-          <TurnstileBox sitekey={SCAN_TURNSTILE_SITE_KEY} onToken={setTurnstileToken} onRendered={setTurnstileRendered} resetSignal={resetSignal} />
-          <Button type="submit" disabled={busy || email.trim().length === 0}>{busy ? "Sending…" : "Email me a code"}</Button>
+          <TurnstileBox sitekey={SCAN_TURNSTILE_SITE_KEY} onToken={setTurnstileToken} onRendered={setTurnstileRendered} resetSignal={resetSignal} armed={turnstileArmed} />
+          <Button type="submit" disabled={busy || waitingForToken || email.trim().length === 0}>{busy ? "Sending…" : "Email me a code"}</Button>
         </form>
       )}
 

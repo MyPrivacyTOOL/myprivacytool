@@ -134,6 +134,63 @@ describe("smoke-test targets", () => {
   });
 });
 
+// MPC-10825 follow-up: github-channel deploys on merge, so its smoke test must prove the sign-in routes (incl. the no-session remove route).
+describe("smoke-test target: github-channel", () => {
+  const AUTH = "https://github.com/login/oauth/authorize?client_id=cid&redirect_uri=https%3A%2F%2Fc%2Fcb&scope=read%3Auser&state=s&code_challenge=c&code_challenge_method=S256&allow_signup=false";
+  const cookie = "mpt_gh_oauth=signed; Max-Age=600; Path=/oauth/github; HttpOnly; Secure; SameSite=Lax";
+  const healthy = (over = {}) => async (u, o = {}) => {
+    const path = new URL(u).pathname;
+    const key = `${o.method || "GET"} ${path}`;
+    if (key in over) return over[key];
+    if (key === "GET /health") return resp(200, { json: { status: "ok" } });
+    if (key === "GET /oauth/github/start" || key === "GET /oauth/github/remove") return resp(302, { headers: { location: AUTH, "set-cookie": cookie } });
+    if (key === "GET /oauth/reddit/remove") return resp(503, { json: { error: "reddit_not_configured" } });
+    if (key === "GET /channels/github/profile") return resp(401, { json: { error: "unauthenticated" } });
+    return resp(404);
+  };
+  const names = (r) => r.filter((x) => !x.ok).map((x) => x.name);
+  it("is registered with the production custom domain as its default", () => {
+    expect(DEFAULTS["github-channel"]).toBe("https://channels.myprivacytool.io");
+    expect(Object.keys(targets)).toContain("github-channel");
+  });
+  it("passes against a healthy Worker, and only ever uses GET (and a POST that must 404)", async () => {
+    const seen = [];
+    const r = await targets["github-channel"]("https://c", async (u, o = {}) => { seen.push(`${o.method || "GET"} ${new URL(u).pathname}`); return healthy()(u, o); });
+    expect(r.every((x) => x.ok)).toBe(true);
+    expect(seen.filter((x) => !x.startsWith("GET"))).toEqual(["POST /oauth/github/remove"]);
+  });
+  it("fails when the no-session remove route is not deployed (the 404 we saw before MPC-10825 shipped)", async () => {
+    const r = await targets["github-channel"]("https://c", healthy({ "GET /oauth/github/remove": resp(404) }));
+    expect(names(r)).toEqual(["GET /oauth/github/remove -> same sign-in, no intent in the URL (the no-session remove route is deployed)"]);
+  });
+  it("fails when the sign-in asks for more than read:user, drops PKCE, or loses the HttpOnly state cookie", async () => {
+    const wide = AUTH.replace("read%3Auser", "repo");
+    expect(names(await targets["github-channel"]("https://c", healthy({ "GET /oauth/github/start": resp(302, { headers: { location: wide, "set-cookie": cookie } }) })))).toHaveLength(1);
+    const noPkce = AUTH.replace("code_challenge_method=S256", "code_challenge_method=plain");
+    expect(names(await targets["github-channel"]("https://c", healthy({ "GET /oauth/github/start": resp(302, { headers: { location: noPkce, "set-cookie": cookie } }) })))).toHaveLength(1);
+    expect(names(await targets["github-channel"]("https://c", healthy({ "GET /oauth/github/remove": resp(302, { headers: { location: AUTH, "set-cookie": "mpt_gh_oauth=x; Path=/" } }) })))).toHaveLength(1);
+  });
+  it("fails when the sign-in intent leaks into the URL", async () => {
+    const leaky = `${AUTH}&intent=remove`;
+    const r = await targets["github-channel"]("https://c", healthy({ "GET /oauth/github/remove": resp(302, { headers: { location: leaky, "set-cookie": cookie } }) }));
+    expect(r.filter((x) => !x.ok)[0].detail).toContain("intent is in the URL");
+  });
+  it("fails when the sign-in goes anywhere but GitHub", async () => {
+    const evil = AUTH.replace("https://github.com", "https://evil.test");
+    expect(names(await targets["github-channel"]("https://c", healthy({ "GET /oauth/github/start": resp(302, { headers: { location: evil, "set-cookie": cookie } }) })))).toHaveLength(1);
+  });
+  it("accepts Reddit either unconfigured (503) or configured (302 to Reddit), and rejects anything else", async () => {
+    const redirect = resp(302, { headers: { location: "https://www.reddit.com/api/v1/authorize?x", "set-cookie": "mpt_rd_oauth=a; HttpOnly" } });
+    expect((await targets["github-channel"]("https://c", healthy({ "GET /oauth/reddit/remove": redirect }))).every((x) => x.ok)).toBe(true);
+    expect(names(await targets["github-channel"]("https://c", healthy({ "GET /oauth/reddit/remove": resp(500) })))).toHaveLength(1);
+  });
+  it("fails when the profile route answers without a session, when POST can start the flow, or when health is down", async () => {
+    expect(names(await targets["github-channel"]("https://c", healthy({ "GET /channels/github/profile": resp(200, { json: { version: "1.0" } }) })))).toHaveLength(1);
+    expect(names(await targets["github-channel"]("https://c", healthy({ "POST /oauth/github/remove": resp(302, { headers: { location: AUTH, "set-cookie": cookie } }) })))).toHaveLength(1);
+    expect(names(await targets["github-channel"]("https://c", healthy({ "GET /health": resp(500) })))).toHaveLength(1);
+  });
+});
+
 describe("smoke() runner", () => {
   const noLog = () => {};
   it("rejects unknown targets", async () => { await expect(smoke("nope")).rejects.toThrow("unknown target"); });

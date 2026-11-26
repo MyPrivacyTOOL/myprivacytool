@@ -68,7 +68,7 @@ describe("ci.yml (merge blocking)", () => {
 });
 
 describe("deploy workflows: pre-deploy checks, smoke test, rollback", () => {
-  const DEPLOYS = { "deploy-mpt-leads.yml": "mpt-leads", "deploy-oauth-poc.yml": "oauth-poc", "deploy-webhook-receiver.yml": "webhook-receiver" };
+  const DEPLOYS = { "deploy-mpt-leads.yml": "mpt-leads", "deploy-oauth-poc.yml": "oauth-poc", "deploy-webhook-receiver.yml": "webhook-receiver", "deploy-github-channel.yml": "github-channel" };
   for (const [file, worker] of Object.entries(DEPLOYS)) {
     describe(file, () => {
       const wf = load(file);
@@ -100,6 +100,33 @@ describe("deploy workflows: pre-deploy checks, smoke test, rollback", () => {
       });
     });
   }
+  // MPC-10825 follow-up: the GitHub channel Worker deploys on merge (it used to be manual-only, so merged Worker changes silently never shipped).
+  describe("deploy-github-channel.yml: deploys on merge to main, never from a pull request", () => {
+    const wf = load("deploy-github-channel.yml");
+    it("runs on push to main for Worker, workflow, smoke-script and recipient-wrapper changes, and by hand", () => {
+      expect(wf.on.push.branches).toEqual(["main"]);
+      expect(wf.on.push.paths).toEqual(expect.arrayContaining(["workers/github-channel/**", ".github/workflows/deploy-github-channel.yml", "scripts/ci/smoke-test.mjs", "shared/recipients/**"]));
+      expect(wf.on).toHaveProperty("workflow_dispatch");
+    });
+    it("the deploy job needs the tests and never runs on a pull request", () => {
+      expect(wf.jobs.deploy.needs).toBe("test");
+      expect(wf.jobs.deploy.if).toContain("github.event_name == 'workflow_dispatch'");
+      expect(wf.jobs.deploy.if).toContain("github.ref == 'refs/heads/main'");
+      expect(wf.jobs.deploy.if).not.toMatch(/pull_request/);
+    });
+    it("keeps the wrangler ERESOLVE workaround on both wrangler steps", () => {
+      for (const s of steps(wf, "deploy").filter((x) => x.uses?.startsWith("cloudflare/wrangler-action"))) expect(s.env.NPM_CONFIG_LEGACY_PEER_DEPS).toBe("true");
+    });
+    it("fails (not warns) when the secret names change or an expected one is missing", () => {
+      const verify = steps(wf, "deploy").find((x) => x.name === "Verify secrets survived the deploy").run;
+      expect(verify).toContain("secret names changed across deploy");
+      expect(verify).toContain("expected secrets missing");
+      expect(verify).not.toContain("::warning::");
+    });
+    it("never puts a secret value in a run script (secrets only reach env or with)", () => {
+      for (const s of steps(wf, "deploy")) expect(s.run ?? "").not.toMatch(/\$\{\{\s*secrets\./);
+    });
+  });
   it("scan-report runs the pre-deploy check too", () => {
     expect(runs(load("deploy-scan-report.yml"), "deploy").join("\n")).toContain("check-env.mjs --require CLOUDFLARE_API_TOKEN,CLOUDFLARE_ACCOUNT_ID --worker workers/scan-report");
   });

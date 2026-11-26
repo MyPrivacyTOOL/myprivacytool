@@ -2,6 +2,7 @@ import { useEffect, useMemo } from "react";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { ArrowRight, BookOpen, Check, Code2, FileText, HelpCircle, ScanLine, ShieldCheck } from "lucide-react";
 import Seo from "@/components/Seo";
+import { STORAGE_NOTE } from "@/data/trustCopy";
 import pageMeta from "@/data/pageMeta.json";
 import { trackThankYouNextStep, trackThankYouView } from "@/lib/analytics";
 
@@ -132,8 +133,7 @@ export default function ThankYou() {
             <ShieldCheck size={16} className="text-brand" aria-hidden="true" /> How we handle your data
           </h2>
           <p className="text-xs text-muted-foreground leading-relaxed mb-4">
-            The scan runs in your browser and its results aren't stored on our servers, unless you choose to save your scan with your email, in which case we keep it for 12 months, then delete it automatically. We only keep what you choose to
-            submit, such as your email address, and we use analytics only with your consent.
+            {STORAGE_NOTE}
           </p>
           <ul className="flex flex-wrap gap-x-5 gap-y-2 text-xs">
             {TRUST_LINKS.map(({ key, to, label }) => (

@@ -8,6 +8,7 @@ declare global {
 
 import { captureAttribution, getAttribution } from './attribution';
 import { hasConsent } from './cookieConsent';
+import { hasScanConsent } from './scanConsent';
 
 // Session tracking
 let sessionStartTime: number = 0;
@@ -24,6 +25,12 @@ export const startSessionTimer = () => {
 export const trackActivity = () => {
   lastActivityTime = Date.now();
 };
+
+// MPC-10790 (Open Tracker rule 2, decision A): nothing goes to GA4 before the Scan me click. The analytics choice alone (cookie banner "Accept
+// analytics") is not enough; the journey must also hold the scan consent. The gtag stub in index.html drops calls while its gate is closed too, so an
+// event from before the consent point is neither queued nor flushed later (that stub is the gate for ordinary events). The one event that carries
+// place and network values, device_profile, also checks here, so a build whose page lacks the stub still sends nothing before the click.
+export const analyticsAllowed = (): boolean => hasConsent() && hasScanConsent();
 
 // Base event tracking
 export const trackEvent = (
@@ -123,6 +130,7 @@ export const trackDeviceProfile = (deviceData: {
   session: { timezone: string };
   privacy: { doNotTrack: boolean };
 }) => {
+  if (!analyticsAllowed()) return;
   trackEvent('device_profile', {
     device_type: deviceData.device.type,
     os: deviceData.device.os,

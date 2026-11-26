@@ -61,9 +61,9 @@ typecheck. Clear the backlog, then drop `continue-on-error`.
 
 | Check | Where | What it does |
 |---|---|---|
-| Pre-deploy | `scripts/ci/check-env.mjs`, first step of `deploy-mpt-leads`, `deploy-oauth-poc`, `deploy-scan-report`, `deploy-webhook-receiver` | Fails before anything ships when `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` are missing or blank (names only, never values), `wrangler.toml` has `REPLACE_*` placeholders, no `name`/`main`, or `EXPECTED_SECRETS.txt` contains anything but secret **names**. |
+| Pre-deploy | `scripts/ci/check-env.mjs`, first step of `deploy-mpt-leads`, `deploy-oauth-poc`, `deploy-scan-report`, `deploy-webhook-receiver`, `deploy-github-channel` | Fails before anything ships when `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` are missing or blank (names only, never values), `wrangler.toml` has `REPLACE_*` placeholders, no `name`/`main`, or `EXPECTED_SECRETS.txt` contains anything but secret **names**. |
 | Secrets survive | existing steps in each deploy workflow | Secret names before vs. after the deploy must match (unchanged). |
-| Post-deploy smoke | `scripts/ci/smoke-test.mjs`, last step of `deploy-mpt-leads`, `deploy-oauth-poc` and `deploy-webhook-receiver` | Hits the live Worker with retries. mpt-leads: CORS preflight, the side-effect-free `@healthcheck.io` POST, POST-only 404. oauth-poc: `/health`, 302 to Google with an HttpOnly state cookie, 404. webhook-receiver: `/health`, unsigned WhatsApp POST 401, verify GET 403, deep-dive start without secret 401, deep-dive Firestore lookup, 404. |
+| Post-deploy smoke | `scripts/ci/smoke-test.mjs`, last step of `deploy-mpt-leads`, `deploy-oauth-poc`, `deploy-webhook-receiver` and `deploy-github-channel` | Hits the live Worker with retries. mpt-leads: CORS preflight, the side-effect-free `@healthcheck.io` POST, POST-only 404. oauth-poc: `/health`, 302 to Google with an HttpOnly state cookie, 404. webhook-receiver: `/health`, unsigned WhatsApp POST 401, verify GET 403, deep-dive start without secret 401, deep-dive Firestore lookup, 404. github-channel: `/health`, the GitHub sign-in and the no-session remove route are 302s to GitHub (`read:user`, S256, HttpOnly state cookie, no intent in the URL), Reddit remove 503 or 302, profile without a session 401, POST to remove 404. |
 | Auto-rollback | same workflows | If the smoke step fails, `wrangler rollback` restores the previous version and the smoke test re-runs. The job stays red either way. |
 | Site smoke | `.github/workflows/smoke-site.yml` | After each push to `main` (waits up to ~10 min for Cloudflare Pages), every 6 h, and on demand: 7 conversion routes return 200 with the SPA shell, sitemap is served, plus both public Workers. |
 
@@ -83,9 +83,9 @@ not per version, so they are kept; the workflow verifies the names to be sure.
 
 ## 5. Known gaps
 
-* **Live HubSpot form for `/contact`:** `VITE_HUBSPOT_CONTACT_FORM_ID` is not set in production yet (MPC-7172), so the
-  live page falls back to `mailto:`. E2E builds with a test GUID to cover the HubSpot path; the mailto fallback is
-  covered by a unit test.
+* **Live HubSpot form for `/contact`:** `VITE_HUBSPOT_CONTACT_FORM_ID` is set in `.env.production` (MPC-8515, 2026-11-25), so the
+  live page sends to HubSpot. E2E builds with a test GUID to cover the HubSpot path; the mailto fallback (used only when the id is unset) is
+  covered by a unit test, and `src/pages/ContactProductionConfig.test.ts` fails if production loses the id.
 * **E2E never touches live backends** by design. Live behaviour is covered by the post-deploy smoke tests, which are
   deliberately side-effect free (no real signup is created).
 * **Scan engine** (`src/lib/*Detection*`, TensorFlow models, hexagon logic) has only the pre-existing `HexagonGrid` test.

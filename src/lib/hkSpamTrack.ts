@@ -12,6 +12,7 @@ export const HK_SPAM_EVENTS = [
   "hk_spam_log_added",
   "hk_spam_scan_click",
   "hk_spam_lang_switch",
+  "hk_shield_waitlist_signup",
 ] as const;
 
 export type HkSpamEvent = (typeof HK_SPAM_EVENTS)[number];

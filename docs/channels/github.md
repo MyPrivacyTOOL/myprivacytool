@@ -93,6 +93,13 @@ makes this rare, and the cost is one extra reconnect.
 GitHub allows 5,000 requests/hour per user token. A cold profile build costs at most 9 requests
 (`/user`, up to 3 pages of repos, 2 of starred, 3 of events). With a 24h cache one user uses about 9 requests per day.
 
+**Requests to this Worker (MPC-10833, 2026-11-24).** `POST /papit/verify` is covered by the zone's Cloudflare rate-limiting rule (zone `myprivacytool.io`, ruleset phase
+`http_ratelimit`, rule "MPT scan/API abuse limit: POST per IP + POST /papit/verify on channels"): block after 5 requests per 10 seconds per IP and Cloudflare location, for
+10 seconds. It is one rule on the Free plan, which allows only one, so the period and block time cannot be tuned and the count is approximate and per location: it slows
+abuse, it is not a hard cap. A live burst of 20 parallel requests saw 3 answered `429`. The rule lives in Cloudflare, not in this repo; to undo it, remove the added
+`(http.request.method eq "POST" and http.host eq "channels.myprivacytool.io" and http.request.uri.path eq "/papit/verify")` clause from the rule's expression. The Worker
+itself has no per-request limiter. The other routes on this host are GET, `DELETE /channels/*` (needs a session cookie and an allowed origin) and the OAuth redirects.
+
 ## Consent age (MPC-10833)
 
 `channel_tokens.consented_at` is set when the person completes the OAuth consent screen (the callback) and is not touched by a token refresh. When a profile is
@@ -119,7 +126,15 @@ disconnect or connect again. An automatic purge would delete user data, so it is
    npx wrangler secret put SUPABASE_SERVICE_ROLE_KEY
    ```
    Local dev: copy `.dev.vars.example` to `.dev.vars` (gitignored), then `npx wrangler dev`.
-6. **Deploy**: run the "GitHub channel Worker" workflow manually (it refuses to deploy while `REPLACE_*` remain).
+6. **Deploy**: the "GitHub channel Worker" workflow (`.github/workflows/deploy-github-channel.yml`) deploys **on merge to `main`** whenever `workers/github-channel/**`,
+   `shared/recipients/**`, `scripts/ci/smoke-test.mjs` or the workflow itself changes, and can still be run by hand (workflow_dispatch). Never from a pull request.
+   Order: tests, pre-deploy check (repo secrets set, no `REPLACE_*`, `EXPECTED_SECRETS.txt` names only), snapshot of the Worker's secret names, deploy, FAIL if any secret
+   name changed or an expected one is missing, then a GET-only smoke test of the live Worker (`node scripts/ci/smoke-test.mjs github-channel`: `/health`; the GitHub sign-in
+   and the no-session remove route must both be a 302 to GitHub with `read:user`, S256, an HttpOnly state cookie and no intent in the URL; Reddit remove 503 or a 302 to Reddit;
+   profile without a session 401; POST to remove 404). If the smoke test fails the Worker is rolled back to the previous version and re-checked, and the job still ends red.
+   The same smoke test runs every 6 hours in `smoke-site.yml`. **Database changes are not deployed by this workflow**: a Worker that reads or writes a new column needs its migration
+   applied first (`deploy-supabase.yml` is manual), so check that before merging a Worker change. Manual rollback: `rollback.yml` is not wired to this Worker yet; use
+   `npx wrangler rollback` in `workers/github-channel` (Cloudflare account `35cb1717...`).
 
 ## Verifying tokens are ciphertext (manual acceptance check)
 
