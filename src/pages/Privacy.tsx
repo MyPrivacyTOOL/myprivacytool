@@ -752,7 +752,8 @@ const Privacy = () => {
                   24-hour copy and ends the session. If your 7-day session has ended, you can still remove the stored connection: sign in with the provider
                   again on the Connect page (or its &ldquo;remove&rdquo; link) and we delete the token and the copy and revoke our access, without
                   reading your profile, saving anything new or signing you in. If the provider tells us you revoked access, we delete our copy of the
-                  token. The cookies are named in the Cookie Policy.
+                  token. Even if you do not disconnect, we automatically delete a stored GitHub or Reddit token that has not been used for 90 days.
+                  The cookies are named in the Cookie Policy.
                 </li>
               </ul>
 

@@ -108,17 +108,20 @@ again writes a new `consented_at`. A row without the column falls back to `creat
 Needs `supabase/migrations/20261124120000_mpc_10833_channel_tokens_consented_at.sql` applied BEFORE this version of the Worker is deployed (the Worker selects and writes the column).
 
 Reachability: the session cookie lasts 7 days and is only issued at connect, so a request with a valid cookie always comes within 7 days of consent. The 90-day check is a backstop
-for a longer session or a changed cookie lifetime. What it does not do is clean up: a token the person never returns for stays stored (encrypted, unused) until they
-disconnect or connect again.
+for a longer session or a changed cookie lifetime. It does not clean up by itself: the daily purge below deletes a token the person never returns for.
 
-### Purge of tokens unused for 90 days (MPC-11258): built, NOT scheduled, deletes nothing yet
+### Purge of tokens unused for 90 days (MPC-11258): scheduled daily, deletes
 
 `public.mpt_purge_stale_channel_tokens(p_dry_run boolean default true, p_days integer default 90)` (migration `20261126000000_mpc_11258_purge_stale_channel_tokens.sql`, service role only) finds
 GitHub and Reddit rows whose `updated_at` is older than 90 days. "Unused" means this: the Worker rewrites `updated_at` only when it saves the token (at connect and on every refresh), and
 access tokens last about 8 hours (GitHub) or 1 hour (Reddit), so `updated_at` is the last real use to within that lifetime. A profile served from the 24-hour cache does not touch the row and
-is not use. The result is provider and counts only, never an id, token or email. **It is a dry run by default**; only `p_dry_run => false`, written out by a person, deletes. `p_days` under 30 is
-refused, a null mode is refused, and no other provider is touched. No `pg_cron` job exists: scheduling it, and the delete run, wait for Chris's Y on the dry-run count recorded on the Notion
-task MPC-11258. Privacy 6B states the 90-day purge only after the delete run is live. Dry run: `select * from public.mpt_purge_stale_channel_tokens();` (the migration is applied by hand, `deploy-supabase.yml`).
+is not use. No usable connection is deleted: a refresh never moves `consented_at`, so a row this stale is already refused (see above). The result is provider and counts only, never an id,
+token or email. The function is still a dry run by default; only `p_dry_run => false` deletes. `p_days` under 30 is refused, a null mode is refused, and no other provider is touched.
+
+**Schedule.** `20261126010000_mpc_11258_schedule_stale_channel_token_purge.sql` creates the `pg_cron` job `mpt-purge-stale-channel-tokens`, daily at 03:17 UTC (11:17 HKT), which runs
+`select * from public.mpt_purge_stale_channel_tokens(false, 90);` and so **deletes** (Chris approved the schedule on 2026-11-26). It is skipped where `pg_cron` is absent. Apply that one file
+by itself, not with `supabase db push`. Deleted rows cannot be restored; the person connects again. Stop it with `select cron.unschedule('mpt-purge-stale-channel-tokens');`.
+Check it with `select jobname, schedule, command from cron.job where jobname = 'mpt-purge-stale-channel-tokens';`. Dry run: `select * from public.mpt_purge_stale_channel_tokens();`
 
 ## Setup
 

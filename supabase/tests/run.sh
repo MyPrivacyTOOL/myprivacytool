@@ -98,6 +98,17 @@ psql_ "$TEST_URL" -At -f supabase/tests/deep-research.test.sql
 psql_ "$TEST_URL" -At -f supabase/tests/mpc-9887-scan-consents.test.sql
 echo "== purge of channel tokens unused for 90 days: dry run by default, guards, grants (MPC-11258)"
 psql_ "$TEST_URL" -At -f supabase/tests/mpc-11258-purge-stale-channel-tokens.test.sql
+echo "== daily schedule for the 90-day token purge: applies twice, one job (MPC-11258)"
+SCHEDULE=supabase/migrations/20261126010000_mpc_11258_schedule_stale_channel_token_purge.sql
+psql_ "$TEST_URL" -f "$SCHEDULE"   # as written (the loop above applied it once already)
+sched_file="$SCHEDULE"
+if [ "$(psql_ "$TEST_URL" -At -c "select count(*) from pg_extension where extname = 'pg_cron'")" = 0 ]; then
+  # pg_cron is absent, so the file above does nothing here. Force only its guard open and let the test supply a stand-in cron schema.
+  sched_file="${TMPDIR:-/tmp}/mpc-11258-schedule-guard-open.sql"
+  sed "s/if exists (select 1 from pg_extension where extname = 'pg_cron') then/if true then/" "$SCHEDULE" > "$sched_file"
+  grep -q 'if true then' "$sched_file" || { echo "::error::the pg_cron guard in $SCHEDULE was not found"; exit 1; }
+fi
+psql_ "$TEST_URL" -At -v mig="$sched_file" -f supabase/tests/mpc-11258-schedule-stale-channel-token-purge.test.sql
 echo "== recipient log follows the scan (MPC-9893)"
 psql_ "$TEST_URL" -At -f supabase/tests/mpc-9893-recipient-log-follows-scan.test.sql
 psql_ "$TEST_URL" -At -f supabase/tests/mpc-9890-free-record-deletion.test.sql
