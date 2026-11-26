@@ -40,9 +40,10 @@ export async function fetchEmailGuess(token: string, fetchImpl?: typeof fetch): 
   const base = resolveScanApiUrl();
   if (!base) return null;
   try {
-    // The sealed token carries an email address (encrypted), so the registry call declares the "email" data item.
+    // The sealed token carries an email address (encrypted), so the call declares the "email" data item. It happens BEFORE the visitor's scan consent click (they
+    // have only opened a link), which the "scan-report" entry (post_click) refuses, so it has its own first-party pre_click entry, off until the privacy owner approves it.
     const res = await recipientFetch(
-      "scan-report",
+      "email-guess-service",
       `${base}/api/scan/guess`,
       { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ token }), cache: "no-store" },
       ["email"],

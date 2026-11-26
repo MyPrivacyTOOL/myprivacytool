@@ -7,6 +7,16 @@ import { renderPage, jsonResponse } from "@/test/render";
 import Scan from "./Scan";
 import { setChoice } from "@/lib/cookieConsent";
 import { resetGuessTokenForTests } from "@/lib/emailGuess";
+import recipientsData from "../../shared/recipients/recipients.data.js";
+import { parseRegistry } from "../../shared/recipients/registry";
+import { setBundledRegistryForTests } from "../../shared/recipients/outbound";
+
+// The call happens before the visitor's scan consent click, so it goes through its own pre_click registry entry, which ships DISABLED. Happy-path tests switch it on.
+const registryWithEntry = (enabled: boolean) => {
+  const reg = parseRegistry(JSON.parse(JSON.stringify(recipientsData)));
+  reg.recipients.find((r) => r.key === "email-guess-service")!.enabled = enabled;
+  return reg;
+};
 
 const TOKEN = "v1.AAAAAAAAAAAAAAAA.BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB";
 const ADDRESS = "zelda.quillfeather@example.test";
@@ -43,14 +53,30 @@ describe("Scan page: the magic guess (MPC-11111)", () => {
     expect(box().value).toBe("");
   });
 
-  describe("when switched on", () => {
-    beforeEach(() => { vi.stubEnv("VITE_EMAIL_GUESS_ENABLED", "true"); setChoice(true); });
+  it("shipped state: site flag on but the registry entry still disabled: nothing is asked and no card shows", async () => {
+    vi.stubEnv("VITE_EMAIL_GUESS_ENABLED", "true");
+    setChoice(true);
+    const f = worker(() => jsonResponse(found));
+    window.history.replaceState(null, "", `/scan#g=${TOKEN}`);
+    renderPage(<Scan />);
+    await new Promise((r) => setTimeout(r, 30));
+    expect(guessCalls(f)).toHaveLength(0);
+    expect(screen.queryByTestId("email-guess-card")).toBeNull();
+  });
 
-    it("opens the token, shows the address, and removes the token from the address bar", async () => {
+  describe("when switched on (flag on and the registry entry enabled)", () => {
+    let restore: (() => void) | null = null;
+    beforeEach(() => { vi.stubEnv("VITE_EMAIL_GUESS_ENABLED", "true"); setChoice(true); restore = setBundledRegistryForTests(registryWithEntry(true)); });
+    afterEach(() => { restore?.(); restore = null; });
+
+    it("opens the token, shows the address, brings the card into view, and removes the token from the address bar", async () => {
+      const scrollIntoView = vi.fn();
+      Element.prototype.scrollIntoView = scrollIntoView as unknown as typeof Element.prototype.scrollIntoView;
       const f = worker(() => jsonResponse(found));
       window.history.replaceState(null, "", `/scan?utm_source=x&utm_medium=channel_osint#g=${TOKEN}`);
       renderPage(<Scan />);
       expect(await screen.findByTestId("email-guess-card")).toHaveTextContent(ADDRESS);
+      expect(scrollIntoView).toHaveBeenCalledTimes(1);
       expect(guessCalls(f)).toHaveLength(1);
       expect(JSON.parse(String((guessCalls(f)[0][1] as RequestInit).body))).toEqual({ token: TOKEN });
       expect(window.location.hash).toBe("");

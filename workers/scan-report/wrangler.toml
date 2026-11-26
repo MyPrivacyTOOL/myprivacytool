@@ -102,7 +102,7 @@ EMAIL_DOMAIN_CHECK = "true"
 EMAIL_CONFIRM_GATE_ENABLED = "true"
 LISTING_CHECK_ENABLED = "true"
 
-# MPC-11111 (the magic guess, built OFF): "POST /api/scan/guess opens that sealed token for the /scan page". Needs ALL THREE: this switch exactly "true", the Worker secret EMAIL_GUESS_KEY (the SAME value on mpt-scan-report and
+# MPC-11111 (the magic guess, built OFF): "POST /api/scan/guess opens that sealed token for the /scan page". Needs ALL FOUR: the registry entry email-guess-service enabled, this switch exactly "true", the Worker secret EMAIL_GUESS_KEY (the SAME value on mpt-scan-report and
 # social-listeners; only Chris creates it), and the site flag VITE_EMAIL_GUESS_ENABLED. Anything but the exact string "true" is off. Wording is DRAFT until Chris approves it.
 # See docs/email-guess-mpc-11111.md. Rollback: set "false" and deploy (tokens already sent simply stop opening).
 EMAIL_GUESS_ENABLED = "false"

@@ -51,7 +51,7 @@ describe("seed (MPC-9883, design 1.5)", () => {
     const planned = registry.recipients.filter((r) => r.planned);
     expect(planned).toHaveLength(9);
     expect(planned.every((r) => !r.enabled)).toBe(true);
-    expect(registry.recipients).toHaveLength(63);   // MPC-10790: +supabase-signups (the sign-up forms' own entry, split from supabase)
+    expect(registry.recipients).toHaveLength(64);   // MPC-10790: +supabase-signups (the sign-up forms' own entry, split from supabase)
   });
   it("validates cleanly, and every live key from design 1.5 is present", () => {
     expect(validateRegistry(data)).toEqual([]);
