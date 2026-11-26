@@ -78,6 +78,31 @@ export function isProbeIdRequest(update: unknown): boolean {
   return typeof text === "string" && /^\/probeid(@\w+)?$/i.test(text.trim());
 }
 
+/**
+ * STOP: removes this sender's rows from the bot-wide probe log (MPC-9907, option A, 2026-11-26). Works in every PROBE_MODE, so rows logged while
+ * mode "all" was on can still be removed after the logger is switched off. Returns how many rows went, or null when that cannot be confirmed.
+ * Only a numeric Telegram id is accepted, so the request is always limited to one sender. Never throws.
+ */
+export async function eraseProbeCaptures(env: Env, senderId: string): Promise<number | null> {
+  if (!env.SUPABASE_URL || !env.SUPABASE_KEY || !/^\d{1,20}$/.test(senderId)) return null;
+  try {
+    const res = await callRecipient("supabase", {
+      url: `${env.SUPABASE_URL.replace(/\/+$/, "")}/rest/v1/channel_probe_captures?platform=eq.telegram&sender_id=eq.${senderId}&select=id`,
+      init: {
+        method: "DELETE",
+        headers: { apikey: env.SUPABASE_KEY, authorization: `Bearer ${env.SUPABASE_KEY}`, Prefer: "return=representation" },
+        signal: AbortSignal.timeout(TIMEOUT_MS),
+      },
+      sent: ["username"], // sender id in the filter
+    }, recipientCtx(env));
+    if (!res.ok) return null;
+    const rows: unknown = await res.json().catch(() => null);
+    return Array.isArray(rows) ? rows.length : 0;
+  } catch {
+    return null;
+  }
+}
+
 interface Row { platform: string; sender_id: string; kind: string; payload: unknown; expires_at?: string | null }
 
 async function save(env: Env, rows: Row[], log: Logger): Promise<void> {

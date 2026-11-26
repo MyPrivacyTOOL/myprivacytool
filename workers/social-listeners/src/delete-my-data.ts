@@ -5,12 +5,13 @@
 //   mpt_delete_profile_snapshots  baseline + re-check snapshots (cascades to fix-list progress and dashboard links/sessions)
 //   mpt_delete_deep_data    DEEP jobs and results (cascade)
 //   mpt_delete_event_flags  MPC-8689 event flags (edits, blocked or unblocked)
-// Not covered here (stated honestly in the reply): the bot-wide probe logs (PROBE_MODE) and anything already sent to Telegram.
+//   eraseProbeCaptures      this sender's rows in the bot-wide probe log (channel_probe_captures)
+// Not covered here: anything already sent to Telegram.
 import { scanAllowed } from "./baseline-scan";
 import { callRecipient } from "../../../shared/recipients/outbound";
 import type { Logger } from "./logger";
 import { senderIds } from "./sender-key";
-import { call, telegramSender } from "./probe-reader";
+import { call, eraseProbeCaptures, telegramSender } from "./probe-reader";
 import { type Env, recipientCtx } from "./shared";
 
 const TIMEOUT_MS = 5000;
@@ -66,10 +67,11 @@ export async function eraseSender(env: Env, plainId: string, log: Logger): Promi
   const flagCounts: (number | null)[] = [];
   for (const k of keys) flagCounts.push(await rpc(env, "mpt_delete_event_flags", { p_sender_id: k }, true));
   const deep = await rpc(env, "mpt_delete_deep_data", { p_sender_id: plainId });                          // DEEP stays plain-id keyed
-  const failed = !keyOk || state === null || deep === null || snapCounts.some((n) => n === null) || flagCounts.some((n) => n === null);
+  const probe = await eraseProbeCaptures(env, plainId);                                                      // probe rows are plain-id keyed
+  const failed = !keyOk || state === null || deep === null || probe === null || snapCounts.some((n) => n === null) || flagCounts.some((n) => n === null);
   const snaps = snapCounts.reduce<number>((a, n) => a + (n ?? 0), 0) + flagCounts.reduce<number>((a, n) => a + (n ?? 0), 0);
-  log.info("delete_my_data", { failed, state: state ?? -1, snapshots: snaps, deep: deep ?? -1 });
-  return { failed, total: (state ?? 0) + snaps + (deep ?? 0) };
+  log.info("delete_my_data", { failed, state: state ?? -1, snapshots: snaps, deep: deep ?? -1, probe: probe ?? -1 });
+  return { failed, total: (state ?? 0) + snaps + (deep ?? 0) + (probe ?? 0) };
 }
 
 export const deleteReply = (r: EraseResult): string => (r.failed ? FAILED : DONE(r.total));
