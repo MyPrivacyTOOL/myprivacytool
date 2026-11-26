@@ -170,7 +170,7 @@ export const EN: HkCopy = {
   didntWork: "Didn't work?",
   didntWorkBody: "Tell us what happened. We attach your phone type and language so we can help faster.",
   scanTitle: "Next: see what else is exposed",
-  scanBody: "Spam often starts with your details being listed online. Run the free privacy scan to see where, then remove it.",
+  scanBody: "Spam often starts with your details being listed online. The free privacy scan shows what your browser and email address reveal. It does not search for listings; our opt-out guides show how to remove them.",
   scanButton: "Run the free privacy scan",
   optOutTitle: "Stop companies you said yes to",
   optOutIntro:
@@ -301,7 +301,7 @@ export const ZH: HkCopy = {
   didntWork: "不成功？",
   didntWorkBody: "告訴我們發生了甚麼事。我們會附上你的手機類型及語言，以便更快協助你。",
   scanTitle: "下一步：看看還有甚麼資料外洩",
-  scanBody: "垃圾訊息往往源自你的資料被公開列出。立即免費掃描，看看在哪裏，然後移除。",
+  scanBody: "垃圾訊息往往源自你的資料被公開列出。免費私隱掃描會顯示你的瀏覽器及電郵地址透露了甚麼。掃描不會搜尋公開列出的資料；我們的退出指南會教你如何移除。",
   scanButton: "免費私隱掃描",
   optOutTitle: "停止你曾答應接收的公司訊息",
   optOutIntro: "登記冊不會攔截你曾經同意接收的公司。請剔選你曾答應接收訊息的發送者類別，再逐一複製通知。發送前請填上你自己的電話號碼及發送者名稱。",
