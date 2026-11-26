@@ -82,6 +82,11 @@
                 "key": "internal-workers",
                 "name": "Our own Workers (service-to-service)",
                 "text": "Our own Workers (service-to-service) receives your email address, your phone number, usernames you typed. Why: One of our Workers calling another of our Workers (cairn bridge, core brain, scan report); stays inside our own Cloudflare account. Kept: Not stored by the call itself."
+              },
+              {
+                "key": "email-guess-service",
+                "name": "Email guess (opens the sealed token from a bot's bridge link)",
+                "text": "Email guess (opens the sealed token from a bot's bridge link) receives your email address. Why: Opens the sealed token in a bot's bridge link so /scan can ask \"Is this your main email?\" about an address you published in your own X bio. Our own Worker; stores nothing and logs nothing. Kept: Nothing is stored."
               }
             ]
           },
@@ -278,6 +283,11 @@
                 "key": "github-extras",
                 "name": "GitHub public profile (extras check)",
                 "text": "GitHub public profile (extras check) receives usernames you typed. Why: Reads the public profile and public events of an allow-listed GitHub account that opened an issue, comment or pull request on our repository (no credential sent). Kept: Provider-side."
+              },
+              {
+                "key": "ga4-measurement-protocol",
+                "name": "Google Analytics Measurement Protocol (server events)",
+                "text": "Google Analytics Measurement Protocol (server events) receives no visitor data. Why: Sends three server-side flow events (a message arrived, the email link was confirmed, the report email was delivered) to our own GA4 property so the funnel can be measured. Each event carries only its name, the channel name for a message that arrived, and a random anonymous id. No email, handle, message text, IP or scan result. Kept: Provider-side."
               }
             ]
           }
@@ -534,6 +544,11 @@
                 "key": "internal-workers",
                 "name": "Our own Workers (service-to-service)",
                 "text": "Our own Workers (service-to-service) receives your email address, your phone number, usernames you typed. Why: One of our Workers calling another of our Workers (cairn bridge, core brain, scan report); stays inside our own Cloudflare account. Kept: Not stored by the call itself."
+              },
+              {
+                "key": "email-guess-service",
+                "name": "Email guess (opens the sealed token from a bot's bridge link)",
+                "text": "Email guess (opens the sealed token from a bot's bridge link) receives your email address. Why: Opens the sealed token in a bot's bridge link so /scan can ask \"Is this your main email?\" about an address you published in your own X bio. Our own Worker; stores nothing and logs nothing. Kept: Nothing is stored."
               }
             ]
           },
@@ -730,6 +745,11 @@
                 "key": "github-extras",
                 "name": "GitHub public profile (extras check)",
                 "text": "GitHub public profile (extras check) receives usernames you typed. Why: Reads the public profile and public events of an allow-listed GitHub account that opened an issue, comment or pull request on our repository (no credential sent). Kept: Provider-side."
+              },
+              {
+                "key": "ga4-measurement-protocol",
+                "name": "Google Analytics Measurement Protocol (server events)",
+                "text": "Google Analytics Measurement Protocol (server events) receives no visitor data. Why: Sends three server-side flow events (a message arrived, the email link was confirmed, the report email was delivered) to our own GA4 property so the funnel can be measured. Each event carries only its name, the channel name for a message that arrived, and a random anonymous id. No email, handle, message text, IP or scan result. Kept: Provider-side."
               }
             ]
           }
@@ -986,6 +1006,11 @@
                 "key": "internal-workers",
                 "name": "Our own Workers (service-to-service)",
                 "text": "Our own Workers (service-to-service) receives your email address, your phone number, usernames you typed. Why: One of our Workers calling another of our Workers (cairn bridge, core brain, scan report); stays inside our own Cloudflare account. Kept: Not stored by the call itself."
+              },
+              {
+                "key": "email-guess-service",
+                "name": "Email guess (opens the sealed token from a bot's bridge link)",
+                "text": "Email guess (opens the sealed token from a bot's bridge link) receives your email address. Why: Opens the sealed token in a bot's bridge link so /scan can ask \"Is this your main email?\" about an address you published in your own X bio. Our own Worker; stores nothing and logs nothing. Kept: Nothing is stored."
               }
             ]
           },
@@ -1182,6 +1207,11 @@
                 "key": "github-extras",
                 "name": "GitHub public profile (extras check)",
                 "text": "GitHub public profile (extras check) receives usernames you typed. Why: Reads the public profile and public events of an allow-listed GitHub account that opened an issue, comment or pull request on our repository (no credential sent). Kept: Provider-side."
+              },
+              {
+                "key": "ga4-measurement-protocol",
+                "name": "Google Analytics Measurement Protocol (server events)",
+                "text": "Google Analytics Measurement Protocol (server events) receives no visitor data. Why: Sends three server-side flow events (a message arrived, the email link was confirmed, the report email was delivered) to our own GA4 property so the funnel can be measured. Each event carries only its name, the channel name for a message that arrived, and a random anonymous id. No email, handle, message text, IP or scan result. Kept: Provider-side."
               }
             ]
           }
@@ -1438,6 +1468,11 @@
                 "key": "internal-workers",
                 "name": "Our own Workers (service-to-service)",
                 "text": "Our own Workers (service-to-service) receives your email address, your phone number, usernames you typed. Why: One of our Workers calling another of our Workers (cairn bridge, core brain, scan report); stays inside our own Cloudflare account. Kept: Not stored by the call itself."
+              },
+              {
+                "key": "email-guess-service",
+                "name": "Email guess (opens the sealed token from a bot's bridge link)",
+                "text": "Email guess (opens the sealed token from a bot's bridge link) receives your email address. Why: Opens the sealed token in a bot's bridge link so /scan can ask \"Is this your main email?\" about an address you published in your own X bio. Our own Worker; stores nothing and logs nothing. Kept: Nothing is stored."
               }
             ]
           },
@@ -1634,6 +1669,11 @@
                 "key": "github-extras",
                 "name": "GitHub public profile (extras check)",
                 "text": "GitHub public profile (extras check) receives usernames you typed. Why: Reads the public profile and public events of an allow-listed GitHub account that opened an issue, comment or pull request on our repository (no credential sent). Kept: Provider-side."
+              },
+              {
+                "key": "ga4-measurement-protocol",
+                "name": "Google Analytics Measurement Protocol (server events)",
+                "text": "Google Analytics Measurement Protocol (server events) receives no visitor data. Why: Sends three server-side flow events (a message arrived, the email link was confirmed, the report email was delivered) to our own GA4 property so the funnel can be measured. Each event carries only its name, the channel name for a message that arrived, and a random anonymous id. No email, handle, message text, IP or scan result. Kept: Provider-side."
               }
             ]
           }
@@ -1890,6 +1930,11 @@
                 "key": "internal-workers",
                 "name": "Our own Workers (service-to-service)",
                 "text": "Our own Workers (service-to-service) receives your email address, your phone number, usernames you typed. Why: One of our Workers calling another of our Workers (cairn bridge, core brain, scan report); stays inside our own Cloudflare account. Kept: Not stored by the call itself."
+              },
+              {
+                "key": "email-guess-service",
+                "name": "Email guess (opens the sealed token from a bot's bridge link)",
+                "text": "Email guess (opens the sealed token from a bot's bridge link) receives your email address. Why: Opens the sealed token in a bot's bridge link so /scan can ask \"Is this your main email?\" about an address you published in your own X bio. Our own Worker; stores nothing and logs nothing. Kept: Nothing is stored."
               }
             ]
           },
@@ -2086,6 +2131,11 @@
                 "key": "github-extras",
                 "name": "GitHub public profile (extras check)",
                 "text": "GitHub public profile (extras check) receives usernames you typed. Why: Reads the public profile and public events of an allow-listed GitHub account that opened an issue, comment or pull request on our repository (no credential sent). Kept: Provider-side."
+              },
+              {
+                "key": "ga4-measurement-protocol",
+                "name": "Google Analytics Measurement Protocol (server events)",
+                "text": "Google Analytics Measurement Protocol (server events) receives no visitor data. Why: Sends three server-side flow events (a message arrived, the email link was confirmed, the report email was delivered) to our own GA4 property so the funnel can be measured. Each event carries only its name, the channel name for a message that arrived, and a random anonymous id. No email, handle, message text, IP or scan result. Kept: Provider-side."
               }
             ]
           }
@@ -2342,6 +2392,11 @@
                 "key": "internal-workers",
                 "name": "Our own Workers (service-to-service)",
                 "text": "Our own Workers (service-to-service) receives your email address, your phone number, usernames you typed. Why: One of our Workers calling another of our Workers (cairn bridge, core brain, scan report); stays inside our own Cloudflare account. Kept: Not stored by the call itself."
+              },
+              {
+                "key": "email-guess-service",
+                "name": "Email guess (opens the sealed token from a bot's bridge link)",
+                "text": "Email guess (opens the sealed token from a bot's bridge link) receives your email address. Why: Opens the sealed token in a bot's bridge link so /scan can ask \"Is this your main email?\" about an address you published in your own X bio. Our own Worker; stores nothing and logs nothing. Kept: Nothing is stored."
               }
             ]
           },
@@ -2538,6 +2593,11 @@
                 "key": "github-extras",
                 "name": "GitHub public profile (extras check)",
                 "text": "GitHub public profile (extras check) receives usernames you typed. Why: Reads the public profile and public events of an allow-listed GitHub account that opened an issue, comment or pull request on our repository (no credential sent). Kept: Provider-side."
+              },
+              {
+                "key": "ga4-measurement-protocol",
+                "name": "Google Analytics Measurement Protocol (server events)",
+                "text": "Google Analytics Measurement Protocol (server events) receives no visitor data. Why: Sends three server-side flow events (a message arrived, the email link was confirmed, the report email was delivered) to our own GA4 property so the funnel can be measured. Each event carries only its name, the channel name for a message that arrived, and a random anonymous id. No email, handle, message text, IP or scan result. Kept: Provider-side."
               }
             ]
           }
@@ -2794,6 +2854,11 @@
                 "key": "internal-workers",
                 "name": "Our own Workers (service-to-service)",
                 "text": "Our own Workers (service-to-service) receives your email address, your phone number, usernames you typed. Why: One of our Workers calling another of our Workers (cairn bridge, core brain, scan report); stays inside our own Cloudflare account. Kept: Not stored by the call itself."
+              },
+              {
+                "key": "email-guess-service",
+                "name": "Email guess (opens the sealed token from a bot's bridge link)",
+                "text": "Email guess (opens the sealed token from a bot's bridge link) receives your email address. Why: Opens the sealed token in a bot's bridge link so /scan can ask \"Is this your main email?\" about an address you published in your own X bio. Our own Worker; stores nothing and logs nothing. Kept: Nothing is stored."
               }
             ]
           },
@@ -2990,6 +3055,11 @@
                 "key": "github-extras",
                 "name": "GitHub public profile (extras check)",
                 "text": "GitHub public profile (extras check) receives usernames you typed. Why: Reads the public profile and public events of an allow-listed GitHub account that opened an issue, comment or pull request on our repository (no credential sent). Kept: Provider-side."
+              },
+              {
+                "key": "ga4-measurement-protocol",
+                "name": "Google Analytics Measurement Protocol (server events)",
+                "text": "Google Analytics Measurement Protocol (server events) receives no visitor data. Why: Sends three server-side flow events (a message arrived, the email link was confirmed, the report email was delivered) to our own GA4 property so the funnel can be measured. Each event carries only its name, the channel name for a message that arrived, and a random anonymous id. No email, handle, message text, IP or scan result. Kept: Provider-side."
               }
             ]
           }
@@ -3246,6 +3316,11 @@
                 "key": "internal-workers",
                 "name": "Our own Workers (service-to-service)",
                 "text": "Our own Workers (service-to-service) receives your email address, your phone number, usernames you typed. Why: One of our Workers calling another of our Workers (cairn bridge, core brain, scan report); stays inside our own Cloudflare account. Kept: Not stored by the call itself."
+              },
+              {
+                "key": "email-guess-service",
+                "name": "Email guess (opens the sealed token from a bot's bridge link)",
+                "text": "Email guess (opens the sealed token from a bot's bridge link) receives your email address. Why: Opens the sealed token in a bot's bridge link so /scan can ask \"Is this your main email?\" about an address you published in your own X bio. Our own Worker; stores nothing and logs nothing. Kept: Nothing is stored."
               }
             ]
           },
@@ -3442,6 +3517,11 @@
                 "key": "github-extras",
                 "name": "GitHub public profile (extras check)",
                 "text": "GitHub public profile (extras check) receives usernames you typed. Why: Reads the public profile and public events of an allow-listed GitHub account that opened an issue, comment or pull request on our repository (no credential sent). Kept: Provider-side."
+              },
+              {
+                "key": "ga4-measurement-protocol",
+                "name": "Google Analytics Measurement Protocol (server events)",
+                "text": "Google Analytics Measurement Protocol (server events) receives no visitor data. Why: Sends three server-side flow events (a message arrived, the email link was confirmed, the report email was delivered) to our own GA4 property so the funnel can be measured. Each event carries only its name, the channel name for a message that arrived, and a random anonymous id. No email, handle, message text, IP or scan result. Kept: Provider-side."
               }
             ]
           }
@@ -3698,6 +3778,11 @@
                 "key": "internal-workers",
                 "name": "Our own Workers (service-to-service)",
                 "text": "Our own Workers (service-to-service) receives your email address, your phone number, usernames you typed. Why: One of our Workers calling another of our Workers (cairn bridge, core brain, scan report); stays inside our own Cloudflare account. Kept: Not stored by the call itself."
+              },
+              {
+                "key": "email-guess-service",
+                "name": "Email guess (opens the sealed token from a bot's bridge link)",
+                "text": "Email guess (opens the sealed token from a bot's bridge link) receives your email address. Why: Opens the sealed token in a bot's bridge link so /scan can ask \"Is this your main email?\" about an address you published in your own X bio. Our own Worker; stores nothing and logs nothing. Kept: Nothing is stored."
               }
             ]
           },
@@ -3894,6 +3979,11 @@
                 "key": "github-extras",
                 "name": "GitHub public profile (extras check)",
                 "text": "GitHub public profile (extras check) receives usernames you typed. Why: Reads the public profile and public events of an allow-listed GitHub account that opened an issue, comment or pull request on our repository (no credential sent). Kept: Provider-side."
+              },
+              {
+                "key": "ga4-measurement-protocol",
+                "name": "Google Analytics Measurement Protocol (server events)",
+                "text": "Google Analytics Measurement Protocol (server events) receives no visitor data. Why: Sends three server-side flow events (a message arrived, the email link was confirmed, the report email was delivered) to our own GA4 property so the funnel can be measured. Each event carries only its name, the channel name for a message that arrived, and a random anonymous id. No email, handle, message text, IP or scan result. Kept: Provider-side."
               }
             ]
           }
@@ -4150,6 +4240,11 @@
                 "key": "internal-workers",
                 "name": "Our own Workers (service-to-service)",
                 "text": "Our own Workers (service-to-service) receives your email address, your phone number, usernames you typed. Why: One of our Workers calling another of our Workers (cairn bridge, core brain, scan report); stays inside our own Cloudflare account. Kept: Not stored by the call itself."
+              },
+              {
+                "key": "email-guess-service",
+                "name": "Email guess (opens the sealed token from a bot's bridge link)",
+                "text": "Email guess (opens the sealed token from a bot's bridge link) receives your email address. Why: Opens the sealed token in a bot's bridge link so /scan can ask \"Is this your main email?\" about an address you published in your own X bio. Our own Worker; stores nothing and logs nothing. Kept: Nothing is stored."
               }
             ]
           },
@@ -4346,6 +4441,11 @@
                 "key": "github-extras",
                 "name": "GitHub public profile (extras check)",
                 "text": "GitHub public profile (extras check) receives usernames you typed. Why: Reads the public profile and public events of an allow-listed GitHub account that opened an issue, comment or pull request on our repository (no credential sent). Kept: Provider-side."
+              },
+              {
+                "key": "ga4-measurement-protocol",
+                "name": "Google Analytics Measurement Protocol (server events)",
+                "text": "Google Analytics Measurement Protocol (server events) receives no visitor data. Why: Sends three server-side flow events (a message arrived, the email link was confirmed, the report email was delivered) to our own GA4 property so the funnel can be measured. Each event carries only its name, the channel name for a message that arrived, and a random anonymous id. No email, handle, message text, IP or scan result. Kept: Provider-side."
               }
             ]
           }

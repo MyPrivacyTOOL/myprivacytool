@@ -25,6 +25,10 @@ routes = [{ pattern = "brain.myprivacytool.io", custom_domain = true }]
 [vars]
 QWEN_BASE_URL = "https://dashscope-intl.aliyuncs.com/compatible-mode/v1"
 QWEN_MODEL = "qwen-plus"
+# MPC-11111 (server-side GA4 events, OPENED FOR THE DEBUGVIEW RUN: revert straight after): needs ALL THREE: the registry entry ga4-measurement-protocol enabled, this switch exactly "true",
+# and the Worker secret GA4_API_SECRET (only Chris creates it). GA4_DEBUG_MODE "true" makes each event show in GA4 DebugView. See docs/email-guess-mpc-11111.md. Rollback: revert the PR.
+GA4_SERVER_EVENTS_ENABLED = "true"
+GA4_DEBUG_MODE = "true"
 
 [observability]
 enabled = true

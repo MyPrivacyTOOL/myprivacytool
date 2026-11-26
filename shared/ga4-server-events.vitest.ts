@@ -20,9 +20,9 @@ const spy = (ok = true) => {
 const ctx = (fetchImpl: typeof fetch, enabled = true) => ({ fetchImpl, registry: registryWith(enabled), flags: { GA4_SERVER_EVENTS_ENABLED: "true" }, consentGate: "none" as const });
 
 describe("registry entry", () => {
-  it("ships DISABLED, so nothing can be sent until the registry is changed in a reviewed commit", () => {
+  it("is ENABLED for the MPC-11111 DebugView run (this PR); the revert PR flips it back to the shipped DISABLED state", () => {
     const r = parseRegistry(JSON.parse(JSON.stringify(recipientsData))).recipients.find((x) => x.key === "ga4-measurement-protocol")!;
-    expect(r.enabled).toBe(false);
+    expect(r.enabled).toBe(true);
     expect(r.hosts).toEqual(["www.google-analytics.com"]);
     expect(r.data_items).toEqual([]);
   });

@@ -56,12 +56,15 @@ describe("Scan page: the magic guess (MPC-11111)", () => {
   it("shipped state: site flag on but the registry entry still disabled: nothing is asked and no card shows", async () => {
     vi.stubEnv("VITE_EMAIL_GUESS_ENABLED", "true");
     setChoice(true);
-    const f = worker(() => jsonResponse(found));
-    window.history.replaceState(null, "", `/scan#g=${TOKEN}`);
-    renderPage(<Scan />);
-    await new Promise((r) => setTimeout(r, 30));
-    expect(guessCalls(f)).toHaveLength(0);
-    expect(screen.queryByTestId("email-guess-card")).toBeNull();
+    const restoreRegistry = setBundledRegistryForTests(registryWithEntry(false));   // explicit, so this stays true whichever way the shipped file is set
+    try {
+      const f = worker(() => jsonResponse(found));
+      window.history.replaceState(null, "", `/scan#g=${TOKEN}`);
+      renderPage(<Scan />);
+      await new Promise((r) => setTimeout(r, 30));
+      expect(guessCalls(f)).toHaveLength(0);
+      expect(screen.queryByTestId("email-guess-card")).toBeNull();
+    } finally { restoreRegistry(); }
   });
 
   describe("when switched on (flag on and the registry entry enabled)", () => {
