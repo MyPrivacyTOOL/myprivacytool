@@ -6,7 +6,7 @@ export const sections = [
   { id: "how-criminals-get-your-bin", title: "How criminals get your BIN" },
   { id: "why-you-missed-it", title: "Why you almost missed it" },
   { id: "what-actually-works", title: "What actually protects your card" },
-  { id: "find-your-exposure", title: "Find where your card data is exposed" },
+  { id: "find-your-exposure", title: "Check what you are exposing" },
 ];
 
 export const faqs: { q: string; a: string }[] = [
@@ -145,24 +145,24 @@ const Content = () => (
       Your <strong>card number itself</strong> is rarely exposed by brokers — it's too risky for them to store. But your <strong>name, phone, email, address and payment history</strong> are sold routinely. Removing those stops criminals from finding your card data in the first place.
     </p>
 
-    <h2 id="find-your-exposure">Find where your card data is exposed</h2>
+    <h2 id="find-your-exposure">Check what you are exposing</h2>
     <p>
-      The best defense is knowing what's already out there. Run a free MyPrivacyTOOL scan to see which data brokers have your name, phone, address and payment info. The scan checks 54 privacy vectors — including data brokers, public records, leaked databases, and social profiles — and shows you exactly what's exposed.
+      The best defense is knowing what's already out there. A free MyPrivacyTOOL scan shows what your browser, device and network reveal to websites, and your emailed report adds what your email address reveals. It does not search data brokers, public records or breach databases, and it cannot see your card details.
     </p>
     <p>
       Once you know what's exposed, you can:
     </p>
     <ul>
-      <li>Remove your data from each broker (MyPrivacyTOOL's removal service automates this).</li>
+      <li>Ask each data broker to remove your listing, using our free <Link to="/opt-out-guides">opt-out guides</Link>. When paid plans open, we plan to offer paid removal that sends requests for you; it is not available today.</li>
       <li>Update passwords and security settings on compromised accounts.</li>
-      <li>Set up monitoring alerts so you know if your data appears again.</li>
+      <li>Set a reminder to search for your details again, so you notice if they reappear. MyPrivacyTOOL monitoring alerts are not available today; we plan to offer them when paid plans open.</li>
     </ul>
 
     <p>
       <Link to={blogCtaHref("card-testing-and-statement-monitoring")}>
         Run a free exposure scan now
       </Link>
-      . It takes 90 seconds and shows you the 54 ways your data is exposed — including where your card information might already be selling.
+      . It shows what your browser, device and network reveal. It does not search for your card details.
     </p>
 
     <h3>When card testing happens, here's what to do:</h3>
@@ -180,7 +180,7 @@ const Content = () => (
     </p>
 
     <p>
-      MyPrivacyTOOL's removal service handles this automatically. After your scan, choose which brokers to remove from and we handle the submissions. You regain control, and criminals lose the data they need to target you in the first place.
+      Today you send those requests yourself: our opt-out guides show the steps. When paid plans open, we plan to offer a paid removal service that sends requests for you. It is not available today.
     </p>
   </>
 );

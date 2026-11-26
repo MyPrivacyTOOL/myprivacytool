@@ -100,7 +100,7 @@ const Content = () => (
       reduce the number of places your details sit, as well as filter what still gets through. If you want to see how
       exposed you are right now, you can{" "}
       <Link to={blogCtaHref("stop-spam-calls-texts-and-emails")}>run a free scan with MyPrivacyTOOL</Link>{" "}
-      to check where your phone number and email may appear in broker listings and public sources.
+      to see what your browser and email address reveal. It does not search broker listings for your phone number or email address.
     </p>
 
     <h2 id="spam-vs-scam">Step 1: Tell spam, scams and legitimate marketing apart</h2>
@@ -296,7 +296,7 @@ const Content = () => (
         <Link to="/blog/remove-personal-information-from-internet">removing personal information from the internet</Link>{" "}
         explains the process. You can also{" "}
         <Link to={blogCtaHref("stop-spam-calls-texts-and-emails")}>start with a free scan</Link> to
-        see where your details appear, and use removal to cut the source rather than chasing each sender.
+        see what your browser and email address reveal. It does not search brokers for you: removing your listings yourself, with our <Link to="/opt-out-guides">opt-out guides</Link>, cuts the source rather than chasing each sender.
       </li>
       <li>
         <strong>Be stingy with your phone number.</strong> Loyalty programs, shop checkouts and website forms often ask
@@ -625,9 +625,9 @@ const Content = () => (
       <li>Close accounts you no longer use and update passwords for any that were breached.</li>
       <li>Use an alias or a separate address for new sign-ups, and skip optional phone number fields.</li>
       <li>
-        Re-check where your details appear. Broker listings can reappear, so an occasional{" "}
-        <Link to={blogCtaHref("stop-spam-calls-texts-and-emails")}>free scan</Link> is a sensible
-        habit.
+        Re-check where your details appear. Broker listings can reappear, so repeat your searches now and then. Our{" "}
+        <Link to={blogCtaHref("stop-spam-calls-texts-and-emails")}>free scan</Link> shows what your browser and email
+        address reveal; it does not search brokers for you.
       </li>
       <li>Report anything new and suspicious rather than only deleting it.</li>
     </ul>

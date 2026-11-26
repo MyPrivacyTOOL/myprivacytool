@@ -60,8 +60,9 @@ const Content = () => (
       advice.
     </p>
     <p>
-      If you would like a quick view of where your details are exposed before you begin, you can run a{" "}
+      If you would like to see what your browser, device and email address reveal before you begin, you can run a{" "}
       <Link to={blogCtaHref("remove-your-name-and-info-from-google")}>free scan with MyPrivacyTOOL</Link>.
+      It does not search Google or data-broker sites for you.
       For the wider picture beyond search results, see our guide on how to{" "}
       <Link to="/blog/remove-personal-information-from-internet">remove personal information from the internet</Link>.
     </p>
@@ -553,9 +554,10 @@ const Content = () => (
     </table>
     <p>
       Results reappear more often than people expect, because many broker sites refresh their data from public
-      records and marketing lists. If you would rather not run the searches yourself, MyPrivacyTOOL&apos;s{" "}
-      <Link to={blogCtaHref("remove-your-name-and-info-from-google")}>free scan</Link> shows
-      where your details appear, and monitoring can flag when they show up again.
+      records and marketing lists. For now these searches are yours to run: MyPrivacyTOOL&apos;s{" "}
+      <Link to={blogCtaHref("remove-your-name-and-info-from-google")}>free scan</Link> does
+      not search Google or data-broker sites for you. When paid plans open, we plan to offer monitoring that flags when
+      your details show up again; it is not available today.
     </p>
     <p>
       To reduce future exposure, limit what you share publicly, use a separate email address and a virtual number for

@@ -5,7 +5,7 @@
       "locale": "en",
       "translation_pending": false,
       "translation_note": null,
-      "as_of": "2026-11-25",
+      "as_of": "2026-11-26",
       "privacy": {
         "groups": [
           {
@@ -41,7 +41,7 @@
               {
                 "key": "account-service",
                 "name": "Account sign-in and your saved scans",
-                "text": "Account sign-in and your saved scans receives your email address. Why: Emails you a sign-in link and keeps the scans you choose to keep in your account until you delete it. Kept: Kept until you delete your account; deleting it removes the account and every scan in it."
+                "text": "Account sign-in and your saved scans receives your email address. Why: Emails you a sign-in link and keeps the scans you choose to keep in your account. Kept: Kept until you delete your account, which removes the account and every scan in it; a saved scan result is deleted 12 months after the scan."
               },
               {
                 "key": "business-team-service",
@@ -457,7 +457,7 @@
       "locale": "ja",
       "translation_pending": true,
       "translation_note": "This section is shown in English while its translation is pending. The English text is the one that applies.",
-      "as_of": "2026-11-25",
+      "as_of": "2026-11-26",
       "privacy": {
         "groups": [
           {
@@ -493,7 +493,7 @@
               {
                 "key": "account-service",
                 "name": "Account sign-in and your saved scans",
-                "text": "Account sign-in and your saved scans receives your email address. Why: Emails you a sign-in link and keeps the scans you choose to keep in your account until you delete it. Kept: Kept until you delete your account; deleting it removes the account and every scan in it."
+                "text": "Account sign-in and your saved scans receives your email address. Why: Emails you a sign-in link and keeps the scans you choose to keep in your account. Kept: Kept until you delete your account, which removes the account and every scan in it; a saved scan result is deleted 12 months after the scan."
               },
               {
                 "key": "business-team-service",
@@ -909,7 +909,7 @@
       "locale": "zh",
       "translation_pending": true,
       "translation_note": "This section is shown in English while its translation is pending. The English text is the one that applies.",
-      "as_of": "2026-11-25",
+      "as_of": "2026-11-26",
       "privacy": {
         "groups": [
           {
@@ -945,7 +945,7 @@
               {
                 "key": "account-service",
                 "name": "Account sign-in and your saved scans",
-                "text": "Account sign-in and your saved scans receives your email address. Why: Emails you a sign-in link and keeps the scans you choose to keep in your account until you delete it. Kept: Kept until you delete your account; deleting it removes the account and every scan in it."
+                "text": "Account sign-in and your saved scans receives your email address. Why: Emails you a sign-in link and keeps the scans you choose to keep in your account. Kept: Kept until you delete your account, which removes the account and every scan in it; a saved scan result is deleted 12 months after the scan."
               },
               {
                 "key": "business-team-service",
@@ -1361,7 +1361,7 @@
       "locale": "ko",
       "translation_pending": true,
       "translation_note": "This section is shown in English while its translation is pending. The English text is the one that applies.",
-      "as_of": "2026-11-25",
+      "as_of": "2026-11-26",
       "privacy": {
         "groups": [
           {
@@ -1397,7 +1397,7 @@
               {
                 "key": "account-service",
                 "name": "Account sign-in and your saved scans",
-                "text": "Account sign-in and your saved scans receives your email address. Why: Emails you a sign-in link and keeps the scans you choose to keep in your account until you delete it. Kept: Kept until you delete your account; deleting it removes the account and every scan in it."
+                "text": "Account sign-in and your saved scans receives your email address. Why: Emails you a sign-in link and keeps the scans you choose to keep in your account. Kept: Kept until you delete your account, which removes the account and every scan in it; a saved scan result is deleted 12 months after the scan."
               },
               {
                 "key": "business-team-service",
@@ -1813,7 +1813,7 @@
       "locale": "vi",
       "translation_pending": true,
       "translation_note": "This section is shown in English while its translation is pending. The English text is the one that applies.",
-      "as_of": "2026-11-25",
+      "as_of": "2026-11-26",
       "privacy": {
         "groups": [
           {
@@ -1849,7 +1849,7 @@
               {
                 "key": "account-service",
                 "name": "Account sign-in and your saved scans",
-                "text": "Account sign-in and your saved scans receives your email address. Why: Emails you a sign-in link and keeps the scans you choose to keep in your account until you delete it. Kept: Kept until you delete your account; deleting it removes the account and every scan in it."
+                "text": "Account sign-in and your saved scans receives your email address. Why: Emails you a sign-in link and keeps the scans you choose to keep in your account. Kept: Kept until you delete your account, which removes the account and every scan in it; a saved scan result is deleted 12 months after the scan."
               },
               {
                 "key": "business-team-service",
@@ -2265,7 +2265,7 @@
       "locale": "es",
       "translation_pending": true,
       "translation_note": "This section is shown in English while its translation is pending. The English text is the one that applies.",
-      "as_of": "2026-11-25",
+      "as_of": "2026-11-26",
       "privacy": {
         "groups": [
           {
@@ -2301,7 +2301,7 @@
               {
                 "key": "account-service",
                 "name": "Account sign-in and your saved scans",
-                "text": "Account sign-in and your saved scans receives your email address. Why: Emails you a sign-in link and keeps the scans you choose to keep in your account until you delete it. Kept: Kept until you delete your account; deleting it removes the account and every scan in it."
+                "text": "Account sign-in and your saved scans receives your email address. Why: Emails you a sign-in link and keeps the scans you choose to keep in your account. Kept: Kept until you delete your account, which removes the account and every scan in it; a saved scan result is deleted 12 months after the scan."
               },
               {
                 "key": "business-team-service",
@@ -2717,7 +2717,7 @@
       "locale": "de",
       "translation_pending": true,
       "translation_note": "This section is shown in English while its translation is pending. The English text is the one that applies.",
-      "as_of": "2026-11-25",
+      "as_of": "2026-11-26",
       "privacy": {
         "groups": [
           {
@@ -2753,7 +2753,7 @@
               {
                 "key": "account-service",
                 "name": "Account sign-in and your saved scans",
-                "text": "Account sign-in and your saved scans receives your email address. Why: Emails you a sign-in link and keeps the scans you choose to keep in your account until you delete it. Kept: Kept until you delete your account; deleting it removes the account and every scan in it."
+                "text": "Account sign-in and your saved scans receives your email address. Why: Emails you a sign-in link and keeps the scans you choose to keep in your account. Kept: Kept until you delete your account, which removes the account and every scan in it; a saved scan result is deleted 12 months after the scan."
               },
               {
                 "key": "business-team-service",
@@ -3169,7 +3169,7 @@
       "locale": "fr",
       "translation_pending": true,
       "translation_note": "This section is shown in English while its translation is pending. The English text is the one that applies.",
-      "as_of": "2026-11-25",
+      "as_of": "2026-11-26",
       "privacy": {
         "groups": [
           {
@@ -3205,7 +3205,7 @@
               {
                 "key": "account-service",
                 "name": "Account sign-in and your saved scans",
-                "text": "Account sign-in and your saved scans receives your email address. Why: Emails you a sign-in link and keeps the scans you choose to keep in your account until you delete it. Kept: Kept until you delete your account; deleting it removes the account and every scan in it."
+                "text": "Account sign-in and your saved scans receives your email address. Why: Emails you a sign-in link and keeps the scans you choose to keep in your account. Kept: Kept until you delete your account, which removes the account and every scan in it; a saved scan result is deleted 12 months after the scan."
               },
               {
                 "key": "business-team-service",
@@ -3621,7 +3621,7 @@
       "locale": "pt",
       "translation_pending": true,
       "translation_note": "This section is shown in English while its translation is pending. The English text is the one that applies.",
-      "as_of": "2026-11-25",
+      "as_of": "2026-11-26",
       "privacy": {
         "groups": [
           {
@@ -3657,7 +3657,7 @@
               {
                 "key": "account-service",
                 "name": "Account sign-in and your saved scans",
-                "text": "Account sign-in and your saved scans receives your email address. Why: Emails you a sign-in link and keeps the scans you choose to keep in your account until you delete it. Kept: Kept until you delete your account; deleting it removes the account and every scan in it."
+                "text": "Account sign-in and your saved scans receives your email address. Why: Emails you a sign-in link and keeps the scans you choose to keep in your account. Kept: Kept until you delete your account, which removes the account and every scan in it; a saved scan result is deleted 12 months after the scan."
               },
               {
                 "key": "business-team-service",
@@ -4073,7 +4073,7 @@
       "locale": "ar",
       "translation_pending": true,
       "translation_note": "This section is shown in English while its translation is pending. The English text is the one that applies.",
-      "as_of": "2026-11-25",
+      "as_of": "2026-11-26",
       "privacy": {
         "groups": [
           {
@@ -4109,7 +4109,7 @@
               {
                 "key": "account-service",
                 "name": "Account sign-in and your saved scans",
-                "text": "Account sign-in and your saved scans receives your email address. Why: Emails you a sign-in link and keeps the scans you choose to keep in your account until you delete it. Kept: Kept until you delete your account; deleting it removes the account and every scan in it."
+                "text": "Account sign-in and your saved scans receives your email address. Why: Emails you a sign-in link and keeps the scans you choose to keep in your account. Kept: Kept until you delete your account, which removes the account and every scan in it; a saved scan result is deleted 12 months after the scan."
               },
               {
                 "key": "business-team-service",

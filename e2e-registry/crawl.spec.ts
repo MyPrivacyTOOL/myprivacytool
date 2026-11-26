@@ -45,14 +45,27 @@ const RTC_PATCH = `(() => {
   }
 })();`;
 
-async function newRecordingContext(browser: import("@playwright/test").Browser, obs: Obs[], phase: () => "pre_click" | "post_click", route: () => string, baseURL: string) {
+// The Scan me consent record (POST /api/consent), answered with a stub so the click can complete: nothing is written anywhere. Returns true when it answered.
+async function stubScanConsent(r: import("@playwright/test").Route, origin: string): Promise<boolean> {
+  const req = r.request();
+  if (new URL(req.url()).pathname !== "/api/consent") return false;
+  const cors = { "access-control-allow-origin": origin, "access-control-allow-headers": "content-type", "access-control-allow-methods": "GET,POST,OPTIONS" };
+  if (req.method() === "OPTIONS") await r.fulfill({ status: 204, headers: cors });
+  else await r.fulfill({ status: 201, headers: { ...cors, "content-type": "application/json" }, body: JSON.stringify({ consent_id: "33333333-3333-4333-8333-333333333333", consent_version: CONSENT_CONFIG.consent_version, consented_at: new Date().toISOString() }) });
+  return true;
+}
+
+// stubConsent (post-click context only): the Scan me click records its consent, which is what releases GA4 / Cloudflare Web Analytics (MPC-10790). Without the stub the
+// POST is aborted, the consent never holds and the post-click phase could not observe the beacon. The request is still recorded first, like every other.
+async function newRecordingContext(browser: import("@playwright/test").Browser, obs: Obs[], phase: () => "pre_click" | "post_click", route: () => string, baseURL: string, stubConsent = false) {
   const context = await browser.newContext({ baseURL });
   await context.addInitScript(RTC_PATCH);
-  await context.route(/^https?:\/\/(?!127\.0\.0\.1|localhost)/, (r) => {
+  await context.route(/^https?:\/\/(?!127\.0\.0\.1|localhost)/, async (r) => {
     const req = r.request();
     let host = "";
     try { host = new URL(req.url()).hostname; } catch { /* ignore */ }
     obs.push({ phase: phase(), host, url: req.url(), route: route(), kind: "request" });
+    if (stubConsent && (await stubScanConsent(r, new URL(baseURL).origin))) return;
     return r.abort("blockedbyclient");
   });
   return context;
@@ -95,7 +108,7 @@ test("every sitemap route pre-click, then the scan action post-click, contacts o
 
   // ---- post-click: stub consent, then the scan action ----
   let current = "";
-  const ctx = await newRecordingContext(browser, obs, () => "post_click", () => current, baseURL!);
+  const ctx = await newRecordingContext(browser, obs, () => "post_click", () => current, baseURL!, true);
   await ctx.addInitScript(() => {
     try { localStorage.setItem("mpt_cookie_consent", JSON.stringify({ v: 1, analytics: true, at: "2026-01-01T00:00:00.000Z" })); } catch { /* ignore */ }
   });
@@ -140,7 +153,13 @@ test("every sitemap route pre-click, then the scan action post-click, contacts o
   const neverHosts = new Set(registry.recipients.filter((r: { key: string }) => NEVER_PRE_CLICK_KEYS.includes(r.key)).flatMap((r: { hosts: string[] }) => r.hosts));
   const hostIsNever = (host: string) => [...neverHosts].some((h) => (h.startsWith("*.") ? host === h.slice(2) || host.endsWith(h.slice(1)) : host === h));
   const neverProblems = obs.filter((o) => o.phase === "pre_click" && o.host && hostIsNever(o.host)).map((o) => `PRE-CLICK ${o.host} on ${o.route} (${NEVER_PRE_CLICK_KEYS.join(" / ")} wait for the click)`);
+  // MPC-10790 follow-up: the CI build carries a dummy Cloudflare token, so the post-click phase (analytics accepted, Scan me pressed) must contact the beacon host, and only then.
+  // If it does not, the pre-click check above proves nothing for this recipient (token dropped from the CI build, or the beacon no longer loads after the click).
+  const cfHosts = registry.recipients.find((x: { key: string }) => x.key === "cloudflare-web-analytics")?.hosts ?? [];
+  const cfPostClick = obs.filter((o) => o.phase === "post_click" && o.kind === "request" && cfHosts.includes(o.host));
+  const cfMissing = cfPostClick.length === 0 ? [`MISSING post-click request to ${cfHosts.join(", ")}: the crawl cannot see the Cloudflare Web Analytics beacon (is VITE_CF_WEB_ANALYTICS_TOKEN set for this build? CI sets a dummy)`] : [];
   const problems = [
+    ...cfMissing,
     ...neverProblems,
     ...zeroProblems,
     ...r.violations.map((f: { message: string }) => `NEW: ${f.message}`),
@@ -153,7 +172,9 @@ test("every sitemap route pre-click, then the scan action post-click, contacts o
 // under www.myprivacytool.io (the page's requests for that host are answered from the local preview; every other host is recorded and aborted, as above).
 // The visitor starts with the analytics choice already stored and has NOT pressed Scan me: no Google host, nothing queued in dataLayer. Then Scan me is pressed
 // (the consent POST is answered with a stub): the tag is requested and the device profile queues only now.
-test("analytics accepted but Scan me not pressed: GA4 neither loads nor queues; after Scan me it does", async ({ browser, baseURL }) => {
+// MPC-10790 follow-up: the same holds for the Cloudflare Web Analytics beacon. The CI build carries a dummy VITE_CF_WEB_ANALYTICS_TOKEN, so the beacon is
+// really requested here once both consents hold (the request is recorded, then aborted: nothing leaves the runner).
+test("analytics accepted but Scan me not pressed: GA4 and Cloudflare Web Analytics neither load nor queue; after Scan me they do", async ({ browser, baseURL }) => {
   test.setTimeout(90_000);
   const PROD = "www.myprivacytool.io";
   const seen: { phase: "before" | "after"; host: string; url: string }[] = [];
@@ -170,24 +191,25 @@ test("analytics accepted but Scan me not pressed: GA4 neither loads nor queues; 
       return r.fulfill({ response: res });
     }
     seen.push({ phase, host: u.hostname, url: req.url() });
-    if (u.pathname === "/api/consent") {   // the Scan me consent record, stubbed so the click can complete
-      const cors = { "access-control-allow-origin": `https://${PROD}`, "access-control-allow-headers": "content-type", "access-control-allow-methods": "GET,POST,OPTIONS" };
-      if (req.method() === "OPTIONS") return r.fulfill({ status: 204, headers: cors });
-      return r.fulfill({ status: 201, headers: { ...cors, "content-type": "application/json" }, body: JSON.stringify({ consent_id: "33333333-3333-4333-8333-333333333333", consent_version: CONSENT_CONFIG.consent_version, consented_at: new Date().toISOString() }) });
-    }
+    if (await stubScanConsent(r, `https://${PROD}`)) return;   // the Scan me consent record, stubbed so the click can complete
     return r.abort("blockedbyclient");
   });
   const page = await context.newPage();
   const google = (list: typeof seen) => list.filter((o) => /(^|\.)(googletagmanager|google-analytics)\.com$/.test(o.host));
+  const cfBeacon = (list: typeof seen) => list.filter((o) => o.host === "static.cloudflareinsights.com");
   const queued = () => page.evaluate(() => ((window as unknown as { dataLayer?: ArrayLike<unknown>[] }).dataLayer ?? []).map((a) => Array.from(a).slice(0, 2).join(":")));
 
   await page.goto("/", { waitUntil: "load" });
   await page.waitForTimeout(5000);   // long enough for the device scan and its device_profile event
   expect(google(seen), "no Google request on Accept analytics alone").toEqual([]);
+  expect(cfBeacon(seen), "no static.cloudflareinsights.com request on Accept analytics alone").toEqual([]);
+  expect(await page.locator('script[src*="cloudflareinsights.com"]').count(), "no Cloudflare beacon <script> in the DOM before Scan me").toBe(0);
   expect(await queued(), "nothing queued in dataLayer before Scan me").toEqual([]);
 
   phase = "after";
   await page.locator(CLICK_SELECTOR).first().click({ timeout: 10_000 });
+  await expect.poll(() => cfBeacon(seen).length, { timeout: 15_000, message: "the Cloudflare Web Analytics beacon is requested after Scan me" }).toBeGreaterThan(0);
+  expect(cfBeacon(seen).every((o) => o.phase === "after"), "the beacon request was made only in the after-Scan-me phase").toBe(true);
   await expect.poll(() => google(seen).length, { timeout: 15_000, message: "the tag is requested after Scan me" }).toBeGreaterThan(0);
   await expect.poll(queued, { timeout: 15_000, message: "the device profile queues after Scan me" }).toContain("event:device_profile");
   await context.close();

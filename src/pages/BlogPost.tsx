@@ -34,7 +34,7 @@ const blogContent: { [key: string]: React.ReactNode } = {
         <p>The question is not whether your data is exposed. It is how exposed, and what can be done about it.</p>
 
         <h2>The 54 Privacy Vectors Exposing Your Data</h2>
-        <p>{countSentence()}. We've identified distinct sources where your personal information is currently exposed:<FeatureStatus feature="F9" /></p>
+        <p>{countSentence()}. Here is what the web scan checks:<FeatureStatus feature="F9" /></p>
 
         {/* MPC-9832: the real 54 web-scan hexagons, grouped by the registry's own groups. Rendered from the registry so the
             list and its counts cannot drift from the scan again (the old hand-written lists added up to 46). */}
@@ -67,8 +67,8 @@ const blogContent: { [key: string]: React.ReactNode } = {
         <h2>How MyPrivacyTOOL Works</h2>
         <p>Most privacy tools start by selling you removal. MyPrivacyTOOL starts with visibility, because you cannot manage what you cannot see.</p>
         <ol>
-          <li><strong>Run your scan.</strong> Enter your details and the free scan checks data brokers for your information.</li>
-          <li><strong>See what was found.</strong> Each broker is shown as listed, not listed, or not checked, with an evidence link, so you can see what was actually checked rather than a vague score.</li>
+          <li><strong>Run your scan.</strong> The free scan shows what your browser, device and network reveal, and your emailed report adds what your email address reveals. It does not search data-broker sites for you.</li>
+          <li><strong>See what was found.</strong> Each check is marked found, checked and clear, or not checked, so you can see what was actually checked rather than a vague score. We check a broker listing only when you paste the address of a page that lists you.</li>
           <li><strong>Understand the exposure.</strong> Know what information is exposed, who can access it, and what someone could do with it.</li>
           <li><strong>Take control.</strong> Follow our step-by-step opt-out guides to remove or restrict your listings at brokers that allow it. Some opt-outs take minutes. Others take waiting, paperwork, or a paid service, and we say so up front.</li>
         </ol>

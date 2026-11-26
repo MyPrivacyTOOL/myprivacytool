@@ -20,7 +20,7 @@ const ComingSoonPage = ({ title, description }: ComingSoonPageProps) => {
           <h1 className="text-3xl font-bold text-foreground mb-3">{title}</h1>
           <p className="text-muted-foreground mb-8">{description}</p>
           <p className="text-sm text-muted-foreground mb-8">
-            This page is coming soon. In the meantime, check your exposure to see where your data is listed.
+            This page is coming soon. In the meantime, you can run the free scan to see what your browser and email address reveal.
           </p>
           <Button asChild size="lg">
             <Link to="/scan">Check My Exposure</Link>

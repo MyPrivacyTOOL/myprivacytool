@@ -24,6 +24,9 @@ That is the two-part test: what the message delivers, then what a public lookup 
 - In mode `on` it only ever holds our own test accounts. Mode `all` captures real users: see below.
 
 ## Mode all (decision D-A, "capture everywhere")
+**Switched off on 2026-11-26 (MPC-9907, option A).** It logged senders before they had answered the 19-or-over question, against what `/privacy` says.
+`wrangler.toml` now sets `PROBE_MODE = "off"`. STOP removes the sender's earlier `channel_probe_captures` rows. Rows of people who never send STOP were not touched.
+
 **Off by default. This mode captures real users and holds personal data (PII).** Before `PROBE_MODE=all` is switched on, the stored-data rules
 (task "Align stored-data rules and user-facing wording with D-A") and the privacy wording must be aligned; the bot copy that says it
 "can't see your profile" is untrue for public profiles and is a follow-up.

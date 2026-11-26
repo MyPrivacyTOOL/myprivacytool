@@ -46,7 +46,7 @@ export async function handleKeep(env, request, url, { sb }) {
     return page(400, 'This link is not valid', 'The link may be incomplete or out of date. If your scan was already deleted, it is gone and nothing can be restored.');
   }
   if (request.method === 'GET') {
-    return page(200, 'Keep my scan?', 'If you keep it, we do not delete your scan and you can come back to see what changed. No account is needed. If you would rather it went, do nothing: it is deleted at the time in the email.',
+    return page(200, 'Keep my scan?', 'If you keep it, we will not delete your scan at the time in the email, and you can come back to see what changed. A saved scan result is still deleted automatically 12 months after the scan. No account is needed. If you would rather it went, do nothing: it is deleted at the time in the email.',
       `<form method="POST" action="/api/keep?s=${encodeURIComponent(scanId)}&amp;t=${encodeURIComponent(url.searchParams.get('t'))}"><button type="submit" style="background:#15803d;color:#fff;border:0;border-radius:8px;padding:12px 20px;font-size:15px;font-weight:600;cursor:pointer">Keep my scan</button></form>`);
   }
   try {
@@ -66,7 +66,7 @@ export function buildCountdownEmail({ stage, deleteAfter, keepLink, signUpLink, 
   const lead = stage === '24h'
     ? `We delete your scan at ${when}, as our policy says. Keep it or sign up if you want it to stay. If you see no value in it, we understand: thanks, and goodbye.`
     : `This is the last reminder: your scan is deleted in 4 hours, at ${when}. Keep it or sign up if you want it to stay. Otherwise there is nothing to do.`;
-  const detail = 'If you keep it, no account is needed and you can come back to see what changed. If you sign up, we keep it as part of your account. If you do neither, everything we hold about you from this scan is deleted, and we will not know who you are afterwards.';
+  const detail = 'If you keep it, no account is needed and you can come back to see what changed. If you sign up, we keep it as part of your account. A saved scan result is deleted 12 months after the scan either way. If you do neither, everything we hold about you from this scan is deleted, and we will not know who you are afterwards.';
   const text = [lead, '', detail, '', `Keep my scan: ${keepLink}`, `Sign up: ${signUpLink}`, '', 'MyPrivacyTOOL', ...(unsubscribeLink ? ['', `Unsubscribe from all our emails: ${unsubscribeLink}`] : [])].join('\n');
   const html = shell(subject, lead, `<h1 style="margin:0 0 12px 0;font-size:22px;line-height:28px;color:#111827">${esc(subject)}</h1>${para(esc(lead))}${para(esc(detail))}${button(keepLink, 'Keep my scan')}${button(signUpLink, 'Sign up')}`, unsubscribeLink);
   return { subject, text: tagLinks(text, `deletion-${stage}`), html: tagLinks(html, `deletion-${stage}`, { html: true }) };

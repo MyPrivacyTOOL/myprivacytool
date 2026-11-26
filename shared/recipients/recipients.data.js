@@ -161,11 +161,11 @@ export default {
       "data_items": [
         "email"
       ],
-      "purpose": "Emails you a sign-in link and keeps the scans you choose to keep in your account until you delete it.",
+      "purpose": "Emails you a sign-in link and keeps the scans you choose to keep in your account.",
       "party": "first",
       "retention": {
         "days": null,
-        "text": "Kept until you delete your account; deleting it removes the account and every scan in it"
+        "text": "Kept until you delete your account, which removes the account and every scan in it; a saved scan result is deleted 12 months after the scan"
       },
       "consent_basis": "user_action",
       "phase": "pre_click",
@@ -1790,6 +1790,34 @@ export default {
       "until": null,
       "reason": "Disabled until Chris approves it and the privacy text covers it (rule 7). Needs the GA4_API_SECRET Worker secret, which only Chris creates.",
       "note": "MPC-11111: built switched off. Turning it on needs three things together: enabled true here, GA4_SERVER_EVENTS_ENABLED=true on the Workers, and the GA4_API_SECRET secret."
+    },
+    {
+      "key": "email-guess-service",
+      "name": "Email guess (opens the sealed token from a bot's bridge link)",
+      "hosts": [
+        "mpt-scan-report.myprivacytool.workers.dev"
+      ],
+      "host_kind": "fixed",
+      "surface": "worker",
+      "data_items": [
+        "email"
+      ],
+      "purpose": "Opens the sealed token in a bot's bridge link so /scan can ask \"Is this your main email?\" about an address you published in your own X bio. Our own Worker; stores nothing and logs nothing.",
+      "party": "first",
+      "retention": {
+        "days": 0,
+        "text": "Nothing is stored"
+      },
+      "consent_basis": "service",
+      "phase": "pre_click",
+      "enabled": false,
+      "flag": "VITE_EMAIL_GUESS_ENABLED",
+      "country_overrides": {},
+      "dpa_listed": false,
+      "since": "2026-11-26",
+      "until": null,
+      "reason": "Disabled until the privacy owner approves it and the Privacy text covers it (rule 7). The call happens before the visitor's scan consent click, so it needs its own pre_click entry; the browser refused it as built without one (found in the 2026-11-26 local rehearsal).",
+      "note": "MPC-11111: built switched off. To turn the magic guess on: this entry enabled true, EMAIL_GUESS_ENABLED on scan-report and social-listeners, the EMAIL_GUESS_KEY secret, and VITE_EMAIL_GUESS_ENABLED."
     }
   ]
 };

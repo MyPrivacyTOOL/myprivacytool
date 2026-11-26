@@ -58,6 +58,7 @@ function setup(envOver: Record<string, unknown> = {}, o: Opts = {}) {
       if (i >= 0) Object.assign(items[i], body); else items.push({ ...body });
       return new Response("", { status: 201 });
     }
+    if (url.includes("/rest/v1/channel_probe_captures")) return Response.json([]); // STOP clears this sender's probe-log rows (MPC-9907)
     return new Response("{}", { status: 404 });
   }));
   const env = { TELEGRAM_WEBHOOK_SECRET: "s", TELEGRAM_BOT_TOKEN: TOKEN, SUPABASE_URL: "https://x.supabase.co", SUPABASE_KEY: "svc",

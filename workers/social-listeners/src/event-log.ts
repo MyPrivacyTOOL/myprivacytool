@@ -53,7 +53,7 @@ export function logRetentionDays(env: Env): number | null {
 
 /** The logged sender of an update, or null when this update must not be logged (mode not "on", bot, unlisted, not opted in). */
 export function loggedSender(env: Env, update: unknown): string | null {
-  // CK-9912: the synthetic check account is logged in every probe mode (the Worker runs PROBE_MODE=all, which never writes this log), so the CI round-trip check can read its reply back. Nobody else is affected.
+  // CK-9912: the synthetic check account is logged in every probe mode (mode "all" never writes this log, and the Worker runs with the probe off), so the CI round-trip check can read its reply back. Nobody else is affected.
   const synthetic = syntheticIds(env);
   if (synthetic.size > 0) {
     const a = updateActor(update);
