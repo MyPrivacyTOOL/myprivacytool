@@ -21,6 +21,17 @@ const TOKEN_RE = /^[A-Za-z0-9_-]{32,64}$/;
 const noEmail = (s) => String(s).replace(/\S+@\S+/g, '[email]');
 
 async function sha(s) { return [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s)))].map((b) => b.toString(16).padStart(2, '0')).join(''); }
+
+// MPC-10612: the employee routes were limited to 5 calls a minute per ADDRESS, shared by view, authorise, withdraw and share. One person's normal journey (open, authorise, reload,
+// withdraw, reload) is about 8 calls, so the 8th got a 429 and the page said "We could not open the invitation just now"; and a whole office behind one address shared that 5.
+// Now the invitation's own hashed token is what is counted: reads 40 a minute (LIVE_LIMITER), changes 5 a minute (RATE_LIMITER). A looser per-address cap (40 a minute, LIVE_LIMITER)
+// still stops floods of random tokens or page-fetch requests, and a malformed token falls back to the old strict per-address limit.
+async function joinLimited(env, request, kind, token, { rateLimited, liveLimited }) {
+  if (liveLimited && await liveLimited(env, request, 'bizjoin-ip:')) return true;
+  if (typeof token !== 'string' || !TOKEN_RE.test(token)) return rateLimited(env, request, 'biz-join:');
+  const who = (await sha(token)).slice(0, 24);
+  return kind === 'view' ? (liveLimited ? liveLimited(env, request, 'bizview:', who) : false) : rateLimited(env, request, 'biz-join:', who);
+}
 export const newToken = () => { const b = crypto.getRandomValues(new Uint8Array(32)); return btoa(String.fromCharCode(...b)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); };
 async function bodyOf(request, max = 16384) {
   if (Number(request.headers.get('content-length') || 0) > max) return null;
@@ -164,19 +175,19 @@ async function memberByToken(sb, token) {
 }
 
 /** POST /api/business/join/view {token} -> what the invitation says. Reading it changes nothing (a mail scanner opening the link is harmless). */
-export async function handleJoinView(env, ctx, request, origin, json, { allowedOrigins, rateLimited, sb }) {
+export async function handleJoinView(env, ctx, request, origin, json, { allowedOrigins, rateLimited, liveLimited, sb }) {
   const g = guard(env, origin, json, allowedOrigins); if (g) return g;
-  if (await rateLimited(env, request, 'biz-join:')) return json({ error: 'Too many requests' }, 429);
   const b = await bodyOf(request); if (!b) return json({ error: 'Invalid request' }, 400);
+  if (await joinLimited(env, request, 'view', b.token, { rateLimited, liveLimited })) return json({ error: 'Too many requests' }, 429);
   try { const f = await memberByToken(sb, b.token); return f ? json(memberView(f.m)) : json({ error: 'Invalid or expired' }, 404); }
   catch (e) { console.error('business: join view failed', noEmail(String(e.status || e))); return json({ error: 'Unavailable' }, 503); }
 }
 
 /** POST /api/business/join/authorise {token, consent:true, share_detail?, listing?} -> {status, results}. Pressing the button IS the consent; the check runs now. */
-export async function handleAuthorise(env, ctx, request, origin, json, { allowedOrigins, rateLimited, sb, fetchImpl = undefined }) {
+export async function handleAuthorise(env, ctx, request, origin, json, { allowedOrigins, rateLimited, liveLimited, sb, fetchImpl = undefined }) {
   const g = guard(env, origin, json, allowedOrigins); if (g) return g;
-  if (await rateLimited(env, request, 'biz-join:')) return json({ error: 'Too many requests' }, 429);
   const b = await bodyOf(request); if (!b) return json({ error: 'Invalid request' }, 400);
+  if (await joinLimited(env, request, 'act', b.token, { rateLimited, liveLimited })) return json({ error: 'Too many requests' }, 429);
   if (b.consent !== true) return json({ error: 'Consent required' }, 400);
   const listing = parseListingRequest(b);
   if (listing.error) return json({ error: listing.error }, 400);
@@ -198,10 +209,10 @@ export async function handleAuthorise(env, ctx, request, origin, json, { allowed
 }
 
 /** POST /api/business/join/{decline,revoke,share} {token, share_detail?}. Revoke deletes the results. */
-export const joinAction = (kind) => async function handleJoinAction(env, ctx, request, origin, json, { allowedOrigins, rateLimited, sb }) {
+export const joinAction = (kind) => async function handleJoinAction(env, ctx, request, origin, json, { allowedOrigins, rateLimited, liveLimited, sb }) {
   const g = guard(env, origin, json, allowedOrigins); if (g) return g;
-  if (await rateLimited(env, request, 'biz-join:')) return json({ error: 'Too many requests' }, 429);
   const b = await bodyOf(request); if (!b) return json({ error: 'Invalid request' }, 400);
+  if (await joinLimited(env, request, 'act', b.token, { rateLimited, liveLimited })) return json({ error: 'Too many requests' }, 429);
   try {
     const f = await memberByToken(sb, b.token); if (!f) return json({ error: 'Invalid or expired' }, 404);
     const r = kind === 'decline' ? await sb.rpc('mpt_business_decline', { p_hash: f.hash })
