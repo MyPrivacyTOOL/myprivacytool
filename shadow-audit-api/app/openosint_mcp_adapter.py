@@ -1,74 +1,97 @@
 """
 OpenOSINT MCP adapter for MyPrivacyTOOL exposure scanning (MPC-11203).
 
-Calls an OpenOSINT MCP server (v2.38.2+) over the MCP protocol and turns each tool's
-output into statement-level provenance records:
+Launches the OpenOSINT MCP server (`openosint-mcp`, v2.38.2, stdio transport) and turns each
+tool's output into provenance records:
 
-    finding -> tool -> data source -> timestamp -> confidence
+    finding line -> tool -> data source -> timestamp -> confidence
+
+Verified against the real openosint 2.38.2 server (see tests/fixtures/openosint_samples.json):
+  - The server speaks MCP over stdio only. The adapter spawns it; there is no HTTP port.
+  - openosint pins `mcp<2`, so install it in its own venv (OPENOSINT_MCP_COMMAND points at it).
+  - Each tool takes its own argument name (email / domain / query / target); see TOOLS.
+  - Output is JSON text: {"tool", "target", "timestamp", "results": [str, ...], "error"}.
+    Failures (missing key, network error) come back as result lines with is_error=False.
+  - OpenOSINT gives no per-finding source or confidence. `data_source` here is the service the
+    tool queries (from OpenOSINT's own tool policy notes); `confidence` is UNSCORED_CONFIDENCE.
+  - In passive mode the server does not list, and refuses, its noisy tools: search_email
+    (holehe), search_username (sherlock), search_domain (sublist3r), search_phone, scrape_url.
+    holehe probes sign-up/reset flows and may notify the account owner. This adapter never calls
+    them under ToolPolicy.PASSIVE_ONLY.
 
 Behaviour:
-  - Up to `concurrent_limit` (default 5) tool calls run concurrently, each with a
-    `timeout_seconds` (default 5s) limit.
-  - Passive-only by default. Active tools (scrapers) are refused unless the adapter is
-    built with ToolPolicy.ALLOW_ACTIVE.
+  - Up to `concurrent_limit` tool calls run concurrently over one server session per scan, each
+    with a timeout (OpenOSINT's own per-tool default unless `timeout_seconds` overrides it).
   - Per-tool failures never fail the scan; they are counted and classified
     (timeout / api_key_missing / rate_limited / policy_blocked / error) in `tool_errors`.
-  - Targets (emails, usernames, domains) are never written to logs.
-
-Assumptions about the OpenOSINT server, to be confirmed against a live server with
-`OpenOSINTAdapter.missing_tools()` and the live-scan step of MPC-11203:
-  - tool names match the registry in the task spec (search_email, search_breach, ...)
-  - each tool takes {"target": <str>} and returns JSON text, either a list or
-    {"findings": [...]}, each finding being a string or an object with `finding`
-    (or `title`/`name`), `source` (or `data_source`) and optional `confidence` (0..1).
+  - Targets (emails, usernames, domains) are never written to logs. OpenOSINT itself logs every
+    tool call with its arguments to stderr (hardcoded INFO, no switch), so the spawned server's
+    stderr is discarded. Set OPENOSINT_DEBUG_STDERR=1 to inherit it when debugging; that WILL put
+    scan targets in your logs.
 """
 
 import asyncio
+import contextlib
 import json
 import logging
 import os
+import re
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Dict, List, Optional, Protocol, Tuple
+from typing import Any, AsyncIterator, Dict, List, Optional, Protocol, Tuple
 
 logger = logging.getLogger(__name__)
 logger.setLevel(os.getenv("OPENOSINT_LOG_LEVEL", "INFO"))
 
-# Tools that run without active network probing of the target. Names from the MPC-11203 spec.
-PASSIVE_TOOLS = frozenset({
-    "search_email", "search_username", "search_whois", "search_dns", "search_rdap",
-    "search_ip", "search_domain", "generate_dorks", "search_github", "search_paste",
-    "search_phone", "search_breach", "search_virustotal", "search_censys",
-    "search_ip2location", "search_abuseipdb", "search_shodan", "search_gdelt_geo",
-    "search_footprint",
+# tool -> (argument name, data source queried, category, default timeout seconds).
+# Passive tools only (OpenOSINT TOOL_POLICY noise == passive); timeouts are OpenOSINT's own
+# _DEFAULT_TIMEOUT values (search_footprint has none published, 30 assumed).
+TOOLS: Dict[str, Tuple[str, str, str, float]] = {
+    "search_breach": ("email", "haveibeenpwned.com", "breach_databases", 15),
+    "search_paste": ("query", "psbdmp.ws", "paste_sites", 15),
+    "search_github": ("query", "api.github.com", "code_hosting", 30),
+    "search_footprint": ("target", "google via Bright Data", "public_footprint", 30),
+    "search_whois": ("domain", "whois registry", "domain_registries", 15),
+    "search_rdap": ("domain", "rdap registry", "domain_registries", 10),
+    "search_dns": ("domain", "dns resolver", "dns_records", 10),
+    "search_virustotal": ("target", "virustotal.com", "reputation", 30),
+}
+PASSIVE_TOOLS = frozenset(TOOLS)
+# Not passive per OpenOSINT: refused under ToolPolicy.PASSIVE_ONLY.
+NON_PASSIVE_TOOLS = frozenset({
+    "search_email", "search_username", "search_domain", "search_phone", "scrape_url",
 })
-ACTIVE_TOOLS = frozenset({"scrape_url", "search_dorks_live"})
 
-# Confidence used when a tool does not report one. It means "unscored", not "50% likely".
+# Confidence when the tool reports none. It means "unscored", not "50% likely".
 UNSCORED_CONFIDENCE = 0.5
 
-# (tool, category) pairs per scan type.
-EMAIL_TOOLS: List[Tuple[str, str]] = [
-    ("search_email", "email_search"),
-    ("search_breach", "breach_databases"),
-]
-USERNAME_TOOLS: List[Tuple[str, str]] = [
-    ("search_username", "social_platforms"),
-    ("search_footprint", "public_footprint"),
-]
-DOMAIN_TOOLS: List[Tuple[str, str]] = [
-    ("search_domain", "domain_lookup"),
-    ("search_whois", "domain_registries"),
-    ("search_dns", "dns_records"),
-    ("search_rdap", "domain_registries"),
-    ("search_footprint", "public_footprint"),
-]
+# search_paste (psbdmp.ws) is left out of the plans: psbdmp.ws answered 502 in every live run on
+# 2026-11-24/25. It stays in TOOLS, so it can be added back to a plan once the service is reliable.
+PLANS: Dict[str, List[str]] = {
+    "email": ["search_breach", "search_github"],
+    "username": ["search_github", "search_footprint"],
+    "domain": ["search_whois", "search_rdap", "search_dns", "search_virustotal", "search_footprint"],
+}
+
+_FORWARDED_ENV = (
+    "PATH", "HOME", "HTTPS_PROXY", "https_proxy", "NO_PROXY", "no_proxy", "SSL_CERT_FILE",
+    "REQUESTS_CA_BUNDLE", "OPENOSINT_PROXY_URL", "HIBP_API_KEY", "GITHUB_TOKEN", "VIRUSTOTAL_API_KEY", "SHODAN_API_KEY",
+    "CENSYS_API_ID", "CENSYS_API_SECRET", "ABUSEIPDB_API_KEY", "BRIGHTDATA_API_KEY",
+)
 
 
 class ToolPolicy(Enum):
     PASSIVE_ONLY = "passive_only"
     ALLOW_ACTIVE = "allow_active"
+
+
+ERROR_TIMEOUT = "timeout"
+ERROR_API_KEY = "api_key_missing"
+ERROR_RATE_LIMIT = "rate_limited"
+ERROR_POLICY = "policy_blocked"
+ERROR_NOT_FOUND = "domain_not_found"
+ERROR_OTHER = "error"
 
 
 class ToolError(Exception):
@@ -79,59 +102,89 @@ class ToolError(Exception):
         self.kind = kind
 
 
-ERROR_TIMEOUT = "timeout"
-ERROR_API_KEY = "api_key_missing"
-ERROR_RATE_LIMIT = "rate_limited"
-ERROR_POLICY = "policy_blocked"
-ERROR_OTHER = "error"
+class ToolSession(Protocol):
+    async def call_tool(self, name: str, arguments: Dict[str, Any]) -> Any:
+        """Return the tool's decoded output. Raise ToolError on a tool-level error."""
 
 
 class ToolClient(Protocol):
-    async def call_tool(self, name: str, arguments: Dict[str, Any]) -> Any:
-        """Return the tool's decoded JSON output. Raise ToolError on a tool-level error."""
+    def session(self) -> "contextlib.AbstractAsyncContextManager[ToolSession]": ...
 
     async def list_tool_names(self) -> List[str]: ...
 
 
 def classify_error_text(text: str) -> str:
+    """Map an error message to an ERROR_* kind. A bare HTTP 401/403 is not treated as a missing
+    key: a proxy or firewall refusal also says 403 (seen in the live run)."""
     t = text.lower()
     if "rate limit" in t or "429" in t or "too many requests" in t:
         return ERROR_RATE_LIMIT
-    if ("api key" in t or "api_key" in t or "apikey" in t or "unauthorized" in t
-            or "401" in t or "403" in t) and ("missing" in t or "not set" in t or "invalid" in t
-                                              or "required" in t or "unauthorized" in t
-                                              or "401" in t or "403" in t):
+    if "disabled_in_passive_mode" in t:
+        return ERROR_POLICY
+    if "key_required" in t or "api key" in t or "api_key" in t or "apikey" in t:
         return ERROR_API_KEY
     return ERROR_OTHER
 
 
-class MCPToolClient:
-    """ToolClient backed by the MCP Python SDK (`mcp.Client`, streamable HTTP or in-process)."""
-
-    def __init__(self, server: Any):
-        self._server = server  # URL string, or anything mcp.Client accepts
+class _MCPSession:
+    def __init__(self, client: Any):
+        self._client = client
 
     async def call_tool(self, name: str, arguments: Dict[str, Any]) -> Any:
-        from mcp import Client  # imported lazily so the adapter loads without the SDK
-
-        async with Client(self._server) as client:
-            result = await client.call_tool(name, arguments)
+        result = await self._client.call_tool(name, arguments)
         text = "\n".join(getattr(c, "text", "") for c in result.content)
         if getattr(result, "is_error", False):
             raise ToolError(classify_error_text(text), text[:200])
-        if getattr(result, "structured_content", None) is not None:
-            return result.structured_content
         try:
             return json.loads(text)
         except ValueError:
             raise ToolError(ERROR_OTHER, "tool returned non-JSON output")
 
-    async def list_tool_names(self) -> List[str]:
-        from mcp import Client
 
-        async with Client(self._server) as client:
-            listing = await client.list_tools()
-        return [t.name for t in listing.tools]
+class MCPToolClient:
+    """ToolClient that spawns the OpenOSINT MCP server over stdio via the MCP Python SDK
+    (mcp>=2.3 `mcp.Client`; it works against the server's mcp 1.x). Pass `server` to use any
+    other transport accepted by mcp.Client (a URL, or an in-process server in tests)."""
+
+    def __init__(self, server: Any = None, allow_active: bool = False):
+        self._server = server
+        self._allow_active = allow_active
+
+    def _stdio_params(self) -> Any:
+        from mcp import StdioServerParameters
+
+        env = {k: os.environ[k] for k in _FORWARDED_ENV if k in os.environ}
+        env["OPENOSINT_ALLOW_ACTIVE"] = "1" if self._allow_active else "0"
+        return StdioServerParameters(
+            command=os.getenv("OPENOSINT_MCP_COMMAND", "openosint-mcp"), args=[], env=env)
+
+    @contextlib.asynccontextmanager
+    async def _client(self) -> AsyncIterator[Any]:
+        from mcp import Client  # imported lazily so the adapter loads without the SDK
+
+        if self._server is not None:
+            async with Client(self._server) as client:
+                yield client
+            return
+        if os.getenv("OPENOSINT_DEBUG_STDERR") == "1":
+            async with Client(self._stdio_params()) as client:
+                yield client
+            return
+        from mcp.client.stdio import stdio_client
+
+        # OpenOSINT logs "Tool: <name> | args: <target>" to stderr and cannot be told not to.
+        with open(os.devnull, "w") as quiet:
+            async with Client(stdio_client(self._stdio_params(), errlog=quiet)) as client:
+                yield client
+
+    @contextlib.asynccontextmanager
+    async def session(self) -> AsyncIterator[ToolSession]:
+        async with self._client() as client:
+            yield _MCPSession(client)
+
+    async def list_tool_names(self) -> List[str]:
+        async with self._client() as client:
+            return [t.name for t in (await client.list_tools()).tools]
 
 
 @dataclass
@@ -141,9 +194,9 @@ class ProvenanceRecord:
     tool_name: str
     data_source: str
     timestamp: str  # ISO 8601 UTC
-    confidence: float  # 0.0-1.0; UNSCORED_CONFIDENCE when the tool reports none
+    confidence: float  # 0.0-1.0; UNSCORED_CONFIDENCE (OpenOSINT reports none)
     tool_category: str
-    is_active: bool  # True only for active (scraping) tools
+    is_active: bool  # True only for non-passive tools
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
@@ -166,60 +219,61 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
-def _to_confidence(value: Any) -> float:
-    try:
-        v = float(value)
-    except (TypeError, ValueError):
-        return UNSCORED_CONFIDENCE
-    return min(1.0, max(0.0, v))
+# "No breaches found for ...", "[GitHub] No users found ...". A bracketed tag like "[!]" is not
+# stripped, so DNS warnings such as "[!] No SPF record found" stay findings.
+# search_dns reports an NXDOMAIN as the line "Domain '<name>' does not exist." That is a failure of
+# the lookup (a typo, or a broken resolver), not an exposure, so it is an error, not a finding.
+_NOT_FOUND = re.compile(r"^Domain '.*' does not exist\.?$")
+_EMPTY_RESULT = re.compile(r"^(\[[A-Za-z]+\]\s*)?No .+ (found|mentioning)\b", re.IGNORECASE)
 
 
 class OpenOSINTAdapter:
     def __init__(
         self,
-        mcp_port: int = 8000,
+        mcp_port: int = 8000,  # unused: kept so existing callers keep working (stdio, no port)
         policy: ToolPolicy = ToolPolicy.PASSIVE_ONLY,
         concurrent_limit: int = 5,
-        timeout_seconds: float = 5.0,
+        timeout_seconds: Optional[float] = None,
         enable_provenance: bool = True,
         client: Optional[ToolClient] = None,
     ):
-        self.mcp_port = mcp_port
         self.policy = policy
         self.concurrent_limit = concurrent_limit
-        self.timeout_seconds = timeout_seconds
+        self.timeout_seconds = timeout_seconds  # None: use each tool's own default
         self.enable_provenance = enable_provenance
         self.mcp_client: ToolClient = client or MCPToolClient(
-            os.getenv("OPENOSINT_MCP_URL", f"http://localhost:{mcp_port}").rstrip("/") + "/mcp"
-        )
-        logger.info("OpenOSINT adapter: policy=%s concurrent_limit=%s timeout=%ss",
-                    policy.value, concurrent_limit, timeout_seconds)
+            allow_active=policy is ToolPolicy.ALLOW_ACTIVE)
+        logger.info("OpenOSINT adapter: policy=%s concurrent_limit=%s timeout=%s",
+                    policy.value, concurrent_limit, timeout_seconds or "per-tool default")
 
     async def missing_tools(self) -> List[str]:
-        """Tool names this adapter uses that the server does not offer (empty = all present)."""
-        wanted = {t for t, _ in EMAIL_TOOLS + USERNAME_TOOLS + DOMAIN_TOOLS}
+        """Tools this adapter uses that the server does not offer (empty = all present)."""
+        wanted = {t for plan in PLANS.values() for t in plan}
         return sorted(wanted - set(await self.mcp_client.list_tool_names()))
 
     async def scan_email(self, email: str, scan_id: str) -> ExposureResult:
-        local = email.split("@", 1)[0]
-        plan = [(t, email, c) for t, c in EMAIL_TOOLS] + [("search_username", local, "social_platforms")]
-        return await self._run(email, scan_id, plan)
+        return await self._run(email, scan_id, "email")
 
     async def scan_username(self, username: str, scan_id: str) -> ExposureResult:
-        return await self._run(username, scan_id, [(t, username, c) for t, c in USERNAME_TOOLS])
+        return await self._run(username, scan_id, "username")
 
     async def scan_domain(self, domain: str, scan_id: str) -> ExposureResult:
-        return await self._run(domain, scan_id, [(t, domain, c) for t, c in DOMAIN_TOOLS])
+        return await self._run(domain, scan_id, "domain")
 
-    async def _run(self, target: str, scan_id: str, plan: List[Tuple[str, str, str]]) -> ExposureResult:
+    async def _run(self, target: str, scan_id: str, kind: str) -> ExposureResult:
         started = datetime.now(timezone.utc)
+        plan = PLANS[kind]
         semaphore = asyncio.Semaphore(self.concurrent_limit)
-        outcomes = await asyncio.gather(
-            *(self._call(tool, arg, category, scan_id, semaphore) for tool, arg, category in plan)
-        )
+        try:
+            async with self.mcp_client.session() as session:
+                outcomes = await asyncio.gather(
+                    *(self._call(session, tool, target, scan_id, semaphore) for tool in plan))
+        except Exception as e:  # server could not start / died: every tool failed
+            logger.warning("scan %s: OpenOSINT session failed: %s", scan_id, type(e).__name__)
+            outcomes = [ToolError(ERROR_OTHER, type(e).__name__) for _ in plan]
         findings: List[ProvenanceRecord] = []
         errors: List[Dict[str, str]] = []
-        for (tool, _, _), outcome in zip(plan, outcomes):
+        for tool, outcome in zip(plan, outcomes):
             if isinstance(outcome, ToolError):
                 errors.append({"tool": tool, "kind": outcome.kind})
             else:
@@ -237,19 +291,20 @@ class OpenOSINTAdapter:
             tool_errors=errors,
         )
 
-    async def _call(self, tool: str, arg: str, category: str, scan_id: str,
+    async def _call(self, session: ToolSession, tool: str, target: str, scan_id: str,
                     semaphore: asyncio.Semaphore):
         """Run one tool. Returns a list of ProvenanceRecord, or a ToolError (never raises)."""
-        is_active = tool in ACTIVE_TOOLS
-        if is_active and self.policy is not ToolPolicy.ALLOW_ACTIVE:
-            logger.warning("scan %s: active tool %s blocked by passive-only policy", scan_id, tool)
+        if tool not in PASSIVE_TOOLS and self.policy is not ToolPolicy.ALLOW_ACTIVE:
+            logger.warning("scan %s: tool %s blocked by passive-only policy", scan_id, tool)
             return ToolError(ERROR_POLICY, tool)
+        arg, _, _, default_timeout = TOOLS.get(tool, ("target", tool, "other", 30))
+        timeout = self.timeout_seconds if self.timeout_seconds is not None else default_timeout
         try:
             async with semaphore:
                 raw = await asyncio.wait_for(
-                    self.mcp_client.call_tool(tool, {"target": arg}), self.timeout_seconds)
+                    session.call_tool(tool, {arg: target, "json_output": True}), timeout)
         except asyncio.TimeoutError:
-            logger.warning("scan %s: tool %s timed out after %ss", scan_id, tool, self.timeout_seconds)
+            logger.warning("scan %s: tool %s timed out after %ss", scan_id, tool, timeout)
             return ToolError(ERROR_TIMEOUT, tool)
         except ToolError as e:
             logger.warning("scan %s: tool %s failed: %s", scan_id, tool, e.kind)
@@ -258,35 +313,33 @@ class OpenOSINTAdapter:
             logger.warning("scan %s: tool %s failed: %s", scan_id, tool, type(e).__name__)
             return ToolError(ERROR_OTHER, type(e).__name__)
         try:
-            return self._records(raw, tool, category, is_active)
+            return self._records(raw, tool)
         except ToolError as e:
-            logger.warning("scan %s: tool %s returned unexpected output", scan_id, tool)
+            logger.warning("scan %s: tool %s: %s", scan_id, tool, e.kind)
             return e
 
-    def _records(self, raw: Any, tool: str, category: str, is_active: bool) -> List[ProvenanceRecord]:
-        items = raw.get("findings") if isinstance(raw, dict) else raw
-        if not isinstance(items, list):
+    def _records(self, raw: Any, tool: str) -> List[ProvenanceRecord]:
+        """Turn OpenOSINT's {"results": [lines], "error": ...} output into records."""
+        if not isinstance(raw, dict) or not isinstance(raw.get("results"), list):
             raise ToolError(ERROR_OTHER, "unexpected output shape")
+        if raw.get("error"):
+            raise ToolError(classify_error_text(str(raw["error"])), "tool reported an error")
+        lines = [str(x).strip() for x in raw["results"] if str(x).strip()]
+        # The server reports failures as result lines: "Scan error: ...", "[key_required] KEY".
+        failed = [ln for ln in lines if ln.startswith("Scan error:") or ln.startswith("[key_required]")]
+        if failed:
+            raise ToolError(classify_error_text(" ".join(failed)), "tool reported a scan error")
+        if any(_NOT_FOUND.match(ln) for ln in lines):
+            raise ToolError(ERROR_NOT_FOUND, "domain does not exist")
+        _, source, category, _ = TOOLS.get(tool, ("target", tool, "other", 30))
         now = _now()
-        records = []
-        for item in items:
-            if isinstance(item, str):
-                item = {"finding": item}
-            if not isinstance(item, dict):
-                continue
-            text = item.get("finding") or item.get("title") or item.get("name")
-            if not text:
-                continue
-            records.append(ProvenanceRecord(
-                finding=str(text),
-                tool_name=tool,
-                data_source=str(item.get("source") or item.get("data_source") or tool),
-                timestamp=now,
-                confidence=_to_confidence(item.get("confidence")),
-                tool_category=category,
-                is_active=is_active,
-            ))
-        return records
+        return [
+            ProvenanceRecord(
+                finding=ln, tool_name=tool, data_source=source, timestamp=now,
+                confidence=UNSCORED_CONFIDENCE, tool_category=category,
+                is_active=tool not in PASSIVE_TOOLS)
+            for ln in lines if not _EMPTY_RESULT.match(ln)
+        ]
 
     def deduplicate_findings(self, findings: List[ProvenanceRecord]) -> List[ProvenanceRecord]:
         """One record per (finding, data_source), keeping the highest confidence; sorted by it."""

@@ -8,6 +8,9 @@ workers_dev = true
 # .github/workflows/deploy-oauth-poc.yml. Live URL once deployed:
 #   https://myprivacytool-oauth-poc.myprivacytool.workers.dev
 #
+# Route binding (added 2026-11-25): /oauth/google/* on the main domain routes to this Worker.
+# Without this, the React SPA on myprivacytool.io has no way to reach the Worker endpoints.
+#
 # Secrets are NOT declared here and `wrangler deploy` never touches their values. Set them in the
 # Cloudflare dashboard (Workers & Pages > myprivacytool-oauth-poc > Settings > Variables and Secrets).
 # Secret names: EXPECTED_SECRETS.txt (GOOGLE_CLIENT_SECRET, STATE_SIGNING_KEY).
@@ -26,6 +29,14 @@ SUPABASE_URL = "https://xmdmkumwxpgahmlweuug.supabase.co"  # public; links a ver
 
 # OPTIONAL secret (NOT in EXPECTED_SECRETS.txt on purpose): SUPABASE_SERVICE_ROLE_KEY. Until it is set the
 # Supabase link reports "not_configured" and sign-in still works. Do not set it before the MPC-6950 key rotation.
+
+[[routes]]
+pattern = "myprivacytool.io/oauth/google/*"
+zone_name = "myprivacytool.io"
+
+[[routes]]
+pattern = "www.myprivacytool.io/oauth/google/*"
+zone_name = "myprivacytool.io"
 
 [observability]
 enabled = true

@@ -585,6 +585,34 @@
       "note": "MPC-9885: webhook-receiver state-store.js keeps chat conversation state (24 h) whose keys and bodies carry phone, email, name and the platform user id (username); added phone, name, username. MPC-9885: mpt-leads saveBaseline sends SHA-256(email) as email_hash plus the scan scores; added email_hash. MPC-9885: partner-api monitors store the monitored value (email, phone, handle or a domain); added email_domain. MPC-9885: mpt-cairn-blackboard stores the investigation seed email and username and fact values (email, username; phone only if HASH_FACT_TYPES leaves it unhashed); username and phone were already listed (MPC-9885 other tasks). MPC-9885: social-listeners stores Telegram/X updates, probe captures and event-log rows (sender key, @username, name, message text; a shared contact adds a phone); added message_text. MPC-9885: shared/support rest-store.ts keeps support cases (message text and the sender's email, phone or handle); added message_text. MPC-9885: scan-report writes users/leads rows with the visitor IP and utm/referrer, and the listing inputs (name, phone, city, country); added utm, referrer, city, country. MPC-9886: utm added because /HongKongSpam inserts its row (utm_source/medium/campaign, optional email) straight into Supabase from the browser."
     },
     {
+      "key": "supabase-signups",
+      "name": "Supabase (sign-up forms)",
+      "hosts": [
+        "*.supabase.co"
+      ],
+      "host_kind": "pattern",
+      "surface": "browser",
+      "data_items": [
+        "email",
+        "utm"
+      ],
+      "purpose": "Stores the email you type into the newsletter or Hong Kong spam sign-up form, when you submit it.",
+      "party": "processor",
+      "retention": {
+        "days": null,
+        "text": "Provider-side"
+      },
+      "consent_basis": "user_action",
+      "phase": "post_click",
+      "enabled": true,
+      "flag": null,
+      "country_overrides": {},
+      "dpa_listed": true,
+      "since": "2026-11-25",
+      "until": null,
+      "note": "MPC-10790: the browser writes the /newsletter and Hong Kong spam sign-ups straight to Supabase, each its own form submit. They were carried under the scan_consent entry above, which the Workers' database use needs. Split so each use has its own basis; the same project and host, no new recipient."
+    },
+    {
       "key": "notion",
       "name": "Notion",
       "hosts": [

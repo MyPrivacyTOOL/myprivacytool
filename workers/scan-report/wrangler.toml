@@ -102,6 +102,11 @@ EMAIL_DOMAIN_CHECK = "true"
 EMAIL_CONFIRM_GATE_ENABLED = "true"
 LISTING_CHECK_ENABLED = "true"
 
+# MPC-11111 (the magic guess, built OFF): "POST /api/scan/guess opens that sealed token for the /scan page". Needs ALL THREE: this switch exactly "true", the Worker secret EMAIL_GUESS_KEY (the SAME value on mpt-scan-report and
+# social-listeners; only Chris creates it), and the site flag VITE_EMAIL_GUESS_ENABLED. Anything but the exact string "true" is off. Wording is DRAFT until Chris approves it.
+# See docs/email-guess-mpc-11111.md. Rollback: set "false" and deploy (tokens already sent simply stop opening).
+EMAIL_GUESS_ENABLED = "false"
+
 # MPC-9817 (F3, accounts and sign-in only): passwordless accounts through Supabase Auth, driven from this Worker (lib/accounts.js): POST /api/account/{signin,verify,me,scan,
 # link-scan,delete,refresh,signout,can}. The sign-in email is ours (confirm-gate style); the browser never talks to Supabase Auth. The one-step tick ("Keep my scan and create
 # my free account", consent version 2026-11-08-v1) is acted on at the click-to-confirm. Needs migration 20261108120000_mpc_9817_accounts_and_signin.sql (applied before this

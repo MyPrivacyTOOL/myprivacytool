@@ -21,7 +21,9 @@ import LiveScanPanel from "@/components/LiveScanPanel";
 import ShareButtons from "@/components/ShareButtons";
 import ScanNumberNotice from "@/components/ScanNumberNotice";
 import ScanRecipientsPanel from "@/components/ScanRecipientsPanel";   // MPC-9893
-import { trackStartSignup, trackReportRequested, trackReportFailed } from "@/lib/analytics";
+import { trackStartSignup, trackReportRequested, trackReportFailed, trackEmailGuessShown, trackMagicGuessSubmitted } from "@/lib/analytics";
+import EmailGuessCard from "@/components/EmailGuessCard";   // MPC-11111: the magic guess, off unless VITE_EMAIL_GUESS_ENABLED is "true"
+import { emailGuessEnabled, fetchEmailGuess, takeGuessToken } from "@/lib/emailGuess";
 import { canOfferScanSave, recognitionEnabled, reportStep } from "@/lib/webScan";
 import { referralsEnabled, rememberReferralCode } from "@/lib/referral";
 import { ReportRequestError, BAD_EMAIL_MESSAGE, REPORT_FAILED_MESSAGE, REPORT_WAIT_MESSAGE, requestScanReport } from "@/lib/scanReport";
@@ -66,6 +68,8 @@ const Scan = () => {
   const [liveToken, setLiveToken] = useState("");
   // MPC-9813: the optional "show us your listing" details. Kept with the saved scan, so they travel only with the save consent.
   const [listingFields, setListingFields] = useState(emptyListingFields);
+  // MPC-11111: the address a bot's bridge link offered back ("Is this your main email?"). Memory only; null = nothing to offer (the usual case).
+  const [guessedEmail, setGuessedEmail] = useState<string | null>(null);
 
   // MPC-7493: the contact step was opened. Under D12 (MPC-7470) a scan is saved only at the contact step, so this sends nothing unless this visit
   // already saved a scan; the drop-off before it is read from the GA4 events.
@@ -74,6 +78,24 @@ const Scan = () => {
     // MPC-7645: a visitor who came from a friend's link may go and run the scan on the home page first; keep the code for this visit.
     if (referralsEnabled()) rememberReferralCode(new URLSearchParams(window.location.search).get("ref"));
   }, []);
+
+  // MPC-11111: when the visit arrived on a bot's bridge link that carries a sealed guess, ask the Worker to open it. Any failure just means no card.
+  useEffect(() => {
+    if (!emailGuessEnabled()) return;
+    const token = takeGuessToken();
+    if (!token) return;
+    let live = true;
+    void fetchEmailGuess(token).then((g) => {
+      if (live && g) { setGuessedEmail(g.email); trackEmailGuessShown(); }
+    });
+    return () => { live = false; };
+  }, []);
+  // Yes only fills the box: the consent line, the button and the click-to-confirm email all still apply.
+  const answerGuess = (yes: boolean) => {
+    if (yes && guessedEmail) setEmail(guessedEmail);
+    setGuessedEmail(null);
+    trackMagicGuessSubmitted(yes ? "yes" : "no");
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -233,7 +255,12 @@ const Scan = () => {
         </p>
 
         {!submitted && <ListingCoverageNote className="max-w-md mx-auto mb-6" />}
-        {!submitted ? renderForm("top") : thanks}
+        {!submitted ? (
+          <>
+            {guessedEmail && <EmailGuessCard email={guessedEmail} onYes={() => answerGuess(true)} onNo={() => answerGuess(false)} />}
+            {renderForm("top")}
+          </>
+        ) : thanks}
         {waitingForToken && <p role="status" className="text-muted-foreground text-sm mt-3 text-left">Verifying you are human, this takes a moment. Your request is sent automatically as soon as it is done. If a box appears, please tick it.</p>}
         {errorMsg && <p role="alert" className="text-foreground text-sm mt-3 border-l-4 border-destructive pl-3 text-left">{errorMsg}</p>}
 

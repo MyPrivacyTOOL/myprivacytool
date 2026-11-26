@@ -93,6 +93,13 @@ makes this rare, and the cost is one extra reconnect.
 GitHub allows 5,000 requests/hour per user token. A cold profile build costs at most 9 requests
 (`/user`, up to 3 pages of repos, 2 of starred, 3 of events). With a 24h cache one user uses about 9 requests per day.
 
+**Requests to this Worker (MPC-10833, 2026-11-24).** `POST /papit/verify` is covered by the zone's Cloudflare rate-limiting rule (zone `myprivacytool.io`, ruleset phase
+`http_ratelimit`, rule "MPT scan/API abuse limit: POST per IP + POST /papit/verify on channels"): block after 5 requests per 10 seconds per IP and Cloudflare location, for
+10 seconds. It is one rule on the Free plan, which allows only one, so the period and block time cannot be tuned and the count is approximate and per location: it slows
+abuse, it is not a hard cap. A live burst of 20 parallel requests saw 3 answered `429`. The rule lives in Cloudflare, not in this repo; to undo it, remove the added
+`(http.request.method eq "POST" and http.host eq "channels.myprivacytool.io" and http.request.uri.path eq "/papit/verify")` clause from the rule's expression. The Worker
+itself has no per-request limiter. The other routes on this host are GET, `DELETE /channels/*` (needs a session cookie and an allowed origin) and the OAuth redirects.
+
 ## Consent age (MPC-10833)
 
 `channel_tokens.consented_at` is set when the person completes the OAuth consent screen (the callback) and is not touched by a token refresh. When a profile is

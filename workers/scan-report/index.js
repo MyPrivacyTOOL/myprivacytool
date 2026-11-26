@@ -5,6 +5,7 @@ import { checkBreaches } from './lib/hibp.js';
 import { pushScanActivity, pushEmailOptOut } from './lib/hubspot.js';
 import { checkBrokers } from './lib/brokers.js';
 import { confirmGateEnabled, listingCheckEnabled, awaitsConfirm, applyConfirmGate, storeListingInputs, runStoredListingChecks, loadListings, handleConfirm } from './lib/confirmGate.js';
+import { handleEmailGuess } from './lib/emailGuess.js';   // MPC-11111: the magic guess, off unless EMAIL_GUESS_ENABLED is "true" and EMAIL_GUESS_KEY is set
 import { parseListingRequest } from './lib/listingCheck.js';
 import { computeScore, breachRisk, CATEGORIES } from './lib/score.js';
 import { buildConfirmationEmail, buildReportEmail, buildUnsubscribedEmail, buildUnsubscribeRequestEmail, sendEmail } from './lib/email.js';
@@ -89,6 +90,8 @@ export default {
     if (request.method === 'GET' && url.pathname === '/api/scan/live') return handleLive(env, request, origin, json, { allowedOrigins: ALLOWED_ORIGINS, limited: liveLimited, sb: db(env) });
     // MPC-9813: the click-to-confirm. Authorised by the signed link in the confirmation email. 404 unless EMAIL_CONFIRM_GATE_ENABLED is "true".
     if (request.method === 'POST' && url.pathname === '/api/scan/confirm') return handleConfirm(env, ctx, request, origin, json, { allowedOrigins: ALLOWED_ORIGINS, rateLimited, sb: db(env) });
+    // MPC-11111: opens the sealed email guess from a bot's bridge link. Authorised by the token itself. 404 unless EMAIL_GUESS_ENABLED is "true" and EMAIL_GUESS_KEY is set.
+    if (request.method === 'POST' && url.pathname === '/api/scan/guess') return handleEmailGuess(env, request, origin, json, { allowedOrigins: ALLOWED_ORIGINS, rateLimited });
     // MPC-9817: accounts and sign-in (email link, no password). All answer 404 unless ACCOUNTS_ENABLED is "true". See lib/accounts.js.
     if (url.pathname.startsWith('/api/account/') && (request.method === 'POST' || request.method === 'GET')) {
       const ctx2 = { allowedOrigins: ALLOWED_ORIGINS, rateLimited, sb: db(env), allowed: recipientAllowed };

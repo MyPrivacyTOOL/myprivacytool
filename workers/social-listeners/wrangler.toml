@@ -50,6 +50,10 @@ service = "core-brain"
 # (recorded on Notion task TID-7873 on 2026-11-02/03). Kept here so a deploy does not wipe it. ROLLBACK: delete this line (or set "off") and deploy.
 PROBE_MODE = "all"
 TELEGRAM_DEEP_SCAN = "on"
+# MPC-11111 (the magic guess, built OFF): "the Mirror seals an email found in the person's own X bio into the bridge link". Needs ALL THREE: this switch exactly "true", the Worker secret EMAIL_GUESS_KEY (the SAME value on mpt-scan-report and
+# social-listeners; only Chris creates it), and the site flag VITE_EMAIL_GUESS_ENABLED. Anything but the exact string "true" is off. Wording is DRAFT until Chris approves it.
+# See docs/email-guess-mpc-11111.md. Rollback: set "false" and deploy (tokens already sent simply stop opening).
+EMAIL_GUESS_ENABLED = "false"
 # MPC-7891 baseline scan (the first risk number): moved here on 2026-10-29 at the owner's instruction so a deploy does not wipe it (the flags workflow value is dropped
 # by the next deploy). Only acts for senders in PROBE_TELEGRAM_IDS (allow-listed test accounts) unless TELEGRAM_SCAN_SCOPE="all" (NOT set; do not set it before the
 # rehearsal and wording approval, see docs/core-brain-game-flow.md). Rollback: set "off" (or delete this line) and deploy.

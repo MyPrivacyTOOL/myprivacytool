@@ -8,7 +8,8 @@ import { resetHubSpotCache } from "./src/hubspot-sync";
 import { hasOAuth1, oauth1Header } from "./src/x-media";
 import { FOLLOW_LINE } from "./src/mirror-bot";
 import { classifyTheme } from "./src/funnel";
-import { CONSENT_MESSAGE, INTENT_REPLIES, WELCOME_BODY, WELCOME_MESSAGE, branded, greeting, buildMirrorMessage, describeShape, extractMirrorDms, parseBareReply, parseMirrorCommand } from "./src/mirror-bot";
+import { CONSENT_MESSAGE, GUESS_NOTICE, INTENT_REPLIES, WELCOME_BODY, WELCOME_MESSAGE, branded, greeting, buildMirrorMessage, describeShape, extractMirrorDms, parseBareReply, parseMirrorCommand } from "./src/mirror-bot";
+import { openGuess } from "../../shared/email-guess";
 
 const sig = (body: string) => "sha256=" + createHmac("sha256", "xs").update(body).digest("base64");
 const dm = (sender: string, text: string, forUser = "999") =>
@@ -664,5 +665,58 @@ describe("HubSpot sync of the X feed (MPC-7628)", () => {
     await post(dm("42", "delete my data"), e());
     await settle();
     expect(x.hs.some((c) => c.method === "DELETE" && c.path === "/crm/v3/objects/contacts/901")).toBe(true);
+  });
+});
+
+// MPC-11111: the magic guess in the Mirror's bridge link. Ships off; carries a sealed address only when the person's own bio holds exactly one.
+describe("magic guess in the Mirror bridge link (MPC-11111)", () => {
+  const KEY = "mirror-test-key-0123456789abcdef";   // not a real secret
+  const ON = { EMAIL_GUESS_ENABLED: "true", EMAIL_GUESS_KEY: KEY };
+  const PLAIN = "https://myprivacytool.io/x";
+  const ADDRESS = "zelda.quillfeather@example.test";
+  async function mirrorFor(bio: string | undefined, extra: object = {}) {
+    vi.restoreAllMocks();   // a fresh spy per call: this helper runs several times in one test
+    resetTokenCache();
+    const f = vi.spyOn(globalThis, "fetch").mockImplementation(async (u) =>
+      String(u).includes("/users/42") ? Response.json({ data: { description: bio, protected: false } }) : new Response("{}"),
+    );
+    await post(dm("42", "MIRROR YES"), { ...env(), ...extra });
+    // sealing uses real WebCrypto (off the main thread), so wait for the DM instead of one event-loop tick
+    await vi.waitFor(() => { if (calls(f).length < 2) throw new Error("the DM has not been sent yet"); });
+    return JSON.parse((calls(f)[1][1] as RequestInit).body as string).text as string;
+  }
+  const linkOf = (text: string) => (text.match(/Next step: run a free full scan at (\S+)/) ?? [])[1] as string;
+
+  it("is off by default: the plain /x link, even when the bio holds an address", async () => {
+    const text = await mirrorFor(`Designer. ${ADDRESS}`);
+    expect(linkOf(text)).toBe(PLAIN);
+    expect(text).not.toContain("#g=");
+    expect(text).not.toContain(GUESS_NOTICE);
+  });
+  it("needs the exact switch AND the key", async () => {
+    expect(linkOf(await mirrorFor(`Designer. ${ADDRESS}`, { EMAIL_GUESS_ENABLED: "true" }))).toBe(PLAIN);
+    expect(linkOf(await mirrorFor(`Designer. ${ADDRESS}`, { EMAIL_GUESS_KEY: KEY }))).toBe(PLAIN);
+    expect(linkOf(await mirrorFor(`Designer. ${ADDRESS}`, { EMAIL_GUESS_ENABLED: "false", EMAIL_GUESS_KEY: KEY }))).toBe(PLAIN);
+    expect(linkOf(await mirrorFor(`Designer. ${ADDRESS}`, { EMAIL_GUESS_ENABLED: "true", EMAIL_GUESS_KEY: "short" }))).toBe(PLAIN);
+  });
+  it("on, with one address in the bio: a /scan link with the same utm tags and a sealed token in the fragment, plus a notice", async () => {
+    const text = await mirrorFor(`Designer. ${ADDRESS}`, ON);
+    const link = linkOf(text);
+    expect(link.startsWith("https://myprivacytool.io/scan?utm_source=x&utm_medium=channel_osint&utm_campaign=bot_reply#g=v1.")).toBe(true);
+    expect(link).not.toContain("zelda");              // the address is not readable in the link
+    expect(link).not.toContain("example.test");
+    expect(text).toContain(GUESS_NOTICE);
+    const opened = await openGuess(KEY, link.split("#g=")[1]);
+    expect(opened).toEqual({ email: ADDRESS, channel: "x", confidence: 0.9, basis: "bio_email" });
+  });
+  it("on, but no address, or two different ones, in the bio: the plain link and no notice", async () => {
+    for (const bio of ["Designer in Leeds", undefined, `${ADDRESS} or other@example.test`]) {
+      const text = await mirrorFor(bio, ON);
+      expect(linkOf(text), String(bio)).toBe(PLAIN);
+      expect(text).not.toContain(GUESS_NOTICE);
+    }
+  });
+  it("is the same message as before when nothing is sealed", () => {
+    expect(buildMirrorMessage({ description: "hello", protected: false })).toContain(`Next step: run a free full scan at ${PLAIN}\n\n`);
   });
 });
