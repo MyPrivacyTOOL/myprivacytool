@@ -442,7 +442,7 @@ const BehaviorPanel: React.FC<BehaviorPanelProps> = ({ onClose }) => {
           <ul className="space-y-2 text-sm text-foreground">
             <li className="flex items-start gap-2">
               <Target className="w-4 h-4 text-foreground mt-0.5 flex-shrink-0" />
-              <span>Mouse movement patterns are <strong className="text-foreground">97% unique</strong></span>
+              <span>Mouse movements can be <strong className="text-foreground">recorded by a page</strong></span>
             </li>
             <li className="flex items-start gap-2">
               <Zap className="w-4 h-4 text-foreground mt-0.5 flex-shrink-0" />
