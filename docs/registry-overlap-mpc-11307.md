@@ -5,13 +5,15 @@ Chris's rule (2026-11-24): the same data point on several channels is **not** a 
 ## What exists in the Notion Hexagon Registry
 
 - **Evidence Key** (text): one snake_case name for the underlying fact (`phone_number`, `profile_photo`, `message_text`). Rows that share a key overlay each other. Platform IDs are platform-scoped (`numeric_telegram_id`) because an ID on one platform does not corroborate an ID on another.
-- **Overlap Channels** (number): how many different channels carry the same Evidence Key, the row itself counted. Empty means the fact is on one channel only. This is a **static snapshot**: it needs recounting when Evidence Keys or rows change.
-- **Confidence %** (formula, live): uses Overlap Channels since 2026-11-25 (MPC-11318, Chris approved; MPC-11388 checked it and kept it). Scale 0-100.
-  `if(prop("Source Count") >= 2, 100, if(prop("Overlap Channels") >= 2, min(97, round(100 * (1 - pow(0.4, prop("Overlap Channels"))))), 50))`
-  Two or more sources give 100. Otherwise 2 channels give 84, 3 give 94, 4 or more give 97 (capped: overlap alone is not certainty). No overlap stays 50. Old formula, to paste back if needed: `if(prop("Source Count") >= 2, 100, 50)`. The Notion connector cannot read formula code or values, so check it by eye (for example Hexagon ID 7 shows 84, ID 1 shows 50). The 0.4 (each channel alone 60% reliable, channels independent) and the 97 cap are the two numbers to change.
+- **Overlap Channels** (number): how many different channels carry the same Evidence Key, the row itself counted. Empty means the fact is on one channel only. This is a **static snapshot** that the live count backs up (see Evidence below): it needs recounting when Evidence Keys or rows change.
+- **Confidence %** (formula, live): uses the overlap count since 2026-11-25 (MPC-11318; MPC-11388 kept it, and on 2026-11-26 pointed it at the live count). Scale 0-100.
+  `let(n, max(1, prop("Overlap Channels"), prop("Live Overlap Count")), if(prop("Source Count") >= 2, 100, if(n >= 2, min(97, round(100 * (1 - pow(0.4, n)))), 50)))`
+  Two or more sources give 100. Otherwise n = the larger of the live count and the static Overlap Channels: 2 channels give 84, 3 give 94, 4 or more give 97 (capped: overlap alone is not certainty). No overlap stays 50. The static count is a floor, so the value cannot fall below the earlier formula. Rollback (formula before 2026-11-26): `if(prop("Source Count") >= 2, 100, if(prop("Overlap Channels") >= 2, min(97, round(100 * (1 - pow(0.4, prop("Overlap Channels"))))), 50))`; before 2026-11-25: `if(prop("Source Count") >= 2, 100, 50)`. The Notion connector cannot read formula or rollup values, so check by eye (message_text rows show 97, call_forwarding rows 84, a single-channel row with Source Count 1 shows 50). The 0.4 (each channel alone 60% reliable, channels independent) and the 97 cap are the two numbers to change.
   MPC-11388 proposed `1 - (1 - base) * 0.4^(n - 1)` on top of this. It was not applied: the live formula already counts overlap, so stacking would count it twice and lower some values (2 channels 84 to 80, 3 channels 94 to 92).
-- **Source Count** (formula): not readable through the connector; assumed to count the row's Data Sources. Confirm by eye.
-- **Overlap Confidence %** (formula, side column, superseded): `round(100 * (1 - pow(0.4, max(1, Overlap Channels))))`. Same idea as the live Confidence % without the Source Count and 97-cap branches (1 channel 60, 2 channels 84, 3 channels 94). Kept for now; hide or remove it when Chris agrees.
+- **Source Count** (formula): `length(prop("Data Sources"))`, read through the API under MPC-11318. It is 1 on every row, including the 152 imports (checked again by eye on rows 420-426, 2026-11-25).
+- **Counted Channel** (formula): the part of Catalogue Code before the first "." or "-" (`tg`, `sms`, `call`, `wa`, `x`, ...). Checked on 2026-11-26: for all 266 Evidence Keys the number of distinct prefixes equals the stored Overlap Channels.
+- **Evidence** (relation) and the database **MPT > Evidence Keys (live overlap count)**: one page per Evidence Key held by 2 or more rows (49 pages, 225 rows linked on 2026-11-26). The page rolls up the distinct Counted Channel values (**Channels**), **Live Count** is their number, and the registry rollup **Live Overlap Count** reads it. Keys held by one row need no page (they count as 1). Notion does not allow a rollup of a rollup, which is why Live Count is a formula. **Upkeep:** when a new row shares an Evidence Key, link it to that key's Evidence page (create the page when the key first reaches 2 rows). The count then updates by itself.
+- The side column Overlap Confidence % (`round(100 * (1 - pow(0.4, max(1, Overlap Channels))))`) was deleted on 2026-11-25 under MPC-11388; nothing used it.
 - **View "Overlap by Evidence Key"**: grouped by key, rows with 2 or more channels. Live, no maintenance.
 
 ## How to recount (repeatable)
@@ -27,5 +29,5 @@ Tests: `node --test scripts/recount-registry-overlap.test.mjs`.
 
 ## Not covered
 
-- The script does not call Notion. A live count in Notion itself would need a self-relation or a rollup between rows that share a key, which is a schema change for Chris to approve.
+- The script does not call Notion. The live count in Notion (Evidence Keys database) covers rows that are linked to an Evidence page; it does not link new rows by itself.
 - Notion query limits: the allowance for SQL and rows-mode queries can run out. If a query fails, do not retry; tell Chris.
