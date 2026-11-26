@@ -524,7 +524,7 @@ export default {
               body: JSON.stringify({
                 from: 'MyPrivacyTOOL <hello@myprivacytool.io>',
                 to: [email],
-                subject: `${firstName.replace(/[\r\n]/g, ' ')}, your privacy scan is being prepared`,
+                subject: `${firstName.replace(/[\r\n]/g, ' ')}, thanks for signing up`,
                 html: emailHtml,
               })
             },
@@ -868,15 +868,14 @@ function inferSource(utm_source, utm_medium, utm_campaign, referrer) {
 
 function buildConfirmationEmail(firstName, source) {
   const p = (t) => `<p style="margin:0 0 12px 0;font-size:15px;line-height:23px;color:#374151">${t}</p>`;
-  return `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light"><title>Your privacy scan is being prepared</title></head>
+  return `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light"><title>Thanks for signing up</title></head>
 <body style="margin:0;padding:0;background:#f3f4f6;-webkit-text-size-adjust:100%">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f3f4f6"><tr><td align="center" style="padding:24px 12px">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;background:#ffffff;border-radius:12px;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#111827">
 <tr><td style="background:#15803d;padding:20px 28px;color:#ffffff;font-size:18px;font-weight:700;letter-spacing:.2px">MyPrivacyTOOL</td></tr>
 <tr><td style="padding:28px 28px 8px 28px"><h1 style="margin:0 0 12px 0;font-size:22px;line-height:28px;color:#111827">Hi ${firstName},</h1>
 ${p('Thanks for signing up &mdash; you&rsquo;re on the list.')}
-${p('We&rsquo;re preparing your free privacy exposure scan across 46 data categories including data brokers, social platforms, and AI training datasets.')}
-${p('You&rsquo;ll hear from us shortly with your full report.')}
+${p('You can run the free scan at any time at <a href="https://myprivacytool.io/scan">myprivacytool.io/scan</a>. It shows what your browser, device and network reveal. It does not search data brokers or AI training datasets.')}
 ${p('In the meantime, if you have any questions, just reply to this email.')}
 ${p('Stay private,<br><strong>The MyPrivacyTOOL Team</strong>')}</td></tr>
 <tr><td style="padding:20px 28px 28px 28px;border-top:1px solid #e5e7eb;font-size:12px;line-height:18px;color:#6b7280">Questions, or want your data deleted? Reply to this email or write to <a href="mailto:hello@myprivacytool.io" style="color:#6b7280">hello@myprivacytool.io</a>. We never sell your data. To stop hearing from us, <a href="https://myprivacytool.io/unsubscribe?utm_source=email&amp;utm_medium=email&amp;utm_campaign=lead-confirmation" style="color:#6b7280">unsubscribe here</a>: it records your opt-out for every email we send.<br>MyPrivacyTOOL &middot; <a href="https://myprivacytool.io/?utm_source=email&amp;utm_medium=email&amp;utm_campaign=lead-confirmation" style="color:#6b7280">myprivacytool.io</a></td></tr>

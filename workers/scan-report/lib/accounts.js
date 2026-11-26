@@ -194,7 +194,7 @@ export async function handleOpenScan(env, ctx, request, origin, json, { allowedO
     const hist = sectionState(await getEntitlements(sb, { accountId: user.id }), 'report.history_full');
     if (!hist.allowed) {
       const all = (await sb.rpc('mpt_list_account_scans', { p_account: user.id })) || [];
-      if (all.length > 1 && all[0]?.scan_number !== scan.scan_number) return json({ error: 'Older scans are kept. They open on a paid plan.', code: 'history_requires_plan', min_tier: hist.min_tier }, 403);
+      if (all.length > 1 && all[0]?.scan_number !== scan.scan_number) return json({ error: 'Older scans are kept. When paid plans open, you will be able to open them on a paid plan.', code: 'history_requires_plan', min_tier: hist.min_tier }, 403);
     }
     return json({ scan });
   } catch (e) { console.error('account: open failed', noEmail(String(e.status || e))); return json({ error: 'Unavailable' }, 503); }
@@ -310,7 +310,7 @@ export async function handleExportIssue(env, ctx, request, origin, json, { allow
   try {
     const ent = await getEntitlements(sb, { accountId: user.id });
     const sec = sectionState(ent, b.format === 'pdf' ? 'report.export_pdf' : 'report.export_json');
-    if (!sec.allowed) return json({ error: 'Export is part of a paid plan.', code: 'export_requires_plan', min_tier: sec.min_tier }, 403);
+    if (!sec.allowed) return json({ error: 'Export is not available on your plan. When paid plans open, it will be part of a paid plan.', code: 'export_requires_plan', min_tier: sec.min_tier }, 403);
     const scan = await sb.rpc('mpt_get_account_scan', { p_account: user.id, p_web_scan: b.scan_number.toLowerCase() });
     if (!scan || !withinRetention([scan], env).length) return json({ error: 'Not found' }, 404);
     const t = await makeExportToken(env, user.id, b.scan_number.toLowerCase(), b.format);
@@ -326,7 +326,7 @@ export async function handleExportDownload(env, request, json, { sb }) {
   if (!t) return json({ error: 'Invalid or expired' }, 401);
   try {
     const ent = await getEntitlements(sb, { accountId: t.accountId });
-    if (!sectionState(ent, t.format === 'pdf' ? 'report.export_pdf' : 'report.export_json').allowed) return json({ error: 'Export is part of a paid plan.', code: 'export_requires_plan' }, 403);
+    if (!sectionState(ent, t.format === 'pdf' ? 'report.export_pdf' : 'report.export_json').allowed) return json({ error: 'Export is not available on your plan. When paid plans open, it will be part of a paid plan.', code: 'export_requires_plan' }, 403);
     const doc = await loadExportDocument(env, sb, t.accountId, t.scanNumber);
     if (!doc) return json({ error: 'Not found' }, 404);
     const clean = stripIps(doc);
