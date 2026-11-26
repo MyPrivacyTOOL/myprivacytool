@@ -1,4 +1,4 @@
-// MPC-9907 (F8 pass 2, finish): blog, worker and locale copy obey the same truth rules as the legal pages.
+// MPC-9907 (F8 pass 2, finish): blog, worker, locale, FAQ and retention copy obey the same truth rules as the legal pages.
 // Facts: no automated removal and no monitoring alerts are live (Terms: "planned, not available today"); paid plans are not open;
 // the free scan searches no broker site, public record or breach database (workers/scan-report/lib/brokerPanel.js: a listing is checked
 // only when the visitor pastes the page that lists them).
@@ -10,6 +10,8 @@ import { renderPage } from "@/test/render";
 import { FEATURE_STATUS } from "@/config/featureStatus";
 import { guides } from "@/content/guides";
 import blogPosts from "@/data/blogPosts.json";
+import { FAQS } from "@/data/faqs";
+import Privacy from "./Privacy";
 
 const read = (f: string) => readFileSync(resolve(process.cwd(), f), "utf8");
 const sentences = (t: string) => t.replace(/\s+/g, " ").split(/(?<=[.!?])\s+/);
@@ -124,5 +126,34 @@ describe("locales: bot strings that make claims", () => {
   it.each(["ja", "zh", "ko", "vi", "es", "de", "fr", "pt", "ar"])("%s: the what-we-see and what-we-keep strings are untranslated", (l) => {
     const d = load(l);
     expect([d["bot.first_hexagon.location"], d["bot.first_hexagon.question"]], "add a truth check for this language before shipping the translation").toEqual(["", ""]);
+  });
+});
+
+// Saved scan results are deleted 12 months after the scan, account or not (mpt_purge_expired_web_scans, migration 20261011220000; the account
+// history hides older scans too). So nothing may say a kept or linked scan stays until the person removes it, or that it holds no IP address.
+describe("retention of kept and account-linked scans", () => {
+  const privacy = () => {
+    renderPage(<Privacy />);
+    return (document.body.textContent ?? "").replace(/\s+/g, " ");
+  };
+  it("/privacy gives the 12-month limit wherever it says how long a linked or kept scan stays", () => {
+    const t = privacy();
+    expect(t).toMatch(/A linked scan's saved result is also deleted automatically 12 months after the scan\./);
+    expect(t).toMatch(/kept until you delete the account or the scan, and its saved result is deleted automatically 12 months after the scan\./);
+    expect(t).toMatch(/A saved scan result is different: it is deleted automatically 12 months after the scan\. It includes the technical details your browser reported, such as your IP address\./);
+    expect(t).not.toMatch(/We do not store your IP address in it/);
+    expect(t).not.toMatch(/keeps the scans you choose to keep in your account until you delete it/);
+    expect(t).toMatch(/a saved scan result is deleted 12 months after the scan/);
+  });
+  it("the Keep page and the countdown email say the 12-month limit too", () => {
+    const src = read("workers/scan-report/lib/freeRecord.js");
+    expect(src).not.toMatch(/If you keep it, we do not delete your scan and/);
+    expect(src).toMatch(/A saved scan result is still deleted automatically 12 months after the scan\./);
+    expect(src).toMatch(/A saved scan result is deleted 12 months after the scan either way\./);
+  });
+  it("every FAQ sentence about paid plans says they are not open", () => {
+    if (FEATURE_STATUS.F3 === "live") return;
+    const hits = FAQS.flatMap((f) => sentences(f.a)).filter((s) => /paid plans/i.test(s) && !/when paid plans (open|are open)|not (yet )?open|not open|planned|not (live|available)/i.test(s));
+    expect(hits).toEqual([]);
   });
 });

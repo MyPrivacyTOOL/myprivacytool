@@ -654,15 +654,17 @@ const Privacy = () => {
                 <li>
                   <strong>Account Data:</strong> Your email address, linked scans and
                   consent record are kept until you delete your account with
-                  "Delete my account and all scans", which deletes them. When paid
+                  "Delete my account and all scans", which deletes them. A linked
+                  scan's saved result is also deleted automatically 12 months
+                  after the scan. When paid
                   plans open, billing data will be kept for the duration of your
                   subscription plus 30 days
                 </li>
                 <li>
                   <strong>Scan Results:</strong> Per-session scan results for
                   submitted handles are deleted automatically after 24 hours.
-                  A scan you link to your free account is kept until you
-                  delete the account or the scan. When paid plans open, results
+                  A scan you link to your free account is kept until you delete the account or the scan, and its saved result
+                  is deleted automatically 12 months after the scan. When paid plans open, results
                   saved to an account may be retained for up to 2 years for
                   historical comparison and reporting
                 </li>
@@ -776,8 +778,10 @@ const Privacy = () => {
                   personal data, such as how many scans finished.
                 </li>
                 <li>
-                  <strong>You kept your scan or signed up:</strong> we keep it
-                  until you delete it. We do not store your IP address in it.
+                  <strong>You kept your scan or signed up:</strong> we keep your record until you delete it or ask us to. A saved scan
+                  result is different: it is deleted automatically 12 months after
+                  the scan. It includes the technical details your browser
+                  reported, such as your IP address.
                 </li>
                 <li>
                   <strong>You are a paying customer:</strong> paid plans are not
