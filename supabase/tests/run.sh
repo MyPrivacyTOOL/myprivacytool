@@ -96,6 +96,8 @@ psql_ "$TEST_URL" -At -f supabase/tests/telegram-event-flags.test.sql
 echo "== Deep Research findings and verification gate (MPC-9549)"
 psql_ "$TEST_URL" -At -f supabase/tests/deep-research.test.sql
 psql_ "$TEST_URL" -At -f supabase/tests/mpc-9887-scan-consents.test.sql
+echo "== purge of channel tokens unused for 90 days: dry run by default, guards, grants (MPC-11258)"
+psql_ "$TEST_URL" -At -f supabase/tests/mpc-11258-purge-stale-channel-tokens.test.sql
 echo "== recipient log follows the scan (MPC-9893)"
 psql_ "$TEST_URL" -At -f supabase/tests/mpc-9893-recipient-log-follows-scan.test.sql
 psql_ "$TEST_URL" -At -f supabase/tests/mpc-9890-free-record-deletion.test.sql
