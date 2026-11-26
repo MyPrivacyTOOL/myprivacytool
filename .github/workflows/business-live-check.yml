@@ -2,10 +2,15 @@ name: Business team live check
 
 # MPC-9824 (F6): one synthetic end-to-end run of business teams on the deployed system: an admin signs in, invites 3 employees, two authorise their own check (the fixture
 # listing page), the admin summary covers those two only, one withdraws, the admin removes the third and deletes the team. Output: the job summary (JSON). On demand, and on a push
-# to a `business-check/**` branch (the relay used when workflows cannot be dispatched from a coding session). F1 synthetic Worker only, testingnt69+biz-* aliases only, rows of the run removed.
+# to a `business-check/**` branch (the relay used when workflows cannot be dispatched from a coding session). F1 synthetic Worker by default (MPC-10612: a manual run can name the production Worker), testingnt69+biz-* aliases only, rows of the run removed.
 
 on:
   workflow_dispatch:
+    inputs:
+      scan_url:
+        description: 'Worker to test. Empty = the F1 synthetic Worker. MPC-10612: https://mpt-scan-report.myprivacytool.workers.dev = production'
+        required: false
+        default: ''
   push:
     branches: ['business-check/**']
 
@@ -26,6 +31,7 @@ jobs:
       SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.NEW_SUPABASE_SECRET_KEY || secrets.SCAN_REPORT_SUPABASE_SERVICE_ROLE_KEY }}
       RESEND_API_KEY: ${{ secrets.SCAN_REPORT_RESEND_API_KEY }}
       RUN_ID: ${{ github.run_id }}
+      BUSINESS_SCAN_URL: ${{ inputs.scan_url }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
