@@ -105,7 +105,7 @@ const EnterpriseIncludes = () => {
               <span className="block">
                 <span className="mb-4 block"><Icon className="w-6 h-6 text-brand" aria-hidden="true" /></span>
                 <span className="font-bold mb-2 block">{title}</span>
-                <span className="text-muted-foreground text-sm leading-relaxed font-normal block">{desc}{status && <FeatureStatus feature={status} />}</span>
+                <span className="text-muted-foreground text-sm leading-relaxed font-normal block">{desc}{status && <FeatureStatus feature={status} state="in_build" />}</span>
                 <span className="text-brand text-xs font-semibold mt-3 inline-flex items-center gap-1">
                   See what this means <ChevronDown className="w-3 h-3" aria-hidden="true" />
                 </span>
