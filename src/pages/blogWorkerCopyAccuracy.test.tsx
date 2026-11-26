@@ -12,6 +12,7 @@ import { guides } from "@/content/guides";
 import blogPosts from "@/data/blogPosts.json";
 import { FAQS } from "@/data/faqs";
 import Privacy from "./Privacy";
+import AcceptableUse from "./AcceptableUse";
 
 const read = (f: string) => readFileSync(resolve(process.cwd(), f), "utf8");
 const sentences = (t: string) => t.replace(/\s+/g, " ").split(/(?<=[.!?])\s+/);
@@ -155,5 +156,15 @@ describe("retention of kept and account-linked scans", () => {
     if (FEATURE_STATUS.F3 === "live") return;
     const hits = FAQS.flatMap((f) => sentences(f.a)).filter((s) => /paid plans/i.test(s) && !/when paid plans (open|are open)|not (yet )?open|not open|planned|not (live|available)/i.test(s));
     expect(hits).toEqual([]);
+  });
+});
+
+describe("/acceptable-use: breach checks and monitoring are not presented as live", () => {
+  it("says breaches are not checked today and names no live email-breach provider", () => {
+    if (FEATURE_STATUS.F5 === "live") return;
+    renderPage(<AcceptableUse />);
+    const text = (document.body.textContent ?? "").replace(/\s+/g, " ");
+    expect(text).toContain("We do not currently check whether an email address appears in known data breaches");
+    expect(text).not.toMatch(/scanning and monitoring service|exposure across known data breaches|Have I Been Pwned API for breach data/);
   });
 });
