@@ -42,15 +42,16 @@ const STALE_CLAIM_MS = 30 * 60 * 1000;   // MPC-7406: a scan 'processing' longer
 const EMAIL_RE = /^[^\s@]{1,64}@[^\s@]+\.[^\s@]{2,}$/;
 const clip = (v, n) => String(v ?? '').slice(0, n);
 // Per-IP limit (wrangler.toml [[unsafe.bindings]] type "ratelimit"); fails open if the binding is absent or errors.
-async function rateLimited(env, request, prefix = '') {
+// `who` (MPC-10612) replaces the address as the thing being counted, e.g. one invitation's hashed token, so people behind one office address do not share a limit.
+async function rateLimited(env, request, prefix = '', who = null) {
   if (!env.RATE_LIMITER) return false;
-  try { return !(await env.RATE_LIMITER.limit({ key: prefix + (request.headers.get('CF-Connecting-IP') || 'unknown') })).success; } catch { return false; }
+  try { return !(await env.RATE_LIMITER.limit({ key: prefix + (who ?? (request.headers.get('CF-Connecting-IP') || 'unknown')) })).success; } catch { return false; }
 }
 
 // MPC-8452: the live view is polled every few seconds, so it has its own, wider limit (wrangler.toml LIVE_LIMITER); fails open like the others.
-async function liveLimited(env, request) {
+async function liveLimited(env, request, prefix = '', who = null) {
   if (!env.LIVE_LIMITER) return false;
-  try { return !(await env.LIVE_LIMITER.limit({ key: 'live:' + (request.headers.get('CF-Connecting-IP') || 'unknown') })).success; } catch { return false; }
+  try { return !(await env.LIVE_LIMITER.limit({ key: 'live:' + prefix + (who ?? (request.headers.get('CF-Connecting-IP') || 'unknown')) })).success; } catch { return false; }
 }
 
 // gmail "+tag" and dots are ignored when matching the allowlist.
@@ -101,7 +102,7 @@ export default {
     }
     // MPC-9824 (F6): business teams. Admin routes use the account session; employee routes use the token from the invite email. 404 unless BUSINESS_TEAMS_ENABLED and ACCOUNTS_ENABLED are "true".
     if (request.method === 'POST' && url.pathname.startsWith('/api/business/') && BUSINESS_ROUTES[url.pathname]) {
-      return BUSINESS_ROUTES[url.pathname](env, ctx, request, origin, json, { allowedOrigins: ALLOWED_ORIGINS, rateLimited, sb: db(env), allowed: recipientAllowed });
+      return BUSINESS_ROUTES[url.pathname](env, ctx, request, origin, json, { allowedOrigins: ALLOWED_ORIGINS, rateLimited, liveLimited, sb: db(env), allowed: recipientAllowed });
     }
     // CK-8503: Resend's signed delivery / bounce events for the report email. 404 unless RESEND_WEBHOOK_SECRET is set.
     // MPC-7554: "I have fixed this" (stops the follow-ups for one report; never an unsubscribe). 404 unless FOLLOWUP_STATE_ENABLED is "true".
