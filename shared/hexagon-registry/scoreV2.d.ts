@@ -13,6 +13,8 @@ export const EMAIL_CATEGORY_WEIGHT: 10;
 export const CATEGORY_WEIGHTS_V2: Readonly<Record<WeightCategoryV2, number>>;
 export const CATEGORY_OF_V2: Readonly<Record<string, WeightCategoryV2>>;
 export const WEIGHTS_LABEL_V2: string;
+/** Z for a scan: 60 when the email checks can apply (an address was given), otherwise the web total 54. */
+export function totalForV2(emailChecksApply: boolean): number;
 export function getScoredHexagonV2(id: string): unknown;
 export function isScoredV2(id: string): boolean;
 export function itemInfoV2(id: string): { hex: unknown; category: WeightCategoryV2; severity: number } | null;
