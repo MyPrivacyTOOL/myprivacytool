@@ -98,6 +98,8 @@ psql_ "$TEST_URL" -At -f supabase/tests/deep-research.test.sql
 psql_ "$TEST_URL" -At -f supabase/tests/mpc-9887-scan-consents.test.sql
 echo "== purge of channel tokens unused for 90 days: dry run by default, guards, grants (MPC-11258)"
 psql_ "$TEST_URL" -At -f supabase/tests/mpc-11258-purge-stale-channel-tokens.test.sql
+echo "== scan funnel link columns (CK-11491)"
+psql_ "$TEST_URL" -At -f supabase/tests/ck-11491-funnel-links.test.sql
 echo "== recipient log follows the scan (MPC-9893)"
 psql_ "$TEST_URL" -At -f supabase/tests/mpc-9893-recipient-log-follows-scan.test.sql
 psql_ "$TEST_URL" -At -f supabase/tests/mpc-9890-free-record-deletion.test.sql

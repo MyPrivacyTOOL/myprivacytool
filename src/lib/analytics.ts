@@ -9,6 +9,7 @@ declare global {
 import { captureAttribution, getAttribution } from './attribution';
 import { hasConsent } from './cookieConsent';
 import { hasScanConsent } from './scanConsent';
+import { funnelParams } from './funnelParams';
 
 // Session tracking
 let sessionStartTime: number = 0;
@@ -41,6 +42,37 @@ export const trackEvent = (
     window.gtag('event', eventName, params);
   }
 };
+
+// ---------------------------------------------------------------------------
+// CK-11491: the free-scan funnel. scan_start -> scan_complete -> report_view -> pricing_view -> checkout_start, each with channel and utm_source.
+// Same consent gate as everything else (analyticsAllowed above, and the gtag stub in index.html): there is no second gate, and an event from before
+// the consent point is dropped, never replayed. So a once-only event is marked as sent only when it was really handed to gtag.
+// No PII: closed-list or slug values only (see funnelParams.ts). The older events (scan_started, privacy_scan_completed) are unchanged.
+// ---------------------------------------------------------------------------
+export type ScanSurface = 'home' | 'scan_page';
+const funnelSent = new Set<string>();
+
+const funnelEvent = (name: string, params: Record<string, string> = {}, onceKey?: string) => {
+  if (!analyticsAllowed() || !window.gtag) return;
+  if (onceKey) {
+    if (funnelSent.has(onceKey)) return;
+    funnelSent.add(onceKey);
+  }
+  captureAttribution(window.location.search);
+  trackEvent(name, { ...funnelParams(), ...params });
+};
+
+export const resetFunnelForTests = () => funnelSent.clear();
+
+/** The visitor pressed Scan me / Check My Exposure (or, with consent already held, gave a first answer). Once per page session. */
+export const trackScanStart = (surface: ScanSurface) => funnelEvent('scan_start', { scan_surface: surface }, 'scan_start');
+/** home: every hexagon is answered (the MPC-7170 meaning of "completed"). scan_page: the live checks all finished. Once per surface. */
+export const trackScanComplete = (surface: ScanSurface) => funnelEvent('scan_complete', { scan_surface: surface }, `scan_complete:${surface}`);
+/** The report page opened from the email button, after the report was sent. Once per page session. */
+export const trackReportView = () => funnelEvent('report_view', { report_surface: 'email_link' }, 'report_view');
+/** A paid plan was chosen. checkout_mode "waitlist" = there is no live checkout, so no payment can follow; "stripe" once checkout opens. */
+export const trackCheckoutStart = (plan: string, checkoutMode: 'waitlist' | 'stripe') =>
+  funnelEvent('checkout_start', { plan, checkout_mode: checkoutMode });
 
 // MPC-9785: password-check usage counts (event names approved by Chris 2026-11-07). Fixed names, NO parameters: nothing derived from
 // the password (text, hash, prefix) and no outcome or breach count is ever sent. Each also checks the visitor's analytics choice itself,
@@ -106,6 +138,7 @@ export const trackScanStarted = () => {
   if (scanStartedTracked) return;
   scanStartedTracked = true;
   attributedEvent('scan_started', {});
+  trackScanStart('home');   // CK-11491: covers a journey that already held consent (no Scan me click on this page); a no-op if already sent
 };
 
 // Canonical O3 KPI event (MPC-7170). A scan is "completed" when every hexagon
@@ -119,6 +152,7 @@ export const trackScanCompleted = (hexagonCount: number) => {
     hexagon_count: hexagonCount,
     funnel_step: 'all_hexagons_confirmed',
   });
+  trackScanComplete('home');   // CK-11491
 };
 
 // Device profile tracking
@@ -623,7 +657,7 @@ export const trackBlogCtaClick = (postSlug: string, ctaLocation: string, destina
 // Pricing page (MPC-7376). No checkout exists yet, so plan buttons are the conversion signal.
 // ---------------------------------------------------------------------------
 export const trackPricingView = () => {
-  trackEvent('pricing_view');
+  funnelEvent('pricing_view');
 };
 
 // `variants` maps experiment id to variant id for the live (non-forced) pricing experiments (MPC-7638),
