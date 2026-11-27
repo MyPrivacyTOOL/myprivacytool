@@ -165,13 +165,18 @@ export function weeklyProperties(weekOf, v, readAt, previousId, ads = null, funn
   const pct = num(v?.conversion_rate_pct);
   const src = (label, value, source) => (value === null ? `${label}: blank (${source} not collected or errored; not estimated)` : `${label}: ${value} (${source})`);
   const cumulative = num(v?.cumulative_scans);
+  // The view has test_scans_excluded only once migration 20261127060000 is applied; until then the figure still includes test scans, and the row says so.
+  const excluded = num(v?.test_scans_excluded);
+  const scanSource = excluded === null
+    ? 'public.scan_hourly_counts, decision D5; INCLUDES test scans'
+    : `public.scan_hourly_counts without the test mailbox, ${excluded} test scans left out to date; scans with no evidence either way are counted, so an upper bound`;
   const active = num(v?.ga4_active_users);
   const mrr = num(v?.current_mrr);
   const blog = num(v?.blog_posts_published);
   const xt = num(v?.x_threads_posted);
   const insights = [
     `${MARKER} Week of ${weekOf}. Every number read ${readAt} from Supabase view mpt_weekly_metrics (project xmdmkumwxpgahmlweuug).`,
-    src('Cumulative Scans', cumulative, 'rows in public.scans, decision D5'),
+    src('Cumulative Scans', cumulative, scanSource),
     src('Conversion Rate %', pct, 'paid users / scans, current week only'),
     src('Current MRR', mrr, 'raw revenue/mrr pull'),
     src('GA4 Active Users', active, 'raw ga4 weekly_overview pull, property 515216281'),

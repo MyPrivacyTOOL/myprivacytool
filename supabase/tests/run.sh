@@ -34,11 +34,14 @@ psql_ "$TEST_URL" -f supabase/sql/mpt-score-baselines.sql
 # mpt-purge-expired-scan-results.sql needs pg_cron (not available in plain Postgres); it is documentation of the live job.
 # MPC-8671 is applied below, after the KPI view chain it replaces (supabase/sql/*, which production got through the SQL editor/MCP, not through migrations).
 # MPC-8737: the ledger migration has its own stage further down (fingerprint before / after, rollback, re-apply), so it is excluded here too.
-for f in $(ls supabase/migrations/*.sql | grep -v -e mpc_8671_kpi_views_hourly_counter -e mpc_8737_data_point_ledger_v1 -e mpc_8753_ledger_risk_axis -e mpc_8737_m3_ledger_erase_parity -e mpc_8689_brokers_rows | sort); do echo "   migration $(basename "$f")"; psql_ "$TEST_URL" -f "$f"; done
+for f in $(ls supabase/migrations/*.sql | grep -v -e mpc_8671_kpi_views_hourly_counter -e mpc_8737_data_point_ledger_v1 -e mpc_8753_ledger_risk_axis -e mpc_8737_m3_ledger_erase_parity -e mpc_8689_brokers_rows -e exclude_test_scans_from_kpi | sort); do echo "   migration $(basename "$f")"; psql_ "$TEST_URL" -f "$f"; done
 echo "   KPI view chain (supabase/sql), in the order production received it"
 for f in mpt-raw-metrics mpt-youtube-daily-metrics mpt-youtube-daily-join mpt-hk-days mpt-hubspot-daily mpt-cloudflare-daily-metrics mpt-cloudflare-daily-join; do echo "   sql $f.sql"; psql_ "$TEST_URL" -f "supabase/sql/$f.sql"; done
 echo "   migration 20261028120001_mpc_8671_kpi_views_hourly_counter.sql"
 psql_ "$TEST_URL" -f supabase/migrations/20261028120001_mpc_8671_kpi_views_hourly_counter.sql
+# Test scans out of the KPIs: redefines the two views above, so it has to come after them.
+echo "   migration 20261127060000_exclude_test_scans_from_kpi.sql"
+psql_ "$TEST_URL" -f supabase/migrations/20261127060000_exclude_test_scans_from_kpi.sql
 # CK-8493: migrations proposed but not yet released (not read by deploy-supabase.yml). Tested here against the throwaway database only.
 # MPC-7471-F4 is excluded here: it drops mpt_score_baselines_email_hash_key, which schema.test.sql still needs, and it has its own stage further down.
 for f in $(ls supabase/proposed/*.sql 2>/dev/null | grep -v mpc_7471_f4_baseline_score_version | sort); do echo "   proposed $(basename "$f")"; psql_ "$TEST_URL" -f "$f"; done
@@ -155,6 +158,8 @@ echo "   legacy rows identical before and after: $before"
 # MPC-8671: the KPI views count scan_hourly_counts, so a purge of public.scans must not move any KPI number.
 echo "== KPI views read the hourly counter; a purge leaves them unchanged (MPC-8671)"
 psql_ "$TEST_URL" -At -f supabase/tests/mpc-8671-kpi-views-hourly-counter.test.sql
+echo "== test-mailbox scans stay out of the KPIs; raw counts and access unchanged"
+psql_ "$TEST_URL" -At -f supabase/tests/exclude-test-scans.test.sql
 
 echo "== CK-8503: simultaneous scan requests for one user create exactly one scan (real concurrent sessions)"
 psql_ "$TEST_URL" -c "insert into public.users (id, email) values ('00000000-0000-4000-8000-0000000000c1', 'ck8503-race@example.com')"

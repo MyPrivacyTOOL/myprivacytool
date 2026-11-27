@@ -20,7 +20,7 @@ check(/PARTIAL/.test(funnelLine('2026-11-23', { ga4: f, reportEmails: 1, reportV
 check(funnelLine('2026-11-16', { ga4: f, reportEmails: 1, reportViews: 0 }) === null && funnelLine('2026-11-30', null) === null, 'no line for weeks before the events existed');
 
 // The row's text is capped at 1900 characters: the funnel line must fit inside it, with every other line filled in.
-const view = { cumulative_scans: 9999, conversion_rate_pct: 12.34, current_mrr: 12345, ga4_active_users: 9999, blog_posts_published: 99, x_threads_posted: 99, engagement_sessions: 999, engagement_full_scans: 999, ga4_scan_events: 999 };
+const view = { test_scans_excluded: 9999, cumulative_scans: 9999, conversion_rate_pct: 12.34, current_mrr: 12345, ga4_active_users: 9999, blog_posts_published: 99, x_threads_posted: 99, engagement_sessions: 999, engagement_full_scans: 999, ga4_scan_events: 999 };
 const text = weeklyProperties('2026-11-23', view, '2026-11-30T16:15:00.000Z', null, { cost_per_scan: 12.5, cac: 99, cost: 999, scan_started: 99, paid_conversions: 9, days: 7 }, { ga4: { days: 7, counts: Object.fromEntries(FUNNEL_EVENTS.map((e) => [e, 99999])) }, reportEmails: 9999, reportViews: 9999 })['Agent Insights'].rich_text[0].text.content;
 check(text.includes('Funnel (CK-11491)') && /Report view rate [0-9.]+%\./.test(text), `funnel line survives the 1900 character cap (text is ${text.length})`);
 

@@ -5,6 +5,7 @@
 import { notion } from './notion.js';
 import { hkDate, hkDayStartOf } from '../lib/hk.js';
 import { buildScorecard } from '../lib/kpi.js';
+import { excludeTestFilter } from '../../../shared/test-records.js';
 import { callRecipient } from '../../../shared/recipients/outbound.ts';
 import { recipientCtx } from '../lib/recipient-ctx.js';
 
@@ -39,7 +40,7 @@ export function buildBlocks(card, readAt) {
       card.funnel.map((s) => [s.name, fmt(s.value), s.from_previous_pct === null ? '' : `${s.from_previous_pct}%`, s.drop_off === null ? '' : fmt(s.drop_off)])),
     head('Last 7 days'),
     table(['Day (HKT)', 'GA4 sessions', 'New scans', 'New users'], card.trend.map((d) => [d.day, fmt(d.sessions), fmt(d.scans), fmt(d.signups)])),
-    para(`Read ${readAt}. Scans and paid users are live counts from Supabase; sessions and sources come from the daily GA4 pull (00:15 HKT), so today's sessions stay blank until tomorrow. ARR is MRR x 12 from the revenue pull. Funnel steps cover the same 7 days. "Saved scan" counts visitors who gave a contact and ticked the save box. Task MPC-7618.`),
+    para(`Read ${readAt}. Scans (running total) and paid users are live from Supabase, without the test mailbox; sessions and sources come from the daily GA4 pull (00:15 HKT), so today's sessions stay blank until tomorrow. ARR is MRR x 12 from the revenue pull. Funnel steps cover the same 7 days. "Saved scan" counts visitors who gave a contact and ticked the save box. Task MPC-7618.`),
   ];
 }
 
@@ -59,13 +60,12 @@ const soft = async (fn) => { try { return await fn(); } catch (e) { console.erro
 export async function readInputs(env, now = new Date()) {
   const today = hkDate(now);
   const from = hkDayStartOf(hkDate(new Date(now.getTime() - 7 * DAY_MS))).toISOString(); // 7 complete days before today
-  const [scans, paid, saves, savesWindow, days, weeks, mrr, sources] = await Promise.all([
-    soft(() => supa(env, 'scans?select=id', true)),
-    soft(() => supa(env, 'users?select=id&payment_status=eq.active&tier=neq.free', true)),
+  const [paid, saves, savesWindow, days, weeks, mrr, sources] = await Promise.all([
+    soft(() => supa(env, `users?select=id&payment_status=eq.active&tier=neq.free&${excludeTestFilter('email')}`, true)),
     soft(() => supa(env, 'web_scan_contacts?select=web_scan_id&save_consent_at=not.is.null', true)),
     soft(() => supa(env, `web_scan_contacts?select=web_scan_id&save_consent_at=gte.${encodeURIComponent(from)}&save_consent_at=lt.${encodeURIComponent(hkDayStartOf(today).toISOString())}`, true)),
     soft(() => supa(env, 'mpt_daily_metrics?select=day,new_scans,ga4_sessions,new_users&order=day.desc&limit=9')),
-    soft(() => supa(env, 'mpt_weekly_metrics?select=week_of,weekly_new_scans&order=week_of.desc&limit=3')),
+    soft(() => supa(env, 'mpt_weekly_metrics?select=*&order=week_of.desc&limit=3')),
     soft(() => supa(env, 'mpt_weekly_metrics?select=current_mrr&current_mrr=not.is.null&order=week_of.desc&limit=1')),
     soft(() => supa(env, `mpt_raw_metrics?select=period_start,payload&source=eq.ga4&report=eq.daily_source_medium&status=in.(ok,partial)&period_start=gte.${encodeURIComponent(from)}&order=period_start.desc,captured_at.desc&limit=60`)),
   ]);
@@ -74,6 +74,10 @@ export async function readInputs(env, now = new Date()) {
   const sourcePayloads = (sources ?? []).filter((r) => { const d = hkDate(new Date(r.period_start)); if (seen.has(d)) return false; seen.add(d); return d < today; }).map((r) => r.payload);
   const complete = (days ?? []).filter((d) => d.day < today).slice(0, 7); // 7 complete days, newest first
   const sum = (key) => (complete.length && complete.every((d) => d[key] !== null && d[key] !== undefined) ? complete.reduce((s, d) => s + Number(d[key]), 0) : null);
+  // "Scans" is the view's running total, which outlives the 7-day clean-up of public.scans (counting that table's rows does not). It is shown only once the
+  // view leaves test scans out (it then has test_scans_excluded). Until then the figure is blank: neither the total with tests nor the rows still stored is right.
+  const latest = weeks?.[0];
+  const scans = latest && latest.test_scans_excluded !== undefined ? latest.cumulative_scans : null;
   return {
     today, days: days ?? [], weeks: weeks ?? [], sources: sourcePayloads,
     totals: { scans, paid, saves, mrr: mrr?.[0]?.current_mrr ?? null },
