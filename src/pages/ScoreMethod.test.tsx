@@ -3,6 +3,7 @@ import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import ScoreMethod from "./ScoreMethod";
+import { SCORE_V2_HEADLINE } from "@/components/ScoreVersionNotice";
 import { CATEGORY_WEIGHTS, BANDS, SCORE_VERSION, WEIGHT_TOTAL, WEIGHTS_LABEL } from "../../shared/hexagon-registry/score.js";
 
 const renderPage = () => render(<MemoryRouter><ScoreMethod /></MemoryRouter>);
@@ -55,12 +56,13 @@ describe("MPC-9792: weights version label and open score questions", () => {
 });
 
 describe("MPC-11569: exposure-v2 explanation", () => {
-  it("says we now check more and the person did not become more exposed, and states the 61 and the email weight", () => {
+  it("says we now check more and the person did not become more exposed, and states the 60 and the email weight", () => {
     renderPage();
     const sec = screen.getByTestId("score-v2-section");
-    expect(sec.textContent).toContain("We now check more things than before, so your score can change. You did not become more exposed.");
-    expect(sec.textContent).toContain("61 in all");
+    expect(sec.textContent).toContain(SCORE_V2_HEADLINE);
+    expect(sec.textContent).toContain("60 in all");
     expect(sec.textContent).toContain("weight of 10%");
     expect(sec.textContent).toContain("exposure-v2");
+    expect(sec.textContent).toContain("not built");
   });
 });

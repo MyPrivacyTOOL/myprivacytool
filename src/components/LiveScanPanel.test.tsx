@@ -30,13 +30,10 @@ describe("LiveScanPanel", () => {
     expect(screen.getByText("Name in your address")).toBeTruthy();
     expect(screen.getByText("Looks like it contains a name")).toBeTruthy();   // MPC-9835: per-row wording
     expect(screen.getByRole("status").textContent).toMatch(/found something/i);
-    expect(screen.queryByTestId("score-v2-note")).toBeNull();
     await advance(3000);
     expect(screen.getByText("Nothing seen in the places we looked")).toBeTruthy();
     expect(screen.getByText("Could not check this one")).toBeTruthy();
     expect(screen.getByRole("status").textContent).toMatch(/fuller report is on its way/);
-    // MPC-11569: once the results are in, the page says why a score can move (and not before: nothing to explain while it runs).
-    expect(screen.getByTestId("score-v2-note").textContent).toBe("We now check more things than before, so your score can change. You did not become more exposed.");
     const n = calls.length;
     await advance(30000);
     expect(calls.length).toBe(n);

@@ -93,9 +93,10 @@ const att = reportAttachment(real.report);
 const parsed = JSON.parse(Buffer.from(att.content, 'base64').toString('utf8'));
 check(/^my-privacy-scan-[a-z0-9-]+\.json$/.test(att.filename) && parsed.schema_version === 1 && parsed.web_scan.hexagons.length === 54 && parsed.email.hexagons.length === 7 && parsed.web_scan.hexagons.find((h) => h.status === 'found').detail !== undefined, 'JSON attachment decodes and carries all hexagons with detail');
 check(!JSON.stringify(parsed).includes('@'), 'JSON attachment holds no email address');
-// MPC-11569: exposure-v2 over 54 + 7 = 61, additive; v1 stays at 54.
-check(parsed.exposure_v2.score_version === 'exposure-v2' && parsed.exposure_v2.coverage.total === 61 && parsed.web_scan.exposure.score_version === 'exposure-v1' && parsed.web_scan.exposure.coverage.total === 54, 'JSON: exposure_v2 (61) sits beside exposure-v1 (54)');
-check(/did not become more exposed/.test(parsed.exposure_v2.explanation) && !JSON.stringify(real.html).includes('did not become more exposed'), 'JSON carries the explanation; the email body gets no score line (wording not approved, MPC-7471-F4)');
+// MPC-11569: exposure-v2 over 54 web + 6 built email = 60, additive; v1 stays at 54; email-breaches (not built) is never counted.
+check(parsed.exposure_v2.score_version === 'exposure-v2' && parsed.exposure_v2.coverage.total === 60 && parsed.web_scan.exposure.score_version === 'exposure-v1' && parsed.web_scan.exposure.coverage.total === 54, 'JSON: exposure_v2 (60) sits beside exposure-v1 (54)');
+check(parsed.exposure_v2.rejected.some((r) => r.id === 'email-breaches' && r.reason === 'not_built'), 'JSON: email-breaches is not counted in exposure_v2 (not built)');
+check(/did not become more exposed/.test(parsed.exposure_v2.explanation.headline) && !real.html.includes('did not become more exposed'), 'JSON carries the explanation; the email body gets no score line (wording not approved, MPC-7471-F4)');
 check(Object.keys(parsed).sort().join() === 'email,exposure_v2,generated_at,report_id,schema_version,score,web_scan', 'JSON top-level keys match docs/report-json-shape.md');
 
 // loader (real MPC-7465 tables: web_scan_contacts links scans.id to web_scans.id)
