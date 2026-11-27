@@ -49,6 +49,13 @@ async function rateLimited(env, request, prefix = '', who = null) {
 }
 
 // MPC-8452: the live view is polled every few seconds, so it has its own, wider limit (wrangler.toml LIVE_LIMITER); fails open like the others.
+// MPC-10612: wide per-address flood cap for the employee invitation routes (wrangler.toml JOIN_LIMITER, 300 / 60s). Without the binding it falls back to the narrower 40 / 60s LIVE_LIMITER
+// per-address cap (still a cap, not open); like the other limiters it fails open only if a binding call throws.
+async function joinFloodLimited(env, request) {
+  if (!env.JOIN_LIMITER) return liveLimited(env, request, 'bizjoin-ip:');
+  try { return !(await env.JOIN_LIMITER.limit({ key: 'join:' + (request.headers.get('CF-Connecting-IP') || 'unknown') })).success; } catch { return false; }
+}
+
 async function liveLimited(env, request, prefix = '', who = null) {
   if (!env.LIVE_LIMITER) return false;
   try { return !(await env.LIVE_LIMITER.limit({ key: 'live:' + prefix + (who ?? (request.headers.get('CF-Connecting-IP') || 'unknown')) })).success; } catch { return false; }
@@ -102,7 +109,7 @@ export default {
     }
     // MPC-9824 (F6): business teams. Admin routes use the account session; employee routes use the token from the invite email. 404 unless BUSINESS_TEAMS_ENABLED and ACCOUNTS_ENABLED are "true".
     if (request.method === 'POST' && url.pathname.startsWith('/api/business/') && BUSINESS_ROUTES[url.pathname]) {
-      return BUSINESS_ROUTES[url.pathname](env, ctx, request, origin, json, { allowedOrigins: ALLOWED_ORIGINS, rateLimited, liveLimited, sb: db(env), allowed: recipientAllowed });
+      return BUSINESS_ROUTES[url.pathname](env, ctx, request, origin, json, { allowedOrigins: ALLOWED_ORIGINS, rateLimited, liveLimited, joinFloodLimited, sb: db(env), allowed: recipientAllowed });
     }
     // CK-8503: Resend's signed delivery / bounce events for the report email. 404 unless RESEND_WEBHOOK_SECRET is set.
     // MPC-7554: "I have fixed this" (stops the follow-ups for one report; never an unsubscribe). 404 unless FOLLOWUP_STATE_ENABLED is "true".

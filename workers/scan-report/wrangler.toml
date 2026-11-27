@@ -152,3 +152,12 @@ name = "LIVE_LIMITER"
 type = "ratelimit"
 namespace_id = "7352"
 simple = { limit = 40, period = 60 }
+
+# MPC-10612: per-address FLOOD cap on the employee invitation routes (/api/business/join/*): 300 requests / 60s. Each invitation is already limited on its own (hashed token:
+# reads 40/min LIVE_LIMITER, changes 5/min RATE_LIMITER), so this only stops one address flooding; it is wide so a whole office opening invitations in the same minute (about 100 people,
+# 3 calls each) is not limited. Code fails open if the binding is missing (and then falls back to the 40/min LIVE_LIMITER per-address cap). namespace_id: account-unique, 7355 is free in this repo.
+[[unsafe.bindings]]
+name = "JOIN_LIMITER"
+type = "ratelimit"
+namespace_id = "7355"
+simple = { limit = 300, period = 60 }
