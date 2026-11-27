@@ -179,6 +179,9 @@ echo "== test-mailbox scans stay out of the KPIs; raw counts and access unchange
 # so apply this one again before testing it (it is idempotent).
 psql_ "$TEST_URL" -f supabase/migrations_archive/20261127060000_exclude_test_scans_from_kpi.sql
 psql_ "$TEST_URL" -At -f supabase/tests/exclude-test-scans.test.sql
+echo "== scorecard daily table: no stand-in zero, one row per measure per day, no public access (MPC-11567)"
+psql_ "$TEST_URL" -At -f supabase/tests/mpc-11567-metrics-daily.test.sql
+
 echo "== hexagon scorecard views: M1, M2, M3, G on fixtures (MPC-11547)"
 # The MPC-8659 stage re-ran an older counting function but does not touch the scorecard views, which only read tables.
 psql_ "$TEST_URL" -At -f supabase/tests/mpc-11547-scorecard.test.sql
