@@ -7,6 +7,11 @@ export interface CatalogueHexagon {
   arrival: 'A' | 'B' | 'C' | 'D';
   risk: 'high' | 'medium' | 'low';
   label: string;
+  /** MPC-11541: the Hexagon Registry row (Hexagon ID) and its Evidence Key. */
+  registry_id?: number;
+  evidence_key?: string;
+  /** Set on rows that came from the 2026-11-27 registry export and were not in the published catalogue before. */
+  added?: string;
   reveals: string;
   field: string;
   status: 'defined' | 'new';
