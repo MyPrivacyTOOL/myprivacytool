@@ -18,11 +18,13 @@ const SITE_URL = 'https://www.myprivacytool.io';
 const chLabel = Object.fromEntries(CHANNELS.map((c) => [c.key, c.label]));
 
 const AR = { A: 'First contact', B: 'Public lookup', C: 'They choose to share', D: 'Wider lookup' };
+const ARLABEL = (a) => (a ? `${a} · ${AR[a]}` : 'Not recorded');
 const ARX = {
   A: "It arrives by itself with the person's first message, request or event. No extra step is needed to get it.",
   B: 'One public lookup using an ID, handle, number, domain or IP address we already received. The person does nothing.',
   C: 'It is only revealed if the person presses a share button, grants a permission, signs in, or opens a link or Mini App.',
   D: 'It goes beyond the channel: the data is sent to a third party or cross-referenced with other sources.',
+  null: 'The arrival class has not been recorded for this row yet.',
 };
 const RN = { high: 'High', medium: 'Medium', low: 'Low' };
 const RL = { high: 'H', medium: 'M', low: 'L' };
@@ -120,13 +122,13 @@ export function hexagonPage(i) {
     ld: { '@context': 'https://schema.org', '@type': 'Article', headline: title, description: desc, url, publisher: { '@type': 'Organization', name: 'MyPrivacyTOOL' } },
     body: `<nav><a href="${BASE}/">All hexagons</a> › ${esc(chLabel[i.channel])}</nav>
 <div class="eyebrow">MyPrivacyTOOL · Hexagon risk page</div><h1>${esc(i.label)}</h1>
-<div class="tags"><span class="tag">${esc(chLabel[i.channel])}</span><span class="tag">${i.arrival} · ${AR[i.arrival]}</span>${REVIEWED[i.slug] ? (REVIEWED[i.slug].draft ? `<span class="tag">Text drafted ${REVIEWED[i.slug].on} (owner review pending)</span>` : `<span class="tag">Text reviewed ${REVIEWED_ON}</span>`) : ''}<span class="tag">${extra ? 'Checked by MPT (extra check)' : mapped ? 'Built (capture switch)' : checked ? 'Checked by MPT' : 'Not checked by MPT yet'}</span></div>
+<div class="tags"><span class="tag">${esc(chLabel[i.channel])}</span><span class="tag">${esc(ARLABEL(i.arrival))}</span>${REVIEWED[i.slug] ? (REVIEWED[i.slug].draft ? `<span class="tag">Text drafted ${REVIEWED[i.slug].on} (owner review pending)</span>` : `<span class="tag">Text reviewed ${REVIEWED_ON}</span>`) : ''}<span class="tag">${extra ? 'Checked by MPT (extra check)' : mapped ? 'Built (capture switch)' : checked ? 'Checked by MPT' : 'Not checked by MPT yet'}</span></div>
 <div class="risk"><div class="hexb ${i.risk}" aria-hidden="true">${RL[i.risk]}</div><div><b>${RN[i.risk]} risk</b><p>${RDEF[i.risk]}</p></div></div>
 <h2>What it reveals</h2><p>${esc(revealsText(i))}</p>
-<h2>How easily it can be obtained</h2><p><b>${i.arrival} · ${AR[i.arrival]}.</b> ${ARX[i.arrival]}</p>
+<h2>How easily it can be obtained</h2><p><b>${esc(ARLABEL(i.arrival))}.</b> ${ARX[i.arrival]}</p>
 <h2>What it could be used for</h2>${heads.length ? `<p>${esc(heads.join(' · '))}.</p>` : ''}<ul>${uses.map((u) => `<li>${esc(u)}</li>`).join('')}</ul>
 <h2>What you can do</h2><ul>${(REVIEWED[i.slug]?.todo ?? DO[i.risk]).map((u) => `<li>${esc(u)}</li>`).join('')}</ul>
-<div class="box"><dl><dt>Hexagon id</dt><dd><code>${esc(i.id)}</code></dd><dt>Field</dt><dd>${esc(i.field || 'Not recorded yet')}</dd><dt>Access</dt><dd>${esc(i.access)}. ${esc(ACC[i.access] || '')}</dd><dt>Status</dt><dd>${i.plan ? `${i.plan === 'later' ? 'Planned for later' : 'Not planned'}: ${esc(i.plan_reason)}. ` : ''}${mapped ? `Built in the code as ${esc(i.code_ids.join(', '))}. X capture records it only when its switch is on.${i.note ? ' ' + esc(i.note) : ''}` : extra ? 'Checked by MPT today as an extra check. It is shown to you but is not part of your risk number or any score yet.' : checked ? 'Checked by MPT today.' : 'Found in the platform documentation. Not checked by MPT yet, and not part of any score.'}</dd>${i.source ? `<dt>Source</dt><dd><a href="${esc(i.source)}" target="_blank" rel="noopener">${esc(i.source)}</a></dd>` : ''}</dl></div>
+<div class="box"><dl><dt>Hexagon id</dt><dd><code>${esc(i.id)}</code></dd><dt>Field</dt><dd>${esc(i.field || 'Not recorded yet')}</dd><dt>Access</dt><dd>${i.access ? `${esc(i.access)}. ${esc(ACC[i.access] || '')}` : 'Not recorded yet.'}</dd><dt>Status</dt><dd>${i.plan ? `${i.plan === 'later' ? 'Planned for later' : 'Not planned'}: ${esc(i.plan_reason)}. ` : ''}${mapped ? `Built in the code as ${esc(i.code_ids.join(', '))}. X capture records it only when its switch is on.${i.note ? ' ' + esc(i.note) : ''}` : extra ? 'Checked by MPT today as an extra check. It is shown to you but is not part of your risk number or any score yet.' : checked ? 'Checked by MPT today.' : 'Found in the platform documentation. Not checked by MPT yet, and not part of any score.'}</dd>${i.source ? `<dt>Source</dt><dd><a href="${esc(i.source)}" target="_blank" rel="noopener">${esc(i.source)}</a></dd>` : ''}</dl></div>
 ${rel.length ? `<h2>Other ${RN[i.risk].toLowerCase()}-risk hexagons on ${esc(chLabel[i.channel])}</h2><div class="rel">${rel.map((x) => `<a href="${BASE}/${x.slug}/">${esc(x.label)}</a>`).join('')}</div>` : ''}
 <p style="margin-top:24px"><a href="/footprint/">See the full footprint map</a> · <a href="${BASE}/">All ${ITEMS.length} hexagons</a></p>
 <p class="note">One hexagon is one fact a channel can reveal about a person. Risk tiers were approved by the owner on 28 Oct 2026. The explanation on this page is general guidance on how this kind of information is commonly misused. It is not a statement that any specific person has been targeted.</p>`,
@@ -135,11 +137,11 @@ ${rel.length ? `<h2>Other ${RN[i.risk].toLowerCase()}-risk hexagons on ${esc(chL
 
 export function masterPage() {
   const order = { high: 0, medium: 1, low: 2 };
-  const srt = [...ITEMS].sort((a, b) => order[a.risk] - order[b.risk] || a.arrival.localeCompare(b.arrival) || chLabel[a.channel].localeCompare(chLabel[b.channel]) || a.label.localeCompare(b.label));
+  const srt = [...ITEMS].sort((a, b) => order[a.risk] - order[b.risk] || (a.arrival || 'E').localeCompare(b.arrival || 'E') || chLabel[a.channel].localeCompare(chLabel[b.channel]) || a.label.localeCompare(b.label));
   const rc = (r) => ITEMS.filter((i) => i.risk === r).length;
   const worst = ITEMS.filter((i) => i.risk === 'high' && i.arrival === 'A').length;
   const chs = [...CHANNELS].sort((a, b) => a.label.localeCompare(b.label));
-  const rows = srt.map((i) => `<tr data-r="${i.risk}" data-c="${i.channel}" data-a="${i.arrival}" data-t="${esc(`${i.label} ${chLabel[i.channel]} ${revealsText(i)}`.toLowerCase())}"><td><i class="dot ${i.risk}"></i> ${RN[i.risk]}</td><td><a href="${BASE}/${i.slug}/">${esc(i.label)}</a></td><td>${esc(chLabel[i.channel])}</td><td>${i.arrival} · ${AR[i.arrival]}</td><td>${esc(revealsText(i))}</td></tr>`).join('');
+  const rows = srt.map((i) => `<tr data-r="${i.risk}" data-c="${i.channel}" data-a="${i.arrival ?? ''}" data-t="${esc(`${i.label} ${chLabel[i.channel]} ${revealsText(i)}`.toLowerCase())}"><td><i class="dot ${i.risk}"></i> ${RN[i.risk]}</td><td><a href="${BASE}/${i.slug}/">${esc(i.label)}</a></td><td>${esc(chLabel[i.channel])}</td><td>${esc(ARLABEL(i.arrival))}</td><td>${esc(revealsText(i))}</td></tr>`).join('');
   const title = `All ${ITEMS.length} hexagons ranked by risk`;
   const desc = `Every fact a channel can reveal about a person, across ${CHANNELS.length} channels, ranked from the highest to the lowest risk.`;
   return page({

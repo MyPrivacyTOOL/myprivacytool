@@ -49,8 +49,10 @@ export function todayFor(h: Pick<CatalogueHexagon, 'status' | 'plan'>): { state:
 
 export function channelTiles(key: string): ChannelTile[] {
   if (key === 'breach-threat') return BREACH_THREAT;
+  // The trail is the curated 2026-11-08 view of the three most important channels; the register rows added on
+  // 2026-11-26 (ids `reg.<hex>`) are shown on /footprint/ and /hexagon/ but are not part of this design.
   return (HEXAGON_CATALOGUE as CatalogueHexagon[])
-    .filter((h) => h.channel === key)
+    .filter((h) => h.channel === key && !h.id.startsWith('reg.'))
     .map((h) => {
       const t = todayFor(h);
       return { id: h.id, label: h.label, sensitivity: h.risk, today: t.state, caption: t.caption };

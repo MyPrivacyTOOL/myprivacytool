@@ -18,7 +18,7 @@ describe('channel groups use exactly the catalogue members', () => {
   }
   for (const key of ['email', 'whatsapp', 'messenger']) {
     it(`${key}: every catalogue tile is there, none invented, in arrival order`, () => {
-      const real = cat.filter((h) => h.channel === key);
+      const real = cat.filter((h) => h.channel === key && !h.id.startsWith('reg.'));
       expect(channelTiles(key).map((t) => t.id)).toEqual(real.map((h) => h.id));
       const arrivals = real.map((h) => h.arrival);
       expect([...arrivals].sort()).toEqual(arrivals);
@@ -52,6 +52,6 @@ describe('captions tell the truth about each tile today', () => {
   });
   it('shows exactly the live email tiles as held today', () => {
     const held = channelTiles('email').filter((t) => t.today === 'held').map((t) => t.id);
-    expect(held.sort()).toEqual(cat.filter((h) => h.channel === 'email' && h.status === 'defined').map((h) => h.id).sort());
+    expect(held.sort()).toEqual(cat.filter((h) => h.channel === 'email' && h.status === 'defined' && !h.id.startsWith('reg.')).map((h) => h.id).sort());
   });
 });

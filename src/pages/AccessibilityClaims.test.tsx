@@ -27,7 +27,7 @@ describe("display-preferences hexagon wording (ACCESS-001)", () => {
   it("the catalogue and its sources no longer say it can hint at a disability", () => {
     expect(h.reveals).not.toMatch(/hint at a disability/i);
     expect(h.reveals).toMatch(/accessibility settings, so treat them as sensitive/);
-    for (const f of ["shared/hexagon-registry/hexagons-366.json", "public/footprint/hexagons-366.json"]) expect(readFileSync(f, "utf8")).not.toMatch(/hint at a disability/i);
+    for (const f of ["shared/hexagon-registry/hexagons-366.json", "public/footprint/hexagons-662.json"]) expect(readFileSync(f, "utf8")).not.toMatch(/hint at a disability/i);
   });
 });
 

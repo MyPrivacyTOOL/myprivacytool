@@ -25,7 +25,7 @@ export const FEATURE_STATUS: Record<FeatureId, FeatureState> = {
   F7b: "planned",
   // F8 Legal pages and policy accuracy. LIVE test: every sentence in Privacy 2.3, Cookies and Terms 6 is true of the code; /accessibility and /gdpr-rights render and are in the footer.
   F8: "in_build",
-  // F9 Hexagon catalogue and Journey. LIVE test: no "46" claim anywhere; "54 run in the scan, 368 in the catalogue" everywhere; /footprint/ carries a Sample-data marker; Journey badges are true.
+  // F9 Hexagon catalogue and Journey. LIVE test: no "46" claim anywhere; "54 run in the scan, 662 in the catalogue" everywhere; /footprint/ carries a Sample-data marker; Journey badges are true.
   F9: "live",       // MPC-9832: LIVE test passed on the deployed site 2026-11-07 (no 46 claim, one count sentence on 4 pages, /footprint/ Sample-data marker from MPC-9831, 8 true Journey badges)
   // F10 Report delivery and storage. LIVE test: /start states what arrives and when, matching a real scan submitted from the live site.
   F10: "live",      // CK-9848 (2026-11-08): LIVE test passed on the deployed system: three timed runs (13:35, 14:45, 18:24 HKT) match /start (confirmation in 2.1-2.6 s; report 4-5 min after the confirm click; delivered event +2.2-2.5 s); scans record purged at 30 days (pg_cron mpt-purge-expired-scans)

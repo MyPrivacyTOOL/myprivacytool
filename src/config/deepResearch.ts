@@ -6,7 +6,7 @@
 // Flip `availability` to "free_now" only when the provider is chosen, a key is provisioned and the
 // synthetic-payload test for that hexagon passes. Provider names here are plans, not commitments.
 //
-// This list is deliberately separate from shared/hexagon-registry (the 54 web / 368 catalogue hexagons):
+// This list is deliberately separate from shared/hexagon-registry (the 54 web / 662 catalogue hexagons):
 // it is outside every score and count until the owner approves registry entries for these (MPC-9546).
 
 export type DeepAvailability = "free_now" | "coming_soon";

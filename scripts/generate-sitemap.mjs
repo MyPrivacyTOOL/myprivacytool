@@ -123,7 +123,7 @@ function generateSitemap() {
   }
 
   // MPC-8689: the master hexagon risk page and one page per hexagon (built into dist/hexagon by generate-hexagon-pages.mjs).
-  const hexLastmod = gitLastmod("shared/hexagon-registry/hexagons-366.json");
+  const hexLastmod = gitLastmod("shared/hexagon-registry/register-662.json");
   entries.push(buildUrlEntry({ loc: `${SITE_URL}/hexagon/`, priority: "0.7", changefreq: "monthly", lastmod: hexLastmod }));
   // MPC-7561: the guides index and one guide per approved hexagon (built by generate-guide-pages.mjs).
   entries.push(buildUrlEntry({ loc: `${SITE_URL}/guides/`, priority: "0.6", changefreq: "monthly", lastmod: hexLastmod }));
