@@ -38,7 +38,7 @@ const footprint = items.map((i) => ({
 }));
 writeFileSync(path.join(ROOT, 'public/footprint/hexagons-366.json'), JSON.stringify(footprint));
 
-const mig = path.join(ROOT, 'supabase/migrations/20261028180000_mpc_8689_hexagon_catalogue.sql');
+const mig = path.join(ROOT, 'supabase/migrations_archive/20261028180000_mpc_8689_hexagon_catalogue.sql');
 if (!existsSync(mig)) {
   const q = (s) => `'${String(s ?? '').replace(/'/g, "''")}'`;
   const arr = (a) => (a && a.length ? `array[${a.map(q).join(', ')}]::text[]` : "'{}'::text[]");

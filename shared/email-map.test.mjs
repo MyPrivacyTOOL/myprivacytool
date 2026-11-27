@@ -64,7 +64,7 @@ for (const x of SENDERS.filter((y) => y.idempotencyPrefix)) {
 const suppression = read('workers/scan-report/lib/suppression.js');
 check(/export async function optOutEverywhere/.test(suppression) && /addSuppression\(sb, e, source\)/.test(suppression) && /email_opt_out_at/.test(suppression), 'optOutEverywhere writes the users flag and the suppression row');
 check(/optOutEverywhere\(sb, email, 'unsubscribe'\)/.test(read('workers/scan-report/index.js')), 'the signed unsubscribe link calls optOutEverywhere');
-check(/insert into public\.email_suppressions/.test(read('supabase/migrations/20261028120000_mpc_7555_one_opt_out.sql')) && /after insert or update of email_opt_out_at/.test(read('supabase/migrations/20261028120000_mpc_7555_one_opt_out.sql')), 'the users-column path is covered by a database trigger and a backfill');
+check(/insert into public\.email_suppressions/.test(read('supabase/migrations_archive/20261028120000_mpc_7555_one_opt_out.sql')) && /after insert or update of email_opt_out_at/.test(read('supabase/migrations_archive/20261028120000_mpc_7555_one_opt_out.sql')), 'the users-column path is covered by a database trigger and a backfill');
 check(/email_suppressions/.test(read('workers/mpt-metrics-collector/collectors/hubspot-optout.js')), 'the HubSpot path is covered by the daily sync');
 check(/optOutEverywhere\(db\(env\), addr, source\)/.test(read('workers/scan-report/index.js')) && /endsEmail = bounce === 'permanent' \|\| status === 'complained'/.test(read('workers/scan-report/lib/receipts.js')), 'the hard-bounce / complaint path writes THE opt-out (and a soft bounce does not)');
 const keyTypes = read('workers/scan-report/lib/emailSends.js');

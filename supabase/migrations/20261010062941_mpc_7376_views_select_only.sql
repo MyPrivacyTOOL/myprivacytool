@@ -1,0 +1,2 @@
+-- History placeholder (MPC-9896 Option B). Version 20261010062941 (mpc_7376_views_select_only) is already applied on the live database.
+-- Intentionally empty: what it contributed is recorded in 20261127060000_mpc_9896_option_b_baseline.sql. Do not add statements here.
