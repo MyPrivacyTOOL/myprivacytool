@@ -47,10 +47,15 @@ export function todayFor(h: Pick<CatalogueHexagon, 'status' | 'plan'>): { state:
   return { state: 'notyet', caption: 'Planned' };
 }
 
+/** MPC-11541: the three lanes keep the members chosen on 2026-11-08 (matched by id prefix). The registry export files catalogue rows by Channel Key (for example email-domain-record is
+ *  on web, x.email on email) and adds documented-only rows; neither may move a tile in or out of these hand-laid lanes. */
+const LANE_IDS: Record<string, RegExp> = { email: /^email[.-]/, whatsapp: /^wa\./, messenger: /^fb\./ };
+
 export function channelTiles(key: string): ChannelTile[] {
   if (key === 'breach-threat') return BREACH_THREAT;
   return (HEXAGON_CATALOGUE as CatalogueHexagon[])
-    .filter((h) => h.channel === key)
+    .filter((h) => (LANE_IDS[key] ? LANE_IDS[key].test(h.id) : h.channel === key))
+    .sort((x, y) => x.arrival.localeCompare(y.arrival)) // arrival order (A, B, C, D); stable, so the catalogue order holds within a class
     .map((h) => {
       const t = todayFor(h);
       return { id: h.id, label: h.label, sensitivity: h.risk, today: t.state, caption: t.caption };

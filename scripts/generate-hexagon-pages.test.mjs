@@ -1,4 +1,4 @@
-// MPC-8689: every hexagon gets its own page with a unique, stable address; the master page lists all 368.
+// MPC-8689: every hexagon gets its own page with a unique, stable address; the master page lists all of them (654 since the 2026-11-27 registry export, MPC-11541).
 import assert from 'node:assert/strict';
 import { mkdtempSync, readFileSync, existsSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -7,8 +7,8 @@ import { HEXAGON_CATALOGUE } from '../shared/hexagon-registry/catalogue.js';
 import { writeHexagonPages, hexagonPage, misuse } from './generate-hexagon-pages.mjs';
 
 const out = mkdtempSync(path.join(tmpdir(), 'hex-pages-'));
-assert.equal(writeHexagonPages(out), 369);
-assert.equal(readdirSync(path.join(out, 'hexagon')).length, 369);
+assert.equal(writeHexagonPages(out), 655);
+assert.equal(readdirSync(path.join(out, 'hexagon')).length, 655);
 for (const h of HEXAGON_CATALOGUE) {
   const f = path.join(out, 'hexagon', h.slug, 'index.html');
   assert.ok(existsSync(f), `page for ${h.id}`);
@@ -20,9 +20,13 @@ for (const h of HEXAGON_CATALOGUE) {
   assert.equal(hexagonPage(h).includes('<script>'), false, 'hexagon pages need no script');
 }
 const master = readFileSync(path.join(out, 'hexagon', 'index.html'), 'utf8');
-assert.equal((master.match(/<tr data-r=/g) || []).length, 368);
-assert.ok(master.includes('54 run in the scan, 368 in the catalogue'), 'master page carries the one count sentence');
-assert.ok(master.includes('92 High') && master.includes('208 Medium') && master.includes('68 Low'));
+assert.equal((master.match(/<tr data-r=/g) || []).length, 654);
+assert.ok(master.includes('54 run in the scan'), 'master page carries the one count sentence');
+assert.ok(!/\b(654|653|662|368|366)\b/.test(master.replace(/<tr data-r=[\s\S]*<\/tbody>/, '')), 'no headline total in the master page copy (MPC-11541)');
+assert.ok(master.includes('285 High') && master.includes('269 Medium') && master.includes('100 Low'));
+// A registry row with no access recorded says so instead of printing an empty access line.
+const noAccess = HEXAGON_CATALOGUE.find((h) => !h.access);
+assert.ok(noAccess && hexagonPage(noAccess).includes('<dt>Access</dt><dd>Not recorded yet</dd>'));
 console.log('generate-hexagon-pages.test.mjs ok');
 
 // Owner decision 7 (batch 2, 2026-10-29): the 14 share-list pages carry hand-written text, and it does not borrow generic claims that do not fit.
