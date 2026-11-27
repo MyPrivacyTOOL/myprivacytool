@@ -19,11 +19,13 @@ Chris's rule (2026-11-24): the same data point on several channels is **not** a 
 ## How to recount (repeatable)
 
 1. Export the registry rows. In a Claude session with the Notion connector: query the registry data source in rows mode, 100 rows per call, filtered by Hexagon ID range (for example 1-100, 101-200 and so on). The tool saves large results to a file. Always export the **whole** registry: a partial export gives wrong counts.
-2. Run `node scripts/recount-registry-overlap.mjs rows1.json rows2.json ... [--json]`.
+2. Run `node scripts/recount-registry-overlap.mjs rows1.json rows2.json ... [--json]` (add `--legacy-catalogue` for the old basis).
 3. Apply each printed change with `notion-update-page` (`update_properties`, `Overlap Channels` = the new number, or `null` to clear), one call per row.
 4. Re-run the script on a fresh export: it should print `rows to write: 0`.
 
-A row's channel comes from its **Catalogue Code** (looked up in `shared/hexagon-registry/hexagons-366.json`), because the registry `Channel` column is unreliable: many rows sit under "Cross-Channel / General". Rows with no Catalogue Code (for example the OSINT hexagons 541-546) use the registry Channel value.
+**Basis (MPC-11493, from 2026-11-27):** the count for an Evidence Key is the number of distinct, non-blank `Channel Key` values among the rows that carry the key. This is the same basis as the Evidence Keys database `Live Count` formula (`length(filter(split(Channels, ","), current != ""))`). A blank Channel Key adds nothing to the count, but the row still holds the key and shows the key's count. A key on fewer than 2 channels leaves the column empty. The export needs the `Channel Key` column (the view "Rows by Channel (check)" does not have `Overlap Channels`; use the Default view).
+
+The old basis (Catalogue Code, then the registry `Channel`) is kept behind `--legacy-catalogue` for comparison only: it disagrees with Channel Key on grouped channels and must not be applied to Notion. Under that flag a row's channel comes from its **Catalogue Code** (looked up in `shared/hexagon-registry/hexagons-366.json`); rows with no Catalogue Code use the registry Channel value.
 
 Tests: `node --test scripts/recount-registry-overlap.test.mjs`.
 
