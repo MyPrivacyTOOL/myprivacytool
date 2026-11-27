@@ -43,12 +43,14 @@ writeFileSync(path.join(ROOT, 'shared/hexagon-registry/catalogue.js'), js);
 const { EXTRA_HEXAGON_IDS } = await import('../shared/hexagon-registry/channels.js'); // built extras are checked, so they are not labelled "not checked yet"
 const extras = new Set(EXTRA_HEXAGON_IDS);
 const { tileState } = await import('../shared/hexagon-registry/tileState.js'); // MPC-11541: Live / In build / Planned, one rule for every tile
+const { EMAIL_NOT_SCORED } = await import('../shared/hexagon-registry/scoreV2.js'); // MPC-11569: an email hexagon that is not built stays In build, with the registry's reason
+const notBuiltNote = (reason) => (reason === 'not built: terms unconfirmed' ? "Not built yet: the breach source's commercial-use terms are unconfirmed." : `Not built yet (${reason}).`);
 
 // /footprint/ dataset: merged into the built-in web items by id (the built-in ones keep their emoji, example and confidence; this file supplies the approved risk tier).
 const shortChannel = (i) => (i.channel === 'web' ? 'Web' : i.channel_label.replace(/\s*\(.*\)$/, ''));
 const footprint = items.map((i) => ({
   id: i.id, label: i.label, group: i.group, box: shortChannel(i), channel: shortChannel(i), sens: i.risk, cap: i.reveals ?? '',
-  val: i.status === 'new' && !extras.has(i.id) ? 'Not checked by MPT yet. Found in the platform documentation.' : '', arrival: i.arrival, status: i.status, tile: tileState(i), slug: i.slug,
+  val: Object.hasOwn(EMAIL_NOT_SCORED, i.id) ? notBuiltNote(EMAIL_NOT_SCORED[i.id]) : i.status === 'new' && !extras.has(i.id) ? 'Not checked by MPT yet. Found in the platform documentation.' : '', arrival: i.arrival, status: i.status, tile: tileState(i), slug: i.slug,
 }));
 writeFileSync(path.join(ROOT, 'public/footprint/hexagons-366.json'), JSON.stringify(footprint));
 

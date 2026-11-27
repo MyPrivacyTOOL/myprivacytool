@@ -14,6 +14,7 @@ import { CompositeFingerprint } from '@/lib/fingerprintDetection';
 import { LanguagePrediction } from '@/lib/languagePredictor';
 import EmailCaptureModal from '@/components/EmailCaptureModal';
 import { SCORE_VERSION } from '../../shared/hexagon-registry/score.js';
+import ScoreVersionNotice from '@/components/ScoreVersionNotice';
 import { exposureForPage, categoryExposure, byBand, BAND_LABEL } from '@/lib/exposureScore';
 import { HEXAGON_COUNT, HEXAGON_GROUP_COUNT } from '../../shared/hexagon-registry/registry.js';
 import { scanCounts, scanCountsLine, totalLabel, type ScanCounts } from '../../shared/hexagon-registry/counts.js';
@@ -869,6 +870,9 @@ Test yours at: ${window.location.origin}`;
             <p className="text-xs text-muted-foreground">Coverage</p>
           </div>
         </div>
+
+        {/* MPC-11569: shown only when the score on screen is exposure-v2 (more checks counted); renders nothing for exposure-v1, which is what ships today. */}
+        <ScoreVersionNotice scoreVersion={exposure.score_version} />
 
         {/* Overall Risk Score Circle */}
         <div className="text-center p-6 bg-secondary rounded-xl border border-risk-low/20">
