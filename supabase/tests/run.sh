@@ -314,7 +314,7 @@ psql_ "$TEST_URL" -At -f supabase/tests/mpc-8689-brokers-rows.test.sql
 
 # MPC-11541: hexagon_catalogue is marked DEPRECATED by comment only. Applied by the loop above; applied again here to prove it is idempotent. Row count is the 368 left by MPC-8689.
 echo "== hexagon_catalogue marked deprecated (MPC-11541)"
-psql_ "$TEST_URL" -f supabase/migrations/20261127080000_mpc_11541_hexagon_catalogue_deprecated.sql
+psql_ "$TEST_URL" -f supabase/migrations/20261127120000_mpc_11541_hexagon_catalogue_deprecated.sql
 psql_ "$TEST_URL" -At -f supabase/tests/hexagon-catalogue-deprecated.test.sql
 
 # MPC-9817: accounts and sign-in. The migration is applied by the loop above; applied again here to prove it is idempotent, then the assertions (RLS, no IP column, consent carry, link/claim, 7-day exit, can(), real delete).
