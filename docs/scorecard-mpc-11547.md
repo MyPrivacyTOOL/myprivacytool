@@ -11,7 +11,7 @@ Nothing here changes a table, `exposure-v1`, `scanCounts` or any product score. 
 | G | `mpt_scorecard_g_weekly` | Disputes on high-confidence tiles / high-confidence tiles shown, per week. High = confidence in force **above 0.8**. NULL, never 0%, when no high-confidence prompt has been answered. |
 
 Context view: `mpt_scorecard_deleted_scans_weekly`. Base view: `mpt_scorecard_web_scan_facts`. Report: `node scripts/metrics-report.mjs` (GET only; `--now`, `--rows <file>`).
-Sample: `docs/scorecard-mpc-11547.sample.json`, made with `--rows` from the views' exact SQL run read-only against production on 2026-11-27, because the views are not deployed yet.
+Sample: `docs/scorecard-mpc-11547.sample.json`, made with `--rows` from the six live production views read on 2026-11-27 (the migration was applied to production that day by hand through the Supabase tool, not by `deploy-supabase.yml`, which is manual-only; production's migration history does not match the repo's file versions, so do not use `supabase db push`). The script itself was not run against the REST API: that needs the service-role key.
 
 ## How "found", "clear" and "high confidence" are decided
 - Found / clear follow `scanCounts`: first occurrence of an id, unknown ids ignored, `cannot_be_checked` hexagons never count, and `clear` only counts where the registry allows it. SQL carries a copy of those registry facts (`mpt_scorecard_registry()`); `scripts/metrics-report.test.mjs` fails if it drifts from `registry.js`.
