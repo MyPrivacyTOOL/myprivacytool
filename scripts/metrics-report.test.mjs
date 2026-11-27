@@ -6,7 +6,7 @@ import { readFileSync } from 'node:fs';
 import { buildReport, hkWeekOf, hkMonthOf, run, VIEWS } from './metrics-report.mjs';
 import { HEXAGONS } from '../shared/hexagon-registry/registry.js';
 
-const MIGRATION = readFileSync(new URL('../supabase/migrations/20261127070000_mpc_11547_hexagon_scorecard_views.sql', import.meta.url), 'utf8');
+const MIGRATION = readFileSync(new URL('../supabase/migrations/20261127075144_mpc_11547_hexagon_scorecard_views.sql', import.meta.url), 'utf8');
 const t = (s) => Date.parse(s);
 
 // ---------- weeks and months are Hong Kong Mondays / first-of-month ----------
