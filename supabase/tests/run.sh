@@ -159,6 +159,9 @@ echo "   legacy rows identical before and after: $before"
 echo "== KPI views read the hourly counter; a purge leaves them unchanged (MPC-8671)"
 psql_ "$TEST_URL" -At -f supabase/tests/mpc-8671-kpi-views-hourly-counter.test.sql
 echo "== test-mailbox scans stay out of the KPIs; raw counts and access unchanged"
+# The MPC-8659 stage above re-runs its own migration, which puts the old counting function back. Production runs that file once, before this one,
+# so apply this one again before testing it (it is idempotent).
+psql_ "$TEST_URL" -f supabase/migrations/20261127060000_exclude_test_scans_from_kpi.sql
 psql_ "$TEST_URL" -At -f supabase/tests/exclude-test-scans.test.sql
 
 echo "== CK-8503: simultaneous scan requests for one user create exactly one scan (real concurrent sessions)"

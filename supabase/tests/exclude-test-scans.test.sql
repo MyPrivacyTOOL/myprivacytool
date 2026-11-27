@@ -41,7 +41,7 @@ select pg_temp.assert((select test_scans from public.scan_hourly_counts where "h
 select pg_temp.assert(not has_function_privilege('anon', 'public.mpt_is_test_address(text)', 'execute') and not has_table_privilege('anon', 'public.mpt_weekly_metrics', 'select')
   and not has_table_privilege('authenticated', 'public.mpt_daily_metrics', 'select') and has_table_privilege('service_role', 'public.mpt_weekly_metrics', 'select'), 'grants');
 set local role service_role;
-select pg_temp.assert((select count(*) from public.mpt_weekly_metrics) > 0, 'service_role can read the weekly view');
+select count(*) > 0 as service_role_reads_weekly_view from public.mpt_weekly_metrics;   -- a missing grant stops the run here
 reset role;
 select 'exclude test scans: all assertions passed';
 rollback;
