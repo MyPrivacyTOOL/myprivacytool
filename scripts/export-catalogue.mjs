@@ -29,7 +29,7 @@ const IN_BUILD_NOTE = 'In build. Not part of your score yet.';
 
 /** Notion exports text with markdown escapes and auto-links (web.postal\_area, [web.network](http://web.network)\_distance). Give back the plain text. */
 export function cleanText(s) {
-  return String(s ?? '').replace(/\[([^\]]*)\]\([^)]*\)/g, '$1').replace(/\\([_*[\]()#.\-`~>|!])/g, '$1').trim();
+  return String(s ?? '').replace(/\[([^\]]*)\]\([^)]*\)/g, '$1').replace(/\\([!-/:-@[-`{-~])/g, '$1').trim();
 }
 
 /** The one publish rule. Row Type empty or "Data point", and Decision not "Dropped". */

@@ -645,7 +645,7 @@ insert into public.footprint_datapoints (hexagon_id, id, code, channel_key, chan
 (629, 'tw.bio', 'tw.bio', 'twitch', 'Twitch', 'Channel description', 'high', 'B', 'planned', 'Their channel description', ''),
 (630, 'tw.account_age', 'tw.account_age', 'twitch', 'Twitch', 'Account created', 'low', 'B', 'planned', 'When the account was created (UTC)', ''),
 (631, 'tw.account_type', 'tw.account_type', 'twitch', 'Twitch', 'Account and broadcaster type', 'low', 'B', 'planned', 'The type of user and of broadcaster', ''),
-(632, 'tw.email', 'tw.email', 'twitch', 'Twitch', 'Email address', 'high', 'C', 'planned', 'Their verified email (needs a user access token with user\:read\:email)', ''),
+(632, 'tw.email', 'tw.email', 'twitch', 'Twitch', 'Email address', 'high', 'C', 'planned', 'Their verified email (needs a user access token with user:read:email)', ''),
 (633, 'rcs.phone', 'rcs.phone', 'imessage-rcs', 'iMessage and RCS', 'Sender phone number', 'high', 'A', 'planned', 'Their phone number (E.164)', ''),
 (634, 'rcs.message_id', 'rcs.message_id', 'imessage-rcs', 'iMessage and RCS', 'Message ID', 'low', 'A', 'planned', 'An ID assigned by their RCS client', ''),
 (635, 'rcs.message_time', 'rcs.message_time', 'imessage-rcs', 'iMessage and RCS', 'Message time', 'low', 'A', 'planned', 'When they sent it (RFC 3339)', ''),

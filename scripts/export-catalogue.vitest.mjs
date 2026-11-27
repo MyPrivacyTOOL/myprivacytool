@@ -97,6 +97,7 @@ describe('cleanText', () => {
   it('undoes Notion escapes and auto-links', () => {
     expect(cleanText('web.postal\\_area')).toBe('web.postal_area');
     expect(cleanText('[web.network](http://web.network)\\_distance')).toBe('web.network_distance');
+    expect(cleanText('needs user\\:read\\:email')).toBe('needs user:read:email');
     expect(cleanText(null)).toBe('');
   });
 });
