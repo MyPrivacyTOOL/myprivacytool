@@ -1,9 +1,8 @@
-import { useState, useEffect, lazy, Suspense } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { ChevronDown, Shield, AlertTriangle, Download, BarChart3, CheckCircle, XCircle, AlertCircle, Cpu, Monitor, Globe, Battery, Video } from 'lucide-react';
+import { ChevronDown, Shield, AlertTriangle, Download, CheckCircle, XCircle, AlertCircle, Cpu, Monitor, Globe, Battery, Video } from 'lucide-react';
 import {
   calculateFingerprintUniqueness,
   CompositeFingerprint,
@@ -20,16 +19,26 @@ import {
   TimezoneLocaleResult,
   BatteryStatusResult,
   MediaDevicesResult,
+  WebRTCState,
 } from '@/lib/fingerprintDetection';
+import { measuredFingerprint, measuredAdvanced } from '@/lib/measuredOnly';
 import FingerprintVerification from './FingerprintVerification';
 
+// CK-8324: one line per WebRTC outcome, so a check that could not look never reads as a clean result.
+const WEBRTC_READ: Record<WebRTCState, string> = {
+  found: 'A public IP address was visible',
+  none_found: 'No public IP address seen',
+  blocked: 'Could not look (WebRTC blocked or restricted)',
+  timed_out: "Check didn't finish",
+  unsupported: 'Not supported by this browser',
+  error: 'Check failed',
+};
 
-// MPC-7200: charts load on demand when the comparison section is opened.
-const FingerprintComparison = lazy(() => import('./FingerprintComparison'));
 interface FingerprintBreakdown {
   name: string;
-  uniqueness: number;
-  impact: 'high' | 'medium' | 'low' | 'critical';
+  /** CK-8324: what the scan read for this signal. Never a rating or an estimate. */
+  read: string;
+  highlight?: boolean;
   icon: string;
   hash?: string;
   category: 'core' | 'advanced';
@@ -58,55 +67,10 @@ export default function FingerprintPanel() {
   const [showTechnical, setShowTechnical] = useState(false);
   const [showHardwareProfile, setShowHardwareProfile] = useState(false);
   const [showGeographic, setShowGeographic] = useState(false);
-  const [uniquenessScore, setUniquenessScore] = useState(0);
 
   useEffect(() => {
     loadFingerprintData();
   }, []);
-
-  // Parse uniqueness string to percentage
-  const parseUniquenessToPercentage = (uniqueness: string): number => {
-    const match = uniqueness.match(/1 in ([\d,]+)/);
-    if (match) {
-      const value = parseInt(match[1].replace(/,/g, ''), 10);
-      if (value < 1000) return 30;
-      if (value < 10000) return 50;
-      if (value < 100000) return 70;
-      if (value < 1000000) return 85;
-      return 95;
-    }
-    return 50;
-  };
-
-  // Animate uniqueness score
-  useEffect(() => {
-    if (fingerprint) {
-      // Adjust score based on advanced fingerprints
-      let baseScore = parseUniquenessToPercentage(fingerprint.uniqueness);
-      
-      // WebRTC leak significantly increases trackability
-      if (advancedFP.webrtc?.isLeaking) {
-        baseScore = Math.min(baseScore + 15, 99);
-      }
-      
-      const targetScore = baseScore;
-      const duration = 1500;
-      const startTime = Date.now();
-      
-      const animate = () => {
-        const elapsed = Date.now() - startTime;
-        const progress = Math.min(elapsed / duration, 1);
-        const eased = 1 - Math.pow(1 - progress, 3);
-        setUniquenessScore(Math.round(targetScore * eased));
-        
-        if (progress < 1) {
-          requestAnimationFrame(animate);
-        }
-      };
-      
-      requestAnimationFrame(animate);
-    }
-  }, [fingerprint, advancedFP.webrtc?.isLeaking]);
 
   const loadFingerprintData = async () => {
     try {
@@ -149,8 +113,7 @@ export default function FingerprintPanel() {
     if (fingerprint.canvas) {
       breakdown.push({
         name: 'Canvas',
-        uniqueness: 99.9,
-        impact: 'high',
+        read: `Hash read: ${fingerprint.canvas.hash.slice(0, 16)}`,
         icon: '🎨',
         hash: fingerprint.canvas.hash,
         category: 'core',
@@ -160,8 +123,7 @@ export default function FingerprintPanel() {
     if (fingerprint.webgl) {
       breakdown.push({
         name: 'WebGL',
-        uniqueness: 95.2,
-        impact: 'high',
+        read: fingerprint.webgl.renderer || `Hash read: ${fingerprint.webgl.hash.slice(0, 16)}`,
         icon: '🎮',
         hash: fingerprint.webgl.hash,
         category: 'core',
@@ -171,8 +133,7 @@ export default function FingerprintPanel() {
     if (fingerprint.audio) {
       breakdown.push({
         name: 'Audio',
-        uniqueness: 78.3,
-        impact: 'medium',
+        read: `Hash read: ${fingerprint.audio.hash.slice(0, 16)}`,
         icon: '🔊',
         hash: fingerprint.audio.hash,
         category: 'core',
@@ -182,8 +143,7 @@ export default function FingerprintPanel() {
     if (fingerprint.fonts) {
       breakdown.push({
         name: 'Fonts',
-        uniqueness: Math.min(45 + fingerprint.fonts.count * 0.5, 85),
-        impact: 'medium',
+        read: `Fonts detected: ${fingerprint.fonts.count}`,
         icon: '🔤',
         category: 'core',
       });
@@ -192,8 +152,7 @@ export default function FingerprintPanel() {
     if (fingerprint.plugins) {
       breakdown.push({
         name: 'Plugins',
-        uniqueness: fingerprint.plugins.adBlocker ? 35 : 23,
-        impact: 'low',
+        read: `Plugins listed: ${fingerprint.plugins.pluginCount}. Ad blocker ${fingerprint.plugins.adBlocker ? 'detected' : 'not detected'}`,
         icon: '🧩',
         category: 'core',
       });
@@ -202,9 +161,9 @@ export default function FingerprintPanel() {
     // Advanced fingerprints
     if (advancedFP.webrtc) {
       breakdown.push({
-        name: 'WebRTC Leak',
-        uniqueness: advancedFP.webrtc.isLeaking ? 100 : 5,
-        impact: advancedFP.webrtc.isLeaking ? 'critical' : 'low',
+        name: 'WebRTC',
+        read: WEBRTC_READ[advancedFP.webrtc.state] ?? 'Not checked',
+        highlight: advancedFP.webrtc.isLeaking,
         icon: '🌐',
         category: 'advanced',
       });
@@ -213,9 +172,7 @@ export default function FingerprintPanel() {
     if (advancedFP.hardware) {
       breakdown.push({
         name: 'Hardware',
-        uniqueness: advancedFP.hardware.hardwareClass === 'very-high' ? 45 : 
-                   advancedFP.hardware.hardwareClass === 'high' ? 35 : 25,
-        impact: 'low',
+        read: `CPU cores: ${advancedFP.hardware.cores}. Memory: ${advancedFP.hardware.memory ? `${advancedFP.hardware.memory} GB` : 'not reported'}`,
         icon: '🖥️',
         category: 'advanced',
       });
@@ -224,8 +181,7 @@ export default function FingerprintPanel() {
     if (advancedFP.screen) {
       breakdown.push({
         name: 'Screen',
-        uniqueness: advancedFP.screen.uniqueness,
-        impact: advancedFP.screen.uniqueness > 60 ? 'medium' : 'low',
+        read: `${advancedFP.screen.resolution}, ${advancedFP.screen.pixelRatio}x pixel ratio, ${advancedFP.screen.colorDepth}-bit color`,
         icon: '📺',
         category: 'advanced',
       });
@@ -234,8 +190,7 @@ export default function FingerprintPanel() {
     if (advancedFP.timezone) {
       breakdown.push({
         name: 'Timezone/Locale',
-        uniqueness: advancedFP.timezone.mismatch ? 75 : 41,
-        impact: advancedFP.timezone.mismatch ? 'high' : 'medium',
+        read: advancedFP.timezone.timezone,
         icon: '🌍',
         category: 'advanced',
       });
@@ -244,8 +199,7 @@ export default function FingerprintPanel() {
     if (advancedFP.battery?.available) {
       breakdown.push({
         name: 'Battery',
-        uniqueness: 12.3,
-        impact: 'low',
+        read: 'Battery status can be read',
         icon: '🔋',
         category: 'advanced',
       });
@@ -254,8 +208,7 @@ export default function FingerprintPanel() {
     if (advancedFP.mediaDevices && (advancedFP.mediaDevices.videoInputs > 0 || advancedFP.mediaDevices.audioInputs > 0)) {
       breakdown.push({
         name: 'Media Devices',
-        uniqueness: advancedFP.mediaDevices.permissionGranted ? 45 : 28.7,
-        impact: 'medium',
+        read: `Cameras: ${advancedFP.mediaDevices.videoInputs}. Microphones: ${advancedFP.mediaDevices.audioInputs}`,
         icon: '🎥',
         category: 'advanced',
       });
@@ -264,35 +217,12 @@ export default function FingerprintPanel() {
     return breakdown;
   };
 
-  const getUniquenessColor = (percentage: number) => {
-    if (percentage < 50) return 'text-risk-low';
-    if (percentage < 80) return 'text-foreground';
-    return 'text-foreground';
-  };
-
-  const getUniquenessLabel = (percentage: number) => {
-    if (percentage < 50) return { level: 'Common', risk: 'low', color: 'bg-risk-low' };
-    if (percentage < 80) return { level: 'Somewhat Unique', risk: 'medium', color: 'bg-risk-mid' };
-    return { level: 'Very Unique', risk: 'high', color: 'bg-risk-high' };
-  };
-
-  const getEstimatedUniqueness = () => {
-    if (!fingerprint) return '1 in unknown';
-    let uniquenessFactor = Math.pow(10, 2 + (uniquenessScore / 20));
-    // Increase if WebRTC is leaking
-    if (advancedFP.webrtc?.isLeaking) {
-      uniquenessFactor *= 10;
-    }
-    return `1 in ${Math.round(uniquenessFactor).toLocaleString()}`;
-  };
-
   const handleExportReport = () => {
     if (!fingerprint) return;
     
     const report = {
       timestamp: new Date().toISOString(),
       compositeHash: fingerprint.compositeHash,
-      uniqueness: fingerprint.uniqueness,
       totalRisk: fingerprint.totalRisk,
       breakdown: getBreakdown().map(b => ({
         ...b,
@@ -305,7 +235,7 @@ export default function FingerprintPanel() {
         fonts: fingerprint.fonts,
         plugins: fingerprint.plugins,
       },
-      advanced: advancedFP,
+      advanced: measuredAdvanced(advancedFP),
     };
     
     const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
@@ -362,7 +292,6 @@ export default function FingerprintPanel() {
 
   if (!fingerprint) return null;
 
-  const uniquenessInfo = getUniquenessLabel(uniquenessScore);
   const breakdown = getBreakdown();
   const coreBreakdown = breakdown.filter(b => b.category === 'core');
   const advancedBreakdown = breakdown.filter(b => b.category === 'advanced');
@@ -408,35 +337,12 @@ export default function FingerprintPanel() {
           <span className="text-2xl">🔴</span>
           <div>
             <h3 className="text-lg sm:text-xl font-bold">Your Browser Fingerprint</h3>
-            <p className="text-sm text-muted-foreground font-normal">12 fingerprinting methods analyzed</p>
+            <p className="text-sm text-muted-foreground font-normal">Signals read from this browser: {breakdown.length}</p>
           </div>
         </CardTitle>
       </CardHeader>
 
       <CardContent className="space-y-6 pt-6">
-        {/* Uniqueness Score */}
-        <div className="text-center py-4 bg-risk-high-soft rounded-xl border border-risk-high/20">
-          <p className="text-muted-foreground text-sm mb-2">Your browser is</p>
-          <p className={`text-3xl sm:text-4xl font-bold ${getUniquenessColor(uniquenessScore)}`}>
-            {getEstimatedUniqueness()}
-          </p>
-          <div className="mt-4 px-4">
-            <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
-              <span>Common</span>
-              <span>Unique</span>
-            </div>
-            <div className="relative h-3 bg-risk-high-soft rounded-full overflow-hidden">
-              <div 
-                className={`absolute inset-y-0 left-0 ${uniquenessInfo.color} transition-all duration-1000 rounded-full`}
-                style={{ width: `${uniquenessScore}%` }}
-              />
-            </div>
-          </div>
-          <p className={`mt-3 text-sm font-medium ${getUniquenessColor(uniquenessScore)}`}>
-            {uniquenessInfo.level} ({uniquenessScore}% unique)
-          </p>
-        </div>
-
         {/* Privacy Score with Advanced Metrics */}
         <div className="p-4 rounded-xl border bg-secondary border-surface-border">
           <h4 className="text-sm font-semibold text-muted-foreground mb-3 flex items-center gap-2">
@@ -522,31 +428,13 @@ export default function FingerprintPanel() {
             {coreBreakdown.map((item) => (
               <div 
                 key={item.name}
-                className="flex items-center gap-3 p-3 bg-risk-high-soft rounded-lg border border-risk-high/20"
+                className={"flex items-center gap-3 p-3 bg-risk-high-soft rounded-lg border border-risk-high/20"}
               >
                 <span className="text-xl">{item.icon}</span>
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-sm font-medium text-foreground">{item.name}</span>
-                    <span className={`text-xs font-medium ${
-                      item.impact === 'high' || item.impact === 'critical' ? 'text-foreground' : 
-                      item.impact === 'medium' ? 'text-foreground' : 'text-risk-low'
-                    }`}>
-                      {item.uniqueness.toFixed(1)}% unique
-                    </span>
-                  </div>
-                  <Progress 
-                    value={item.uniqueness} 
-                    className="h-1.5 bg-risk-high-soft"
-                  />
+                  <span className="block text-sm font-medium text-foreground">{item.name}</span>
+                  <span className="block text-xs text-muted-foreground break-words">{item.read}</span>
                 </div>
-                <span className={`text-xs px-2 py-0.5 rounded-full ${
-                  item.impact === 'high' || item.impact === 'critical' ? 'bg-risk-high/15 text-foreground' : 
-                  item.impact === 'medium' ? 'bg-risk-mid/15 text-foreground' : 
-                  'bg-risk-low-soft text-risk-low'
-                }`}>
-                  {item.impact}
-                </span>
               </div>
             ))}
           </div>
@@ -562,36 +450,14 @@ export default function FingerprintPanel() {
               <div 
                 key={item.name}
                 className={`flex items-center gap-3 p-3 rounded-lg border ${
-                  item.impact === 'critical' 
-                    ? 'bg-risk-high/15 border-risk-high/40' 
-                    : 'bg-risk-mid-soft border-risk-mid/20'
+                  item.highlight ? 'bg-risk-high/15 border-risk-high/40' : 'bg-risk-mid-soft border-risk-mid/20'
                 }`}
               >
                 <span className="text-xl">{item.icon}</span>
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-sm font-medium text-foreground">{item.name}</span>
-                    <span className={`text-xs font-medium ${
-                      item.impact === 'critical' ? 'text-foreground font-bold' :
-                      item.impact === 'high' ? 'text-foreground' : 
-                      item.impact === 'medium' ? 'text-foreground' : 'text-risk-low'
-                    }`}>
-                      {item.impact === 'critical' ? 'Highest impact' : `${item.uniqueness.toFixed(1)}% unique`}
-                    </span>
-                  </div>
-                  <Progress 
-                    value={item.uniqueness} 
-                    className="h-1.5 bg-risk-mid-soft"
-                  />
+                  <span className="block text-sm font-medium text-foreground">{item.name}</span>
+                  <span className="block text-xs text-muted-foreground break-words">{item.read}</span>
                 </div>
-                <span className={`text-xs px-2 py-0.5 rounded-full ${
-                  item.impact === 'critical' ? 'bg-risk-high/15 text-foreground' :
-                  item.impact === 'high' ? 'bg-risk-high/15 text-foreground' : 
-                  item.impact === 'medium' ? 'bg-risk-mid/15 text-foreground' : 
-                  'bg-risk-low-soft text-risk-low'
-                }`}>
-                  {item.impact}
-                </span>
               </div>
             ))}
           </div>
@@ -644,7 +510,7 @@ export default function FingerprintPanel() {
               
               <p className="text-xs text-muted-foreground mt-3 leading-relaxed">
                 This combination of hardware specs reveals your device type and can be used to track you 
-                even after clearing cookies. High-end devices are more unique and trackable.
+                even after clearing cookies.
               </p>
             </div>
           </CollapsibleContent>
@@ -852,30 +718,6 @@ export default function FingerprintPanel() {
                 <span className="text-muted-foreground ml-2 break-all">{fingerprint.compositeHash}</span>
               </div>
             </div>
-          </CollapsibleContent>
-        </Collapsible>
-
-        {/* Comparison Section */}
-        <Collapsible>
-          <CollapsibleTrigger asChild>
-            <Button 
-              variant="outline" 
-              className="w-full justify-between border-risk-high/30 text-foreground hover:bg-risk-high-soft"
-            >
-              <span className="flex items-center gap-2">
-                <BarChart3 className="w-4 h-4" />
-                Compare With Others
-              </span>
-              <ChevronDown className="w-4 h-4" />
-            </Button>
-          </CollapsibleTrigger>
-          <CollapsibleContent className="pt-4">
-            <Suspense fallback={null}>
-              <FingerprintComparison 
-                fingerprint={fingerprint} 
-                uniquenessScore={uniquenessScore} 
-              />
-            </Suspense>
           </CollapsibleContent>
         </Collapsible>
 
