@@ -24,14 +24,14 @@ Two candidate designs:
 
 | # | Step | Evidence |
 |---|---|---|
-| 1 | `scan_request` | synthetic Worker answers success + scan number |
+| 1 | `scan_request` | (MPC-10608) the synthetic Worker records a scan consent (`POST /api/consent`, as the site's consent block does), then accepts the scan carrying its `consent_id`: success + scan number |
 | 2 | `saved_scan` | `web_scans` row with the sent hexagon count |
 | 3 | `linked_contact_consent` | `web_scan_contacts` row with `save_consent_at` and wording version |
-| 4 | `report_request` | `scans` row, source `web_scan`, attached to a test address (refuses to continue otherwise) |
+| 4 | `report_request` | `scans` row, source `web_scan`, attached to a test address (refuses to continue otherwise), carrying this run's `consent_id` (the report job refuses a request without one) |
 | 5 | `first_email_accepted` | `scans.confirmation_sent_at` set (the provider accepted it; **accepted is not inbox receipt**) |
 | 6 | `report_sent` | `report_status = sent` and `resend_message_id` (waits up to 15 min for the cron) |
 | 7 | `report_checks` | sent HTML/text read back from Resend (falls back to a rebuild from the saved scan, flagged in the result): two parts, bridge line, honest statuses, scan number in HTML + text + JSON, JSON valid and agreeing with the scan, HTML under 100 KB, no unsupported markup, plain-text parity |
-| 8 | `links_resolve` | every https link in the report answers 2xx (the signed unsubscribe link is not fetched) |
+| 8 | `links_resolve` | every https link in the report answers 2xx (the signed unsubscribe link is not fetched). (MPC-10608) One exception: HTTP 403 from a data broker host on `BOT_BLOCKED_VERIFIED_HOSTS` (`scripts/nightly-chain/checks.mjs`) is counted as **automated check blocked**, which is not proof the link works. A host is listed only after its opt-out page has been opened in a real browser, and is re-checked there monthly. A second list, `CERT_CHAIN_VERIFIED_HOSTS`, covers one host (`help.whitepages.com.au`) for one error (its server omits the intermediate certificate), on the same terms. A third list, `BLOCKED_UNVERIFIED_HOSTS` (`www.whitepages.com`, `www.fastpeoplesearch.com`, accepted by decision on MPC-10608, 2026-11-27 HKT), is **not verified**: both showed a block page in the browser check, so their 403 does not fail the run and every run names them as blocked, NOT verified. A removed page could hide behind that 403; check both from an ordinary US connection when one is available. Any other 403, 404, 410, 5xx, DNS or TLS error, or timeout still fails; the run log lists every failing link |
 | 0 | `db_ready` | (MPC-7557) the production database has what the Worker needs: the receipt, send-event, delivery-count and atomic-scan functions, and the columns on `scans`, `email_sends`, `email_suppressions`. Checked with calls that change nothing; a missing item fails the night naming it (a migration is not applied) before anything is sent. Added after the CK-8503 migration was recorded as applied but was not |
 | 9 | `delivery_event_seen` | (MPC-7556) the Resend webhook stored a `delivered` event for the test report on its `email_sends` row within 5 minutes. No event, or a bounce, fails the night: the webhook, its secret or the migration is broken |
 

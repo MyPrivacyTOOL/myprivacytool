@@ -1,4 +1,6 @@
 // MPC-7557: pure checks for the nightly chain test. No network, no secrets: every function takes data and returns problems, so CI can prove them.
+import { readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { checkEmail, htmlLinks, HARD_LIMIT_BYTES } from '../../workers/scan-report/lib/renderChecks.js';
 import { HEXAGONS } from '../../shared/hexagon-registry/registry.js';
 import { captureStatus } from '../../shared/hexagon-registry/status.js';
@@ -19,7 +21,19 @@ export function fixtureScan() {
   });
 }
 
-/** The request body for POST /api/scan (the same shape the /scan page sends). */
+/** The scan-consent wording version the Worker accepts, read from the one place it lives (plain node cannot import the .ts), so a wording change needs no edit here. */
+export function consentVersion() {
+  const v = readFileSync(new URL('../../shared/recipients/consent-config.ts', import.meta.url), 'utf8').match(/consent_version:\s*"([^"]+)"/)?.[1];
+  if (!v) throw new Error('consent_version not found in shared/recipients/consent-config.ts');
+  return v;
+}
+
+/** The request body for POST /api/consent. Nobody is shown wording in this test, so the text hash names a synthetic text rather than posing as the real one. */
+export function consentRequestBody(scanId) {
+  return { scan_id: scanId, consent_version: consentVersion(), consent_text_sha256: createHash('sha256').update('nightly-chain synthetic consent').digest('hex'), locale: 'en' };
+}
+
+/** The request body for POST /api/scan (the same shape the /scan page sends). The caller adds the consent_id that POST /api/consent returned. */
 export function scanRequestBody(email, hexagons, { requestId } = {}) {
   return {
     email, consent: true, consent_source: 'synthetic_nightly', scan: hexagons, save_consent: true, save_consent_version: '2026-10-12-v1',
@@ -56,14 +70,64 @@ export function linksToResolve(html) {
   return [...new Set(htmlLinks(html))].filter((l) => !/\/unsubscribe\?/.test(l) && !/\/scan\/live/.test(l)).map((l) => l.replace(/&amp;/g, '&')).slice(0, 25);
 }
 
-/** A link "resolves" when it answers 2xx or redirects (3xx) to somewhere that does. A 404/410/5xx or a network error does not. */
-export async function resolveLinks(urls, fetchImpl = fetch, { timeoutMs = 10000 } = {}) {
+/**
+ * MPC-10608 (decided 2026-11-17 HKT): some data broker opt-out pages answer HTTP 403 to any automated request. A 403 is tolerated ONLY for a host on this list,
+ * and a host is listed ONLY after a person or session has opened its opt-out link in a real browser and seen the opt-out page. It is reported as
+ * "automated check blocked", never as a working link. Every other 403, and 404, 410, 5xx, DNS, TLS errors and timeouts, stay failures.
+ * Re-open each listed link in a browser monthly; remove a host whose page no longer opens. `verified` is the HKT date of the last browser check.
+ */
+export const BOT_BLOCKED_VERIFIED_HOSTS = {
+  'www.truthfinder.com': { verified: '2026-11-27', saw: 'redirects to the PeopleConnect Suppression Center (the opt-out form)' },
+  'www.beenverified.com': { verified: '2026-11-27', saw: 'checked by a person in their own browser: the people-search opt-out page with its record search form' },
+  'www.mylife.com': { verified: '2026-11-27', saw: 'checked by a person in their own browser: the deletion and opt-out form' },
+  'www.intelius.com': { verified: '2026-11-27', saw: 'checked by a person in their own browser: the PeopleConnect Suppression Center (the opt-out form)' },
+};
+// Not on this list: www.whitepages.com and www.fastpeoplesearch.com showed a block page, not the opt-out page, in that browser check. They are below.
+
+/**
+ * MPC-10608 (decided 2026-11-27 HKT): NOT VERIFIED. These two hosts refused every check, the browser checks included, so nobody has seen their opt-out page from
+ * here. Their HTTP 403, and nothing else, does not fail the run; every run names them as "blocked, NOT verified". Known cost: a page that has been removed could
+ * hide behind the same 403. Do not add a host here without an owner decision. Open both from an ordinary US connection (not a VPN) when one is available: move a
+ * host to the verified list if its opt-out page opens, or take it off if the page is gone.
+ */
+export const BLOCKED_UNVERIFIED_HOSTS = {
+  'www.whitepages.com': { decided: '2026-11-27', saw: 'block page in both browser checks' },
+  'www.fastpeoplesearch.com': { decided: '2026-11-27', saw: 'block page in both browser checks' },
+};
+
+/**
+ * MPC-10608 (decided 2026-11-27 HKT): one more exception, for one host and one error only. This server sends its certificate without the intermediate one.
+ * Browsers fetch the missing certificate and open the page; Node does not and refuses the connection. Same rules as above: browser-checked monthly, reported
+ * as "automated check blocked". Any other error on this host (expired or wrong-name certificate, DNS, timeout, any HTTP status) still fails.
+ */
+export const CERT_CHAIN_VERIFIED_HOSTS = {
+  'help.whitepages.com.au': { code: 'UNABLE_TO_VERIFY_LEAF_SIGNATURE', verified: '2026-11-27', saw: 'the "My residential listing" help page' },
+};
+
+const hostOf = (u) => { try { return new URL(u).hostname; } catch { return ''; } };
+
+/**
+ * A link "resolves" when it answers 2xx or redirects (3xx) to somewhere that does. A 404/410/5xx or a network error does not.
+ * Returns the failures. A tolerated refusal (see above) is not a failure: it is pushed to `blocked` (browser-verified) or `unverified` (nobody has seen the page),
+ * so the caller can count and name the two apart.
+ */
+export async function resolveLinks(urls, fetchImpl = fetch, { timeoutMs = 10000, blocked = [], unverified = [], allowedHosts = BOT_BLOCKED_VERIFIED_HOSTS, certHosts = CERT_CHAIN_VERIFIED_HOSTS, unverifiedHosts = BLOCKED_UNVERIFIED_HOSTS } = {}) {
   const bad = [];
   for (const u of urls) {
     try {
       const res = await fetchImpl(u, { method: 'GET', redirect: 'follow', signal: AbortSignal.timeout(timeoutMs), headers: { 'User-Agent': 'mpt-nightly-chain/1 (+https://myprivacytool.io)' } });
-      if (!(res.status >= 200 && res.status < 300)) bad.push(`${u.replace(/[?#].*/, '')} -> HTTP ${res.status}`);
-    } catch (e) { bad.push(`${u.replace(/[?#].*/, '')} -> ${String(e.name || 'error')}`); }
+      if (res.status >= 200 && res.status < 300) continue;
+      // The refusal must come from the listed host itself: a redirect that ends in a 403 somewhere else is not covered.
+      const host = hostOf(u);
+      const refusedByHost = res.status === 403 && (!res.url || hostOf(res.url) === host);
+      if (refusedByHost && Object.hasOwn(allowedHosts, host)) blocked.push(`${host} (HTTP 403)`);
+      else if (refusedByHost && Object.hasOwn(unverifiedHosts, host)) unverified.push(`${host} (HTTP 403)`);
+      else bad.push(`${u.replace(/[?#].*/, '')} -> HTTP ${res.status}`);
+    } catch (e) {
+      const host = hostOf(u); const code = typeof e.cause?.code === 'string' ? e.cause.code : '';
+      if (code && Object.hasOwn(certHosts, host) && certHosts[host].code === code) blocked.push(`${host} (incomplete certificate chain)`);
+      else bad.push(`${u.replace(/[?#].*/, '')} -> ${String(e.name || 'error')}${code ? ` (${code})` : ''}`);
+    }
   }
   return bad;
 }
