@@ -33,3 +33,15 @@ export interface ExposureResultV2 {
   warnings: string[];
 }
 export function computeExposureV2(items: ExposureItem[], opts?: { total?: number; final?: boolean }): ExposureResultV2;
+
+/** The v2 scoring core over any set of scored hexagons (the report's web + email set, the Telegram set). See scoreV2.js. */
+export function makeScorer(def: {
+  hexagons: readonly { id: string; category: string; truth: { level: string; sensitivity: string }; status: { allowed: readonly string[] } }[];
+  weights: Readonly<Record<string, number>>;
+  categoryOf: Readonly<Record<string, string>>;
+  notScored?: Readonly<Record<string, string>>;
+  defaultTotal: number;
+}): {
+  itemInfo: (id: string) => { hex: unknown; category: string; severity: number } | null;
+  compute: (items: ExposureItem[], opts?: { total?: number; final?: boolean }) => ExposureResultV2;
+};
