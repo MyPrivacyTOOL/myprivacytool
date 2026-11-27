@@ -12,7 +12,8 @@
 //   follows the registry Channel Key and it gains registry_id and evidence_key.
 // - A row that is new gets its fields from the registry and `added: "2026-11-27"`. Risk: Critical and High are "high". A row with no arrival class is filed as D ("wider
 //   lookup, not in the baseline"), the least-claiming class. Nothing is invented: an empty registry field stays empty.
-// - OWNER_EXCLUDED rows stay data points in the registry but are not published. Count check: published + excluded = Data point rows, and the build asserts it again.
+// - Rows with Decision = Dropped stay data points in the registry but are not published (Chris, 2026-11-27: 78, 90, 99, 153, 538 = 5 rows). The rule is the registry field, not a list of ids.
+//   Decision = Held rows (97, 174) stay published. Count check: published + excluded = Data point rows, and the build asserts it again. --expect-published=<n> stops the export when the derived count differs.
 import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
@@ -21,8 +22,9 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SOURCE = path.join(ROOT, 'shared/hexagon-registry/hexagons-366.json');
 export const DATA_SOURCE = '40c28547-eaa7-81c6-a953-000b18c5b905';
 export const ADDED = '2026-11-27';
-// Chris, 2026-11-27 (MPC-11541): 538 "Public registers" is not a Control; it stays a data point with Decision = Dropped and is not published (654 = 662 - 7 non-data - 1).
-export const OWNER_EXCLUDED = { 538: 'Decision = Dropped (owner, 2026-11-27): stays a data point in the registry, not published' };
+// Chris, 2026-11-27 (MPC-11541): every row with Decision = Dropped stays a data point in the registry but is not published (650 = 662 - 7 non-data - 5 dropped).
+export const EXCLUDED_DECISION = 'Dropped';
+export const EXCLUDE_REASON = 'Decision = Dropped (owner, 2026-11-27): stays a data point in the registry, not published';
 
 // Notion returns text with markdown link wrappers and backslash escapes around ids such as dy.ids ([dy.ids](http://dy.ids)) and snake_case; undo both.
 export const clean = (s) => String(s ?? '').replace(/\[([^\]]*)\]\([^)]*\)/g, '$1').replace(/\\/g, '').trim();
@@ -39,7 +41,7 @@ const CHANNEL_META = {
 const RISK = { Critical: 'high', High: 'high', Medium: 'medium', Low: 'low' };
 const slugify = (s) => clean(s).toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
 
-export function exportCatalogue(rows, { dataPointRows, previous }) {
+export function exportCatalogue(rows, { dataPointRows, previous, expectPublished }) {
   const dataRows = rows.filter((r) => (r['Row Type'] || 'Data point') === 'Data point');
   if (dataRows.length !== dataPointRows) throw new Error(`registry export: ${dataRows.length} Data point rows given, Notion reports ${dataPointRows}`);
   if (new Set(dataRows.map((r) => r['Hexagon ID'])).size !== dataRows.length) throw new Error('registry export: duplicate Hexagon ID');
@@ -61,7 +63,7 @@ export function exportCatalogue(rows, { dataPointRows, previous }) {
   for (const i of previous.items) { const m = /^([A-D])(\d+)$/.exec(i.code); if (m) seq[`${i.channel}|${m[1]}`] = Math.max(seq[`${i.channel}|${m[1]}`] ?? 0, +m[2]); }
   for (const r of dataRows) {
     const rid = r['Hexagon ID'];
-    if (OWNER_EXCLUDED[rid]) { if (byId.has(clean(r['Catalogue Code']))) claimed.add(clean(r['Catalogue Code'])); excluded.push({ registry_id: rid, label: clean(r.Footprint), reason: OWNER_EXCLUDED[rid] }); continue; }
+    if (r.Decision === EXCLUDED_DECISION) { if (byId.has(clean(r['Catalogue Code']))) claimed.add(clean(r['Catalogue Code'])); excluded.push({ registry_id: rid, label: clean(r.Footprint), reason: EXCLUDE_REASON }); continue; }
     const code = clean(r['Catalogue Code']);
     const old = byRid.get(rid) ?? (code && owner.get(code) === rid ? byId.get(code) : null);
     const key = clean(r['Channel Key']);
@@ -81,6 +83,7 @@ export function exportCatalogue(rows, { dataPointRows, previous }) {
     if (!old && (byId.has(item.id) || published.some((p) => p.id === item.id))) throw new Error(`registry export: id ${item.id} would clash`);
     published.push(item);
   }
+  if (expectPublished !== undefined && dataRows.length - excluded.length !== expectPublished) throw new Error(`registry export: derived ${dataRows.length - excluded.length} publishable rows (${dataRows.length} Data point rows less ${excluded.length} with Decision = ${EXCLUDED_DECISION}), expected ${expectPublished}. Stop and report.`);
   const missing = previous.items.filter((i) => !claimed.has(i.id) && !(i.registry_id && published.some((p) => p.registry_id === i.registry_id)));
   if (missing.length) throw new Error(`registry export: catalogue items with no registry row: ${missing.map((i) => i.id).join(', ')}`);
   // Slugs: keep every existing one; a new label that clashes is prefixed with its channel, then with its registry id.
@@ -108,7 +111,8 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const n = Number((args.find((a) => a.startsWith('--data-point-rows=')) || '').split('=')[1]);
   if (!Number.isInteger(n)) throw new Error('pass --data-point-rows=<the Row Type = Data point count Notion shows>');
   const rows = args.filter((a) => !a.startsWith('--')).flatMap((f) => { const d = JSON.parse(readFileSync(f, 'utf8')); return Array.isArray(d) ? d : d.results; });
-  const out = exportCatalogue(rows, { dataPointRows: n, previous: JSON.parse(readFileSync(SOURCE, 'utf8')) });
+  const e = (args.find((a) => a.startsWith('--expect-published=')) || '').split('=')[1];
+  const out = exportCatalogue(rows, { dataPointRows: n, previous: JSON.parse(readFileSync(SOURCE, 'utf8')), expectPublished: e === undefined ? undefined : Number(e) });
   writeFileSync(SOURCE, JSON.stringify(out, null, 1) + '\n');
   console.log(`registry export: ${out.items.length} published + ${out.registry.excluded.length} excluded = ${n} Data point rows`);
 }
