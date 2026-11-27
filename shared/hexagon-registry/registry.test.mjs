@@ -12,8 +12,8 @@ test('54 hexagons: 41 always, 13 conditional, unique ids', () => {
   assert.ok(!isKnownHexagonId('<script>'));
 });
 
-test('trust score is empty everywhere; unclear hexagons default to NOT_CHECKED and never allow CLEAR', () => {
-  assert.ok(HEXAGONS.every((h) => h.trust_score === null));
+test('no trust_score field (MPC-8357); unclear hexagons default to NOT_CHECKED and never allow CLEAR', () => {
+  assert.ok(HEXAGONS.every((h) => !('trust_score' in h)));
   const flagged = HEXAGONS.filter((h) => h.status.code_cannot_tell_clear_from_not_checked);
   assert.equal(flagged.length, 29);
   for (const h of flagged) {
@@ -30,7 +30,7 @@ import { captureStatus } from './status.js';
 
 test('seven email hexagons are in the shared registry, outside the 54 web hexagons', () => {
   assert.deepEqual(EMAIL_HEXAGONS.map((h) => h.id), ['email-breaches', 'email-name', 'email-provider', 'email-profile', 'email-libravatar', 'email-domain-record', 'email-github-commits']);
-  assert.ok(EMAIL_HEXAGONS.every((h) => h.trust_score === null && !isKnownHexagonId(h.id)));
+  assert.ok(EMAIL_HEXAGONS.every((h) => !('trust_score' in h) && !isKnownHexagonId(h.id)));
 });
 
 test('capture status: the 7 cannot-be-checked are always NOT_CHECKED; placeholders are NOT_CHECKED; CLEAR only where allowed', () => {

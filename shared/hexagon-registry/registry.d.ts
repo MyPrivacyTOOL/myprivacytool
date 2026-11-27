@@ -33,7 +33,6 @@ export interface HexagonRegistryEntry {
     not_checked: string;
     detection_change_to_make_checkable: string | null;
   };
-  trust_score: null;
   source: string;
 }
 
@@ -50,7 +49,6 @@ export interface EmailHexagonEntry {
   example_value: string;
   truth: { level: TruthLevel; sensitivity: string; note: string };
   status: { kind: string; allowed: HexagonStatus[]; found: string; clear: string; not_checked: string };
-  trust_score: null;
   source: string;
   build_status: string;
 }

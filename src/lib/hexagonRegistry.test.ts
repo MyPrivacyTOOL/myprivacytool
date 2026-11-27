@@ -19,13 +19,13 @@ describe('hexagon registry', () => {
     expect(HEXAGON_CONDITIONAL_COUNT).toBe(13);
   });
 
-  it('has the required fields on every entry and leaves the trust score empty', () => {
+  it('has the required fields on every entry and has no trust_score field (MPC-8357)', () => {
     for (const h of HEXAGONS) {
       for (const k of ['id', 'label', 'group', 'captures', 'value_to_user', 'value_type'] as const) expect(h[k], `${h.id}.${k}`).toBeTruthy();
       expect(['always', 'conditional']).toContain(h.presence);
       expect(['yes', 'partly', 'no']).toContain(h.user_can_check);
       expect(TRUTH_LEVELS).toContain(h.truth.level);
-      expect(h.trust_score).toBeNull();
+      expect('trust_score' in h).toBe(false);
       expect(h.status.allowed.every(s => STATUSES.includes(s))).toBe(true);
       expect(h.artwork.emoji).toBeTruthy();
     }
