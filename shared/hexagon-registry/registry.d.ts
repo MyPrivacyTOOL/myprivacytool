@@ -33,7 +33,7 @@ export interface HexagonRegistryEntry {
     not_checked: string;
     detection_change_to_make_checkable: string | null;
   };
-  trust_score: null;
+  trust_score: 0 | 50 | 100;
   source: string;
 }
 

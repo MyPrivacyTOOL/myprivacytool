@@ -2,7 +2,7 @@
 
 One list of the 54 web scan hexagons (41 always, 13 conditional): label, group, what it captures, value to the user,
 truth level (measured / estimate / cannot be checked), confidence the code holds, and the FOUND / CHECKED AND CLEAR /
-NOT CHECKED rule. `trust_score` is deliberately null: Chris has not defined it. Do not fill it in.
+NOT CHECKED rule. `trust_score` (MPC-8357) is how easily the person can check the value themselves: 100 / 50 / 0 from `user_can_check` (yes / partly / no), set by a human reviewer; null = not rated (the email hexagons). Definition: Notion rules page, section 3c.
 
 - Code copy: `registry.js` (plain ESM, imported by the website in `src/` and by `workers/scan-report`).
 - **Reviewed record (source of truth for the content): https://app.notion.com/p/3f628547eaa7810fac20ce7fd5efdc36**

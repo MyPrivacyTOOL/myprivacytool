@@ -12,8 +12,8 @@ test('54 hexagons: 41 always, 13 conditional, unique ids', () => {
   assert.ok(!isKnownHexagonId('<script>'));
 });
 
-test('trust score is empty everywhere; unclear hexagons default to NOT_CHECKED and never allow CLEAR', () => {
-  assert.ok(HEXAGONS.every((h) => h.trust_score === null));
+test('trust_score follows user_can_check (MPC-8357); unclear hexagons default to NOT_CHECKED and never allow CLEAR', () => {
+  assert.ok(HEXAGONS.every((h) => h.trust_score === { yes: 100, partly: 50, no: 0 }[h.user_can_check]));
   const flagged = HEXAGONS.filter((h) => h.status.code_cannot_tell_clear_from_not_checked);
   assert.equal(flagged.length, 29);
   for (const h of flagged) {
