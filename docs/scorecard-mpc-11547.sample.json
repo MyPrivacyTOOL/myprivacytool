@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-27T05:50:00.000Z",
+  "generated_at": "2026-11-27T08:00:00.000Z",
   "timezone": "Asia/Hong_Kong",
   "headline_note": "The locked KPI (10,000 free scans / 1,000 paid / $120k ARR by 2027-08-01) is the headline and is not changed or computed here. These four are secondary.",
   "period": {
@@ -245,7 +245,7 @@
       },
       {
         "week_of_deletion": "2026-11-23",
-        "deleted_scans": 19
+        "deleted_scans": 25
       }
     ]
   }
