@@ -1,6 +1,7 @@
 // node workers/mpt-content-consumer/worker.test.mjs  (producer + consumer + approval; stubbed KV / D1 / fetch, no network)
 import assert from 'node:assert/strict';
-import consumer, { parseDraft, buildPrompt, guardrails, topicFor, slackBlocks, claimViolations, scanLink, CLAIMS_RULES } from './worker.js';
+import consumer, { parseDraft, buildPrompt, guardrails, topicFor, slackBlocks, claimViolations, scanLink, CLAIMS_RULES, cardFields } from './worker.js';
+import { buildTopicPairs } from '../../scripts/sync-workstream-3-to-kv.mjs';
 import producer, { hktDate, buildMessage } from '../mpt-content-producer/worker.js';
 import approval, { scheduledTime } from '../mpt-content-approval/worker.js';
 import { parseSchedule, toSections } from '../../scripts/sync-content-cache-to-kv.mjs';
@@ -86,6 +87,24 @@ for (const [bad, why] of [
 check(claimViolations({ copy: 'Check your exposure: https://myprivacytool.io?utm_source=x' }).some((r) => /scan/.test(r)), 'homepage-only link fails');
 check(claimViolations({ copy: ok, slides: ['We delete your data'] }).length > 0, 'slides are checked too');
 
+// ---- phase 2: per-post cards ----
+const CARD = { template: 'fix', label: 'ONE FIX', headline: 'Remove yourself from Spokeo', alice: 'pointing', urls: { instagram: 'https://s.example/ig.jpg', linkedin: 'https://s.example/li.jpg', x: 'https://s.example/x.jpg', pinterest: 'https://s.example/pin.jpg' } };
+const imgDays = parseSchedule([
+  { type: 'heading_2', text: 'SOCIAL MEDIA: Twitter/X THREADS (Nov 27 – Dec 10)' },
+  { type: 'bulleted_list_item', text: 'Nov 27 (Fri): Thread: "Opt out of Spokeo" (Fix)' },
+  { type: 'heading_2', text: 'IMAGE HEADLINES (Nov 27 – Dec 10)' },
+  { type: 'bulleted_list_item', text: 'Nov 27: One fix: Remove yourself from Spokeo' },
+]);
+check(imgDays['2026-11-27'].items.image[0].text === 'One fix: Remove yourself from Spokeo' && imgDays['2026-11-27'].items.x[0].text.startsWith('Thread:'), 'IMAGE HEADLINES section parsed next to the X topic');
+const tp = buildTopicPairs({ scheduleBlocks: [{ type: 'heading_2', text: 'X THREADS' }, { type: 'bulleted_list_item', text: 'Nov 27: Thread: a' }, { type: 'bulleted_list_item', text: 'Nov 28: Thread: b' }], cards: { '2026-11-27': CARD, '2026-12-31': CARD } });
+check(JSON.parse(tp.find((p) => p.key === 'topic:2026-11-27').value).card.urls.instagram === CARD.urls.instagram && !JSON.parse(tp.find((p) => p.key === 'topic:2026-11-28').value).card && !tp.some((p) => p.key === 'topic:2026-12-31'), 'cards merge into their own day only');
+check(buildMessage(new Date('2026-11-26T22:00:00Z'), { topic: 'T', card: CARD }).card === CARD, 'producer passes the card through');
+check(cardFields(CARD, 'facebook').asset_url === CARD.urls.instagram && cardFields(CARD, 'linkedin').asset_url === CARD.urls.linkedin && cardFields(CARD, 'x').asset_url === CARD.urls.x, 'each platform gets its card size');
+check(Object.keys(cardFields(CARD, 'youtube')).length === 0 && Object.keys(cardFields(null, 'instagram')).length === 0 && Object.keys(cardFields({ urls: { instagram: 'http://insecure' } }, 'instagram')).length === 0, 'youtube, missing or bad card: no override');
+const cb = slackBlocks('daily-posts-2026-11-27', 'T', [], CARD);
+check(cb.some((b) => b.type === 'image' && b.image_url === CARD.urls.instagram) && cb.some((b) => b.type === 'context' && /linkedin/.test(b.elements[0].text)), 'Slack shows the card and links every size');
+check(slackBlocks('t', 'T', [], null).some((b) => b.type === 'context' && /No per-post card/.test(b.elements[0].text)), 'Slack says so when there is no card');
+
 // ---- consumer end to end ----
 const L = ' Check your exposure: https://myprivacytool.io/scan?utm_source=p';
 const goodFor = (platform) => (platform === 'pinterest' ? { copy: `body${L}`, title: 'T' } : platform === 'youtube' ? { copy: `desc${L}`, title: 'T', script: 'spoken' } : platform === 'instagram' ? { copy: `cap${L}`, slides: ['s1'] } : { copy: `${platform} copy${L}` });
@@ -124,6 +143,13 @@ check(JSON.parse(env.AGENT_LOGS.logs.find((r) => r.status === 'notified').draft_
 await consumer.queue({ messages: [{ ...msg, attempts: 3 }] }, env);
 check(slackPosts.length === 1, 'duplicate delivery is a no-op');
 
+// card flows from the queue message into the saved drafts, then into the Make envelope
+const envC = { ...env, AGENT_LOGS: makeDb() };
+await consumer.queue({ messages: [{ body: { date: '2026-11-27', action: 'generate_daily_posts', topic: 'Opt out of Spokeo', card: CARD }, attempts: 1, ack: () => {}, retry: () => {} }] }, envC);
+const cDrafts = envC.AGENT_LOGS.logs.filter((r) => r.status === 'drafted').map((r) => JSON.parse(r.draft_content));
+check(cDrafts.find((d) => d.platform === 'instagram').asset_url === CARD.urls.instagram && cDrafts.find((d) => d.platform === 'linkedin').asset_url === CARD.urls.linkedin && !cDrafts.find((d) => d.platform === 'youtube').asset_url, 'queued card lands on each draft');
+check(slackPosts.at(-1).blocks.some((b) => b.type === 'image'), 'that day\'s Slack message shows the card');
+
 // ---- approval worker ----
 const taskId = 'daily-posts-2026-10-20';
 const makeCalls = [];
@@ -141,6 +167,8 @@ slackPosts.length = 0;
 const res = await approval.fetch(post({ action: 'approve_all', drafted_content_id: taskId, timestamp: '2026-10-20T22:15:00Z' }, { authorization: 'Bearer tok' }), aenv, ctx);
 check(res.status === 200 && makeCalls.length === 1 && makeCalls[0].posts.length === 6, 'approve_all posts one envelope with 6 posts to Make');
 const li = makeCalls[0].posts.find((c) => c.platform === 'linkedin');
+const igC = (await import('../mpt-content-approval/worker.js')).buildMakePayload(cDrafts, { taskId: 'daily-posts-2026-11-27', approvedBy: 'chris', approvalTimestamp: '2026-11-26T22:15:00Z', defaultAssetUrl: 'https://cdn.example.com/default.png' });
+check(igC.posts.find((p) => p.platform === 'instagram').asset_url === CARD.urls.instagram && igC.posts.find((p) => p.platform === 'youtube').asset_url === 'https://cdn.example.com/default.png', 'Make gets the card for Instagram, the default where there is none');
 check(li.body === `linkedin copy${L}` && li.link_url.startsWith('https://myprivacytool.io/scan?utm_source=linkedin') && li.title && li.link_url && li.asset_url && li.cta && li.publish_timestamp.endsWith('+08:00') && makeCalls[0].approved_by === 'chris' && makeCalls[0].approval_timestamp === '2026-10-21T06:15:00+08:00', 'envelope carries approver, HKT timestamps and per-post fields');
 check(makeCalls[0].posts.find((c) => c.platform === 'youtube').script === 'spoken', 'youtube script passes through');
 check(env.AGENT_LOGS.metrics.length === 0 && env.AGENT_LOGS.logs.some((r) => r.status === 'handed_off') && !env.AGENT_LOGS.logs.some((r) => r.status === 'published'), 'CK-8482: a Make 200 logs handed_off, never published, and seeds no metrics');

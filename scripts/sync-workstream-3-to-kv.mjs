@@ -19,14 +19,24 @@
 // Usage: node scripts/sync-workstream-3-to-kv.mjs [--dry-run]
 //
 // KV layout:
-//   topic:<YYYY-MM-DD> -> {date, items:{pillar|blog|x|reddit|linkedin:[{text,qualifier}]}}
+//   topic:<YYYY-MM-DD> -> {date, items:{pillar|blog|x|reddit|linkedin|image:[{text,qualifier}]}, card?}
+//   Optional env CARDS_MANIFEST: path to the manifest from tools/social-cards/run.mjs (adds `card` to days that have one).
 //   topic:index        -> {synced_at, count, dates:[...]}
 
 import { pathToFileURL } from 'node:url';
+import { existsSync, readFileSync } from 'node:fs';
 import { fetchBlocks, parseSchedule } from './sync-content-cache-to-kv.mjs';
 
-export function buildTopicPairs({ scheduleBlocks, year, now = new Date() }) {
+/** Cards manifest written by tools/social-cards/run.mjs: {'YYYY-MM-DD': {template,label,headline,alice,urls:{...}}}. */
+export function readCards(path) {
+  if (!path || !existsSync(path)) return {};
+  try { return JSON.parse(readFileSync(path, 'utf8')).cards ?? {}; } catch (e) { console.error(`cards manifest unreadable: ${e.message}`); return {}; }
+}
+
+export function buildTopicPairs({ scheduleBlocks, year, now = new Date(), cards = {} }) {
   const days = parseSchedule(scheduleBlocks, year);
+  // Content System v1 phase 2: a day whose card rendered and uploaded carries it; the producer passes it to the consumer.
+  for (const [d, card] of Object.entries(cards)) if (days[d]) days[d].card = card;
   const dates = Object.keys(days).sort();
   if (!dates.length) throw new Error('No dated items parsed from the WORKSTREAM 3 page; refusing to overwrite KV.');
   return [
@@ -44,7 +54,9 @@ export async function main(env = process.env, argv = process.argv) {
   const nsId = env.KV_NAMESPACE_ID || '187c9af3fc3a44bea3b1eb80298ab0ce';
 
   const scheduleBlocks = await fetchBlocks(env.SCHEDULE_PAGE_ID || '3f128547-eaa7-81ed-8e81-e74b87da1efc', notionToken);
-  const pairs = buildTopicPairs({ scheduleBlocks, year: Number(env.CONTENT_YEAR) || 2026 });
+  const cards = readCards(env.CARDS_MANIFEST);
+  if (env.CARDS_MANIFEST) console.log(`cards manifest: ${Object.keys(cards).length} days with a card`);
+  const pairs = buildTopicPairs({ scheduleBlocks, year: Number(env.CONTENT_YEAR) || 2026, cards });
   console.log(`${pairs.length} KV keys -> ${nsId} (mpt-brand-topics)`);
   if (dryRun) { console.log('dry run: nothing written'); return pairs; }
 

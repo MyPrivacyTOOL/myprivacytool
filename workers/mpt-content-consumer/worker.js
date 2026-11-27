@@ -7,6 +7,7 @@
 
 import { callRecipient } from '../../shared/recipients/outbound.ts';
 import { workerRecipientContext } from '../../shared/recipients/worker-ctx.ts';
+import { blockedReasons } from '../../shared/content/claims.mjs';
 
 export const PLATFORMS = ['x', 'linkedin', 'instagram', 'facebook', 'pinterest', 'youtube'];
 const PLATFORM_NAMES = { x: 'X', linkedin: 'LinkedIn', instagram: 'Instagram', facebook: 'Facebook', pinterest: 'Pinterest', youtube: 'YouTube' };
@@ -52,6 +53,15 @@ export const CLAIMS_RULES = [
 // Must equal CAMPAIGN in workers/mpt-content-approval/worker.js so a post's text link and its link card report as one GA4 campaign.
 const CAMPAIGN = 'mpc-7033-daily';
 const TITLED = ['pinterest', 'youtube'];
+
+// Content System v1 phase 2: the day's card (rendered by tools/social-cards at 05:00 HKT) per platform. Facebook uses the 4:5
+// Instagram card; YouTube keeps its video. A platform with no card keeps the approval Worker's default image.
+export const CARD_SIZE = { instagram: 'instagram', facebook: 'instagram', linkedin: 'linkedin', x: 'x', pinterest: 'pinterest' };
+const validCard = (card) => card && typeof card === 'object' && card.urls && typeof card.urls === 'object' && Object.values(card.urls).every((u) => typeof u === 'string' && u.startsWith('https://'));
+export function cardFields(card, platform) {
+  const url = validCard(card) ? card.urls[CARD_SIZE[platform]] : null;
+  return url ? { asset_url: url, card: { label: card.label, headline: card.headline } } : {};
+}
 
 export const taskIdFor = (date) => `daily-posts-${date}`;
 const now = () => new Date().toISOString();
@@ -126,24 +136,10 @@ export function parseDraft(platform, text) {
   return { platform, ...d, cta: CTA };
 }
 
-// Each rule: [pattern, reason shown to the reviewer and fed back to the model on the rewrite].
-const BLOCKED_PATTERNS = [
-  [/\b100\s?%|\b\d+(\.\d+)?\s?%|\bper ?cent\b/i, 'states a percentage or statistic'],
-  [/\bdark[\s-]?web\b/i, 'mentions dark web monitoring'],
-  [/\b(top\s+)?\d[\d,]*\+?\s+(data[\s-])?(brokers?|people[\s-]search sites?)\b/i, 'states a broker count'],
-  [/\ball (data[\s-])?brokers\b/i, 'says "all brokers"'],
-  [/\b(we|myprivacytool|our (plans?|service|tool|team))\s+(will\s+)?(removes?|deletes?|erases?|scrubs?|wipes?)\b|\bkeeps? (it|your data|your details|you) off\b|\bremoval service\b/i, 'claims MyPrivacyTOOL removes data'],
-  [/(?:[$€£¥]|\bhk\$|\bus\$|\busd|\bhkd)\s?\d/i, 'states a price'],
-  [/\bsuccess rates?\b|\bguarantee[ds]?\b/i, 'claims a success rate or guarantee'],
-  [/\b(we|myprivacytool)\s+(do not |don't |never )?(store|keep|save|retain)s?\b|\b(scan )?results (are|is|aren't|are not) (not )?(stored|saved|kept|deleted)\b/i, 'describes data storage'],
-  [/\bno sign[\s-]?up\b|\bfastest\b/i, 'uses a blocked phrase ("no sign-up" or "fastest")'],
-  [/\b\d+\+?\s+years?\b[^.\n]{0,30}\b(experience|in (security|privacy|cyber))/i, 'states founder credentials'],
-];
-
 /** Reasons a draft breaks the approved claims list or the link rule; empty means it passes. */
 export function claimViolations(draft) {
   const text = [draft.copy, draft.title, draft.script, ...(Array.isArray(draft.slides) ? draft.slides : [])].filter((t) => typeof t === 'string').join('\n');
-  const out = BLOCKED_PATTERNS.filter(([re]) => re.test(text)).map(([, why]) => why);
+  const out = blockedReasons(text);
   if (!/myprivacytool\.io\/scan\b/i.test(draft.copy ?? '')) out.push('the copy does not link to myprivacytool.io/scan');
   const links = (draft.copy ?? '').match(/myprivacytool\.io(\/[^\s)?#]*)?/gi) ?? [];
   if (links.some((l) => !/myprivacytool\.io\/(scan|opt-out-guides)\b/i.test(l))) out.push('links to a MyPrivacyTOOL page other than /scan or /opt-out-guides');
@@ -179,13 +175,19 @@ async function callLlm(env, prompt) {
   return (body.content ?? []).filter((b) => b.type === 'text').map((b) => b.text).join('');
 }
 
-export function slackBlocks(taskId, topic, drafts) {
+export function slackBlocks(taskId, topic, drafts, card = null) {
   const clip = (s, n) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
   const body = (d) => (d.title ? `*${d.title}*\n${d.copy}` : d.copy);
   const button = (text, action_id, style) => ({ type: 'button', text: { type: 'plain_text', text }, action_id, value: taskId, ...(style ? { style } : {}) });
   return [
     { type: 'header', text: { type: 'plain_text', text: `MPT daily drafts: ${taskId.replace('daily-posts-', '')}` } },
     { type: 'section', text: { type: 'mrkdwn', text: `*Topic:* ${topic}` } },
+    ...(validCard(card)
+      ? [
+        { type: 'image', image_url: card.urls.instagram ?? Object.values(card.urls)[0], alt_text: `${card.label}: ${card.headline}`, title: { type: 'plain_text', text: `Today's card: ${card.label}: ${card.headline}`.slice(0, 2000) } },
+        { type: 'context', elements: [{ type: 'mrkdwn', text: `Card sizes: ${Object.entries(card.urls).map(([k, u]) => `<${u}|${k}>`).join(' · ')}. Instagram and Facebook use 4:5, LinkedIn 1200x630, X 1600x900.` }] },
+      ]
+      : [{ type: 'context', elements: [{ type: 'mrkdwn', text: ':warning: No per-post card today (none rendered by the 05:00 sync). Posts use the default brand image.' }] }]),
     ...drafts.flatMap((d) => [
       { type: 'divider' },
       { type: 'section', text: { type: 'mrkdwn', text: `*${PLATFORM_NAMES[d.platform]}*\n${clip(body(d), 2600)}` } },
@@ -195,13 +197,13 @@ export function slackBlocks(taskId, topic, drafts) {
   ];
 }
 
-async function postSlack(env, topic, taskId, drafts) {
+async function postSlack(env, topic, taskId, drafts, card) {
   const res = await callRecipient('slack', {
     url: 'https://slack.com/api/chat.postMessage',
     init: {
       method: 'POST',
       headers: { Authorization: `Bearer ${env.SLACK_BOT_TOKEN}`, 'Content-Type': 'application/json; charset=utf-8' },
-      body: JSON.stringify({ channel: env.SLACK_CHANNEL, text: `MPT daily drafts ready for approval (${taskId})`, blocks: slackBlocks(taskId, topic, drafts), unfurl_links: false }),
+      body: JSON.stringify({ channel: env.SLACK_CHANNEL, text: `MPT daily drafts ready for approval (${taskId})`, blocks: slackBlocks(taskId, topic, drafts, card), unfurl_links: false }),
     },
     sent: [],
   }, workerRecipientContext(env));
@@ -260,7 +262,7 @@ export async function generateDailyPosts(env, date, hint = {}) {
     const topic = resolveTopic(hint, schedule, platform);
     if (!topic) throw new Error(`${platform}: no topic for ${date}`);
     try {
-      const draft = { ...(await draftPlatform(env, platform, topic, date, guard, hint)), topic, ...(Array.isArray(hint?.asset_tags) && hint.asset_tags.length ? { asset_tags: hint.asset_tags } : {}) };
+      const draft = { ...(await draftPlatform(env, platform, topic, date, guard, hint)), topic, ...cardFields(hint?.card, platform), ...(Array.isArray(hint?.asset_tags) && hint.asset_tags.length ? { asset_tags: hint.asset_tags } : {}) };
       await log(env, taskId, 'drafted', { draft });
       have.set(platform, draft);
     } catch (e) {
@@ -271,7 +273,7 @@ export async function generateDailyPosts(env, date, hint = {}) {
   if (failed.length) throw new Error(failed.join('; '));
 
   const drafts = PLATFORMS.map((p) => have.get(p));
-  const slack = await postSlack(env, resolveTopic(hint, schedule, 'x') ?? drafts[0].topic, taskId, drafts);
+  const slack = await postSlack(env, resolveTopic(hint, schedule, 'x') ?? drafts[0].topic, taskId, drafts, hint?.card);
   await log(env, taskId, 'notified', { draft: slack });
   await warnOverdueReceipts(env, date).catch((e) => console.error('receipt alert failed', String(e)));
   return 'notified';
@@ -280,10 +282,10 @@ export async function generateDailyPosts(env, date, hint = {}) {
 export default {
   async queue(batch, env) {
     for (const msg of batch.messages) {
-      const { date, action, topic, pillar, format_type, asset_tags } = msg.body ?? {};
+      const { date, action, topic, pillar, format_type, asset_tags, card } = msg.body ?? {};
       if (action !== 'generate_daily_posts' || !/^\d{4}-\d{2}-\d{2}$/.test(date ?? '')) { console.error('bad message', JSON.stringify(msg.body)); msg.ack(); continue; }
       try {
-        await generateDailyPosts(env, date, { topic, pillar, format_type, asset_tags });
+        await generateDailyPosts(env, date, { topic, pillar, format_type, asset_tags, card });
         msg.ack();
       } catch (e) {
         await log(env, taskIdFor(date), 'failed', { error: `attempt ${msg.attempts}: ${e?.message}` }).catch(() => {});

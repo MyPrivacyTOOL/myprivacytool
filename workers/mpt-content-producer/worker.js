@@ -10,7 +10,7 @@ export function buildMessage(now = new Date(), topic = null) {
   const msg = { date: hktDate(now), action: 'generate_daily_posts' };
   if (topic?.topic) {
     msg.topic = topic.topic;
-    for (const k of ['pillar', 'format_type', 'asset_tags']) if (topic[k] !== undefined) msg[k] = topic[k];
+    for (const k of ['pillar', 'format_type', 'asset_tags', 'card']) if (topic[k] !== undefined) msg[k] = topic[k];
   }
   return msg;
 }
