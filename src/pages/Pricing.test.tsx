@@ -3,6 +3,12 @@ import { fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { renderPage, jsonResponse } from "@/test/render";
 import Pricing from "./Pricing";
+import { resetFunnelForTests } from "@/lib/analytics";
+
+// CK-11491: pricing_view and checkout_start check the consent gate in the app, so these tests hold both consents.
+const gate = vi.hoisted(() => ({ open: true }));
+vi.mock("@/lib/cookieConsent", async (orig) => ({ ...(await orig<typeof import("@/lib/cookieConsent")>()), hasConsent: () => gate.open }));
+vi.mock("@/lib/scanConsent", async (orig) => ({ ...(await orig<typeof import("@/lib/scanConsent")>()), hasScanConsent: () => gate.open }));
 
 let gtag: ReturnType<typeof vi.fn>;
 const eventNames = () => gtag.mock.calls.filter((c) => c[0] === "event").map((c) => c[1]);
@@ -10,21 +16,40 @@ const eventNames = () => gtag.mock.calls.filter((c) => c[0] === "event").map((c)
 beforeEach(() => {
   gtag = vi.fn();
   window.gtag = gtag;
+  gate.open = true;
+  resetFunnelForTests();
 });
 afterEach(() => {
   delete window.gtag;
 });
 
 describe("Pricing analytics (MPC-7376)", () => {
-  it("fires pricing_view once on load", () => {
+  it("fires pricing_view once on load, with channel and utm_source", () => {
     renderPage(<Pricing />);
     expect(eventNames()).toEqual(["pricing_view"]);
+    expect(gtag).toHaveBeenLastCalledWith("event", "pricing_view", { channel: "direct", utm_source: "(none)" });
+  });
+
+  it("CK-11491: a paid plan fires checkout_start as waitlist; the business link does not", () => {
+    renderPage(<Pricing />);
+    fireEvent.click(screen.getByRole("link", { name: "Talk to us about business plans" }));
+    expect(eventNames()).not.toContain("checkout_start");
+    fireEvent.click(screen.getAllByRole("button", { name: "Choose plan" })[1]);
+    expect(gtag).toHaveBeenCalledWith("event", "checkout_start", { channel: "direct", utm_source: "(none)", plan: "pro", checkout_mode: "waitlist" });
+  });
+
+  it("CK-11491: without consent neither funnel event is handed to gtag", () => {
+    gate.open = false;
+    renderPage(<Pricing />);
+    fireEvent.click(screen.getAllByRole("button", { name: "Choose plan" })[1]);
+    expect(eventNames()).not.toContain("pricing_view");
+    expect(eventNames()).not.toContain("checkout_start");
   });
 
   it("fires pricing_plan_click with the plan and destination", () => {
     renderPage(<Pricing />);
     fireEvent.click(screen.getAllByRole("button", { name: "Choose plan" })[1]);
-    expect(gtag).toHaveBeenLastCalledWith("event", "pricing_plan_click", {
+    expect(gtag).toHaveBeenCalledWith("event", "pricing_plan_click", {
       plan: "pro",
       cta_location: "pricing_card",
       destination: "#waitlist",
@@ -117,8 +142,8 @@ describe("Pricing A/B tests (MPC-7638)", () => {
     expect(screen.getAllByRole("button", { name: /^Get this plan/ })).toHaveLength(3);
     expect(screen.getByText("The scan is free and needs no credit card.")).toBeTruthy();
     fireEvent.click(screen.getAllByRole("button", { name: /^Get this plan/ })[0]);
-    expect(eventNames()).toEqual(["pricing_view", "pricing_plan_click"]);
-    expect(gtag).toHaveBeenLastCalledWith("event", "pricing_plan_click", expect.not.objectContaining({ ab_pricing_cta: expect.anything() }));
+    expect(eventNames()).toEqual(["pricing_view", "pricing_plan_click", "checkout_start"]);
+    expect(gtag).toHaveBeenCalledWith("event", "pricing_plan_click", expect.not.objectContaining({ ab_pricing_cta: expect.anything() }));
   });
 });
 

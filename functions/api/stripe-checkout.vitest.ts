@@ -76,3 +76,40 @@ describe("stripe-webhook", () => {
     expect((await webhookPost({ request: good, env: { STRIPE_WEBHOOK_SECRET: "whsec" } })).status).toBe(200);
   });
 });
+
+describe("stripe-webhook: scan -> Stripe customer link (CK-11491)", () => {
+  const completed = JSON.stringify({ type: "checkout.session.completed", data: { object: { customer: "cus_ABC123", customer_details: { email: "Ada@Example.com" } } } });
+  const post = async (body: string, extra: Record<string, string> = {}) => {
+    const request = new Request("https://x/api/stripe-webhook", { method: "POST", body, headers: { "Stripe-Signature": await sign(body, "whsec", Math.floor(Date.now() / 1000)) } });
+    return webhookPost({ request, env: { STRIPE_WEBHOOK_SECRET: "whsec", ...extra } });
+  };
+
+  it("writes the customer id on that address's unlinked scans", async () => {
+    const f = vi.fn(async () => new Response(null, { status: 204 }));
+    vi.stubGlobal("fetch", f);
+    expect((await post(completed, { SUPABASE_SERVICE_ROLE_KEY: "test-service-key" })).status).toBe(200);
+    expect(f).toHaveBeenCalledTimes(1);
+    const [url, init] = f.mock.calls[0] as unknown as [string, RequestInit];
+    expect(String(url)).toBe("https://xmdmkumwxpgahmlweuug.supabase.co/rest/v1/scans?email_scanned=eq.ada%40example.com&stripe_customer_id=is.null");
+    expect(init.method).toBe("PATCH");
+    expect(JSON.parse(init.body as string)).toEqual({ stripe_customer_id: "cus_ABC123" });
+  });
+
+  it("answers 500 when the write fails, so Stripe sends the event again", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("no", { status: 400 })));
+    expect((await post(completed, { SUPABASE_SERVICE_ROLE_KEY: "test-service-key" })).status).toBe(500);
+  });
+
+  it("is dormant without the database key, and ignores other or malformed events", async () => {
+    const f = vi.fn();
+    vi.stubGlobal("fetch", f);
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    expect((await post(completed)).status).toBe(200);
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining("not linked"));
+    for (const body of ["{}", "nope", JSON.stringify({ type: "invoice.paid" }), completed.replace("cus_ABC123", "x&y=1")]) {
+      expect((await post(body, { SUPABASE_SERVICE_ROLE_KEY: "test-service-key" })).status).toBe(200);
+    }
+    expect(f).not.toHaveBeenCalled();
+    warn.mockRestore();
+  });
+});

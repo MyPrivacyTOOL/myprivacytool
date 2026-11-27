@@ -470,7 +470,17 @@ async function processScan(env, sb, job, fetchImpl, rctx) {
   if (referralsEnabled(env)) await completeReferral(env, sb, job.user_id, fetchImpl, recipientAllowed, rctx);   // MPC-7645: this report finishing is what earns the friend who invited them a month of Pro
   const hs = await pushScanActivity(env, { email, scanId: job.id, score: result.score, riskLevel: result.risk_level, signalsFound: result.signals_found, breachStatus: hibp.status, breachCount: breaches.length }, fetchImpl, rctx);
   if (hs.failed) console.error('HubSpot activity push failed:', hs.failed);
+  if (hs.contactId) await linkHubSpotContact(sb, job.id, hs.contactId);
   return { sent: true, signals: inserted.length };
+}
+
+// CK-11491: the scan -> CRM contact link, filled from the lookup the report job already makes. It happens here, after the report, on purpose: before the
+// confirm click no check may use the visitor's details, so nothing asks HubSpot about them at capture. Best effort; the row (and the link) is deleted
+// by the same retention rules as before.
+async function linkHubSpotContact(sb, scanId, contactId) {
+  if (!/^[0-9]{1,20}$/.test(String(contactId))) return;
+  try { await sb.patch(`scans?id=eq.${scanId}&hubspot_contact_id=is.null`, { hubspot_contact_id: String(contactId) }); }
+  catch (e) { console.error('scan to HubSpot link failed:', e.status || 'error'); }
 }
 
 // MPC-7645: the "Invite 3 friends" block in the report. Needs UNSUBSCRIBE_SECRET (it signs the private invite link). Never lets the programme break the report.

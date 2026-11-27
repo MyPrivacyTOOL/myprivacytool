@@ -21,6 +21,7 @@ import {
   trackFormSubmitError,
   trackFormValidationError,
   trackPricingPlanClick,
+  trackCheckoutStart,
   trackPricingView,
   trackPricingWaitlistSignup,
 } from "@/lib/analytics";
@@ -130,6 +131,8 @@ const Pricing = () => {
     trackPricingPlanClick(p.name.toLowerCase(), p.cta.to, liveVariants);
     live.forEach((id) => trackExperimentCta(id, assignments[id].variantId));
     if (p.cta.to.startsWith("#")) {
+      // CK-11491: the furthest a visitor can get towards paying today is the waitlist pop-up (no live checkout); the event says so.
+      if (PAID_PLANS.includes(p.name)) trackCheckoutStart(p.name.toLowerCase(), "waitlist");
       if (PAID_PLANS.includes(p.name)) setPlan(p.name);
       setOpen(true);
     }
