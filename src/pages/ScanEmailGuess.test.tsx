@@ -67,7 +67,14 @@ describe("Scan page: the magic guess (MPC-11111)", () => {
   describe("when switched on (flag on and the registry entry enabled)", () => {
     let restore: (() => void) | null = null;
     beforeEach(() => { vi.stubEnv("VITE_EMAIL_GUESS_ENABLED", "true"); setChoice(true); restore = setBundledRegistryForTests(registryWithEntry(true)); });
-    afterEach(() => { restore?.(); restore = null; });
+    // MPC-11111: the test below replaces Element.prototype.scrollIntoView; put the original back so it cannot leak into later tests.
+    let originalScrollIntoView: typeof Element.prototype.scrollIntoView | undefined;
+    beforeEach(() => { originalScrollIntoView = Element.prototype.scrollIntoView; });
+    afterEach(() => {
+      restore?.(); restore = null;
+      if (originalScrollIntoView) Element.prototype.scrollIntoView = originalScrollIntoView;
+      else delete (Element.prototype as { scrollIntoView?: unknown }).scrollIntoView;
+    });
 
     it("opens the token, shows the address, brings the card into view, and removes the token from the address bar", async () => {
       const scrollIntoView = vi.fn();
@@ -76,7 +83,8 @@ describe("Scan page: the magic guess (MPC-11111)", () => {
       window.history.replaceState(null, "", `/scan?utm_source=x&utm_medium=channel_osint#g=${TOKEN}`);
       renderPage(<Scan />);
       expect(await screen.findByTestId("email-guess-card")).toHaveTextContent(ADDRESS);
-      expect(scrollIntoView).toHaveBeenCalledTimes(1);
+      // EmailGuessCard scrolls from a passive effect, so wait for it instead of asserting right after the card appears.
+      await waitFor(() => expect(scrollIntoView).toHaveBeenCalledTimes(1));
       expect(guessCalls(f)).toHaveLength(1);
       expect(JSON.parse(String((guessCalls(f)[0][1] as RequestInit).body))).toEqual({ token: TOKEN });
       expect(window.location.hash).toBe("");

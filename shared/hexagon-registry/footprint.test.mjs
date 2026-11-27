@@ -16,7 +16,12 @@ assert.deepEqual([none.checked, none.toReview, none.total], [0, 363, 363]);
 const both = footprintSummary([...HEXAGONS.map((h) => h.id), ...TELEGRAM_HEXAGONS.map((h) => h.id)]);
 assert.deepEqual([both.checked, both.toReview], [84, 279]);
 assert.equal(footprintLine(both), '84 of 363 footprint hexagons checked, 279 still to review');
-assert.equal(footprintChannelsLine(both), 'Web scan 54 of 87, Telegram 30 of 44');
+// MPC-11555: the per-channel denominators are DERIVED from the catalogue (published-before-the-export items on that channel), not pinned. They move whenever a registry Channel Key is
+// corrected: the 2026-11-27 cleanup took five items off Web (x.location, tg.miniapp_location, tg.miniapp_device, email-domain-record, email.web_archive) and put two on Telegram, so a fresh
+// export reads "Web scan 54 of 82, Telegram 30 of 46", where the old pin said 87 and 44.
+const denom = (key) => HEXAGON_CATALOGUE.filter((h) => !h.added && h.channel === key).length;
+assert.ok(denom('web') >= HEXAGONS.length && denom('telegram') >= TELEGRAM_HEXAGONS.length, 'a denominator never falls below the hexagons the code defines for the channel');
+assert.equal(footprintChannelsLine(both), `Web scan 54 of ${denom('web')}, Telegram 30 of ${denom('telegram')}`);
 
 // Telegram on its own: 30 of 363, not 30 of 30.
 assert.equal(footprintSummary(TELEGRAM_HEXAGONS.map((h) => h.id)).toReview, 333);
@@ -26,10 +31,10 @@ const newId = HEXAGON_CATALOGUE.find((h) => h.status === 'new' && !h.added && !E
 const odd = footprintSummary([newId, 'not-a-hexagon', 'location', 'location']);
 assert.deepEqual([odd.checked, odd.toReview], [1, 362]);
 
-// The eight built Telegram extras (MPC-8689 pilot) count as checked: Telegram 38 of 44, still outside the 30 and every score.
+// The eight built Telegram extras (MPC-8689 pilot) count as checked: Telegram 38 of the Telegram denominator, still outside the 30 and every score.
 const withExtras = footprintSummary([...TELEGRAM_HEXAGONS.map((h) => h.id), ...TELEGRAM_EXTRA_IDS]);
 assert.deepEqual([withExtras.checked, withExtras.toReview], [38, 325]);
-assert.equal(footprintChannelsLine(withExtras), 'Telegram 38 of 44');
+assert.equal(footprintChannelsLine(withExtras), `Telegram 38 of ${denom('telegram')}`);
 // The four built email extras count as checked too (email 7 + 4 of 21), still outside every score.
 const emailBuilt = footprintSummary(EMAIL_EXTRA_IDS);
 assert.deepEqual([emailBuilt.checked, emailBuilt.byChannel.find((c) => c.key === 'email').checked], [4, 4]);
