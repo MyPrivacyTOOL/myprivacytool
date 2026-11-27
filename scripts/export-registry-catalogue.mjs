@@ -24,6 +24,7 @@ export const DATA_SOURCE = '40c28547-eaa7-81c6-a953-000b18c5b905';
 export const ADDED = '2026-11-27';
 // Chris, 2026-11-27 (MPC-11541): every row with Decision = Dropped stays a data point in the registry but is not published (650 = 662 - 7 non-data - 5 dropped).
 export const EXCLUDED_DECISION = 'Dropped';
+const WAS_FIELDS = ['id', 'decision', 'decision_reason', 'decided', 'plan', 'plan_decision', 'plan_reason'];
 export const EXCLUDE_REASON = 'Decision = Dropped (owner, 2026-11-27): stays a data point in the registry, not published';
 
 // Notion returns text with markdown link wrappers and backslash escapes around ids such as dy.ids ([dy.ids](http://dy.ids)) and snake_case; undo both.
@@ -63,7 +64,16 @@ export function exportCatalogue(rows, { dataPointRows, previous, expectPublished
   for (const i of previous.items) { const m = /^([A-D])(\d+)$/.exec(i.code); if (m) seq[`${i.channel}|${m[1]}`] = Math.max(seq[`${i.channel}|${m[1]}`] ?? 0, +m[2]); }
   for (const r of dataRows) {
     const rid = r['Hexagon ID'];
-    if (r.Decision === EXCLUDED_DECISION) { if (byId.has(clean(r['Catalogue Code']))) claimed.add(clean(r['Catalogue Code'])); excluded.push({ registry_id: rid, label: clean(r.Footprint), reason: EXCLUDE_REASON }); continue; }
+    if (r.Decision === EXCLUDED_DECISION) {
+      if (byId.has(clean(r['Catalogue Code']))) claimed.add(clean(r['Catalogue Code']));
+      // Nothing is deleted: the item's own record (decision, reason, date) moves to excluded[].was, and a re-run keeps what an earlier run already moved.
+      const item = byRid.get(rid) ?? byId.get(clean(r['Catalogue Code']));
+      if (item) claimed.add(item.id);
+      const kept = (previous.registry?.excluded ?? []).find((e) => e.registry_id === rid)?.was;
+      const was = item ? Object.fromEntries(WAS_FIELDS.filter((k) => item[k] !== undefined && item[k] !== null).map((k) => [k, item[k]])) : kept;
+      excluded.push({ registry_id: rid, label: clean(r.Footprint), reason: EXCLUDE_REASON, ...(was && Object.keys(was).length ? { was } : {}) });
+      continue;
+    }
     const code = clean(r['Catalogue Code']);
     const old = byRid.get(rid) ?? (code && owner.get(code) === rid ? byId.get(code) : null);
     const key = clean(r['Channel Key']);
