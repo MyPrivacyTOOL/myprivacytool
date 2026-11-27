@@ -138,6 +138,7 @@ describe("PaPIT limits wording", () => {
     const guide = read("src/content/guides/githubProfile.tsx");
     expect(guide).not.toMatch(/valid for 30 days|30 days of validity/);
     expect(guide).toMatch(/until you disconnect/);
+    expect(guide.replace(/\s+/g, " ").match(/We delete a stored token automatically if it is not used for 90 days\./g)).toHaveLength(2);
     expect(guide).toMatch(/Remove my stored connection/);
     expect(read("src/components/ConnectGitHub.tsx")).not.toMatch(/data_retention_days/);
     expect(read("src/pages/Privacy.tsx")).toMatch(/If your 7-day session has ended, you can still remove the stored connection/);
@@ -183,12 +184,13 @@ describe("PaPIT expiry and re-consent wording", () => {
     expect(PAPIT_SCHEMA).toMatch(/expires_at: string/);
     expect(PAPIT_SCHEMA).not.toMatch(/not enforced/);
   });
-  it("says the token is not used 90 days after connecting, a refresh does not restart that, and that nothing deletes it automatically", () => {
+  it("says the token is not used 90 days after connecting, a refresh does not restart that, and that a daily job deletes it after 90 days unused", () => {
     const t = limit("Access token");
     expect(t).toMatch(/90 days after the user last connected/);
     expect(t).toMatch(/401 reconsent_required/);
     expect(t).toMatch(/refresh does not restart the 90 days/);
-    expect(t).toMatch(/do not delete the stored token automatically/);
+    expect(t).toMatch(/daily job deletes a stored token that has not been saved or refreshed for 90 days/);
+    expect(t).not.toMatch(/do not delete the stored token automatically|not built/);
   });
   it("documents POST /papit/verify with 200, 410, 422, 400 and 413, and reconsent_required on the profile call", () => {
     const ep = ENDPOINTS.find((e) => e.path === "/papit/verify")!;
