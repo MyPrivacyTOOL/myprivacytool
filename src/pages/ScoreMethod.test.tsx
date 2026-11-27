@@ -3,7 +3,6 @@ import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import ScoreMethod from "./ScoreMethod";
-import { SCORE_V2_HEADLINE } from "@/components/ScoreVersionNotice";
 import { CATEGORY_WEIGHTS, BANDS, SCORE_VERSION, WEIGHT_TOTAL, WEIGHTS_LABEL } from "../../shared/hexagon-registry/score.js";
 
 const renderPage = () => render(<MemoryRouter><ScoreMethod /></MemoryRouter>);
@@ -52,17 +51,5 @@ describe("MPC-9792: weights version label and open score questions", () => {
     expect(screen.getByRole("heading", { name: /Overlapping checks/ })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Three things the score is not" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: /channels and places/ })).toBeInTheDocument();
-  });
-});
-
-describe("MPC-11569: exposure-v2 explanation", () => {
-  it("says we now check more and the person did not become more exposed, and states the 60 and the email weight", () => {
-    renderPage();
-    const sec = screen.getByTestId("score-v2-section");
-    expect(sec.textContent).toContain(SCORE_V2_HEADLINE);
-    expect(sec.textContent).toContain("60 in all");
-    expect(sec.textContent).toContain("weight of 10%");
-    expect(sec.textContent).toContain("exposure-v2");
-    expect(sec.textContent).toContain("not built");
   });
 });

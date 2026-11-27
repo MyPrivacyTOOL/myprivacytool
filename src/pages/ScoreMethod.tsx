@@ -5,8 +5,6 @@ import { HEXAGON_COUNT } from "../../shared/hexagon-registry/registry.js";
 import { countSentence } from "../../shared/hexagon-registry/countSentence.js";
 import { HEXAGONS } from "../../shared/hexagon-registry/registry.js";
 import { BANDS, BAND_LABEL, CATEGORY_OF, CATEGORY_WEIGHTS, SCORE_VERSION, WEIGHTS_LABEL } from "../../shared/hexagon-registry/score.js";
-import { SCORE_VERSION_V2, HEXAGON_COUNT_V2, EMAIL_CATEGORY_WEIGHT } from "../../shared/hexagon-registry/scoreV2.js";
-import { SCORE_V2_HEADLINE } from "@/components/ScoreVersionNotice";
 
 // MPC-7471-F4: "How we calculate your score". Wording approved by Chris (2026-10-26) from docs/exposure-score-explainer-draft.md.
 // The weights and the bands are read from the same constants the score uses (shared/hexagon-registry/score.js), so this page cannot drift from the code.
@@ -132,14 +130,6 @@ const ScoreMethod = () => (
           <h2 className="text-2xl font-bold text-gray-900">Versions and comparing scores</h2>
           <p className="mt-2 text-gray-700">
             Every score is stamped with the version of this method, currently <strong>{SCORE_VERSION}</strong>. If we ever change the method, scores from different versions cannot be compared, and we will say so. Scores saved before this method existed are marked "legacy" and are not compared with new ones. A different number between two versions does not mean your privacy got better or worse.
-          </p>
-        </section>
-
-        <section className="mb-8" data-testid="score-v2-section">
-          <h2 className="text-2xl font-bold text-gray-900">When we also check your email address</h2>
-          <p className="mt-2 text-gray-700"><strong>{SCORE_V2_HEADLINE}</strong> Your score can be higher or lower than before because more checks are counted, not because anything about you changed.</p>
-          <p className="mt-2 text-gray-700">
-            If you give us an email address, your report is scored with method <strong>{SCORE_VERSION_V2}</strong>: the same {HEXAGON_COUNT} browser checks plus {HEXAGON_COUNT_V2 - HEXAGON_COUNT} email checks, {HEXAGON_COUNT_V2} in all. The email checks form one more category with a weight of {EMAIL_CATEGORY_WEIGHT}%, and the other weights are unchanged. A scan with no email result scores exactly the same as before. Coverage is now out of {HEXAGON_COUNT_V2}, so the same checks cover a smaller share. We do not yet check your address against known data breaches: that check is not built, so it is not counted.
           </p>
         </section>
 

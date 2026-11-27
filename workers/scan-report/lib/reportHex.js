@@ -167,7 +167,6 @@ export function buildReportJson({ scanId, webScan, web, emailHexes, score, gener
     report_id: scanId || null,
     web_scan: webScan ? { saved: true, id: webScan.id ?? null, created_at: webScan.created_at ?? null, summary: tally(web), exposure: webExposure(web), exposure_v2_shadow: webExposureV2(web, emailHexes), hexagons: web.map(outHex) } : { saved: false, id: null, created_at: null, summary: null, exposure: null, hexagons: [] },
     email: { summary: tally(emailHexes), hexagons: emailHexes.map(outHex) },
-    exposure_v2: webScan ? webAndEmailExposure(web, emailHexes) : null,
     score: score ?? null,
   };
 }

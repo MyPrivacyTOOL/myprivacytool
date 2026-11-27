@@ -43,13 +43,6 @@ Every "Your privacy report" email carries one file, `my-privacy-scan-<report id>
     "summary": { "found": 0, "clear": 0, "not_checked": 0, "total": 4 },
     "hexagons": [ /* same hexagon shape: email-breaches, email-name, email-provider, email-profile */ ]
   },
-  "exposure_v2": {                     // MPC-11569: exposure-v2 over the 54 web + the 6 built email hexagons (Z = 60; email-breaches is not built, listed in rejected as not_built); null when web_scan.saved is false. ADDITIVE: web_scan.exposure (exposure-v1, 54) is unchanged.
-    "score_version": "exposure-v2", "status": "scored|no_checked_items", "provisional": false,
-    "score": 76, "band": "high", "coverage": { "checked": 52, "total": 60, "percent": 87 },
-    "counts": {}, "categories": { /* the nine v1 categories plus "email" (weight 10, proposed) */ }, "rejected": [], "warnings": [],
-    "explanation": { "headline": "We now check more. You did not become more exposed.", "detail": "Your score now counts more checks, so it can be higher or lower than before. ..." },
-    "method_url": "https://myprivacytool.io/how-we-calculate-your-score"
-  },
   "score": { "value": 90, "risk_level": "low", "partial": true }   // null when nothing was scored. NOT the web exposure score: the email-footprint "privacy health" score, where HIGHER IS SAFER
 }
 ```
