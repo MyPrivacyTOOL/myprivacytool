@@ -1,0 +1,2 @@
+-- History placeholder (MPC-9896 Option B). Version 20261006104957 (mpc_7350_revoke_rls_auto_enable_execute) is already applied on the live database.
+-- Intentionally empty: what it contributed is recorded in 20261127060000_mpc_9896_option_b_baseline.sql. Do not add statements here.

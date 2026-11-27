@@ -32,7 +32,7 @@ insert into public.email_sends (provider_message_id, email_type, is_test, sent_a
   ('x-3', 'confirm', true, '2026-04-06 02:05:00+00'), ('x-4', 'report', true, '2026-04-06 02:06:00+00'),
   ('x-5', 'confirm', false, '2026-04-06 03:05:00+00'),
   ('x-6', 'confirm', true, '2026-04-06 05:05:00+00'), ('x-7', 'confirm', true, '2026-04-06 05:06:00+00');
-\i supabase/migrations/20261127060000_exclude_test_scans_from_kpi.sql
+\i supabase/migrations_archive/20261127060000_exclude_test_scans_from_kpi.sql
 select pg_temp.assert((select array_agg(test_scans order by "hour") from public.scan_hourly_counts where "hour" >= '2026-04-06 00:00+00' and "hour" < '2026-04-07 00:00+00') = array[2,1,0,0,1]::bigint[], 'history reclassified only on evidence, capped');
 select pg_temp.assert((select sum(scans_created) from public.scan_hourly_counts where "hour" >= '2026-04-06 00:00+00' and "hour" < '2026-04-07 00:00+00') = 8, 'raw history unchanged');
 select pg_temp.assert((select test_scans from public.scan_hourly_counts where "hour" = '2026-03-02 03:00:00+00') = 2, 're-running never double counts');

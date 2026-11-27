@@ -128,7 +128,12 @@ check(/No one can see results for this address without this code/.test(mail.text
 
   const t = await readToken(env, token); const owner = await subjectHash(env, 'owner@gmail.com');
   check(t && t.subject === owner && t.challengeId === id, 'token: carries the subject hash and challenge id');
-  check(await readToken(env, token + 'x') === null && await readToken(env, token.slice(0, -2) + '00') === null, 'token: any change to the signature is refused');
+  // The signature is random hex, so a fixed edit (for example "end it with 00") sometimes changes nothing (1 in 256) and the token stays valid.
+  // Flip one character to a DIFFERENT one, first and last, and require that the token really changed before requiring it to be refused.
+  const flip = (c) => (c === '0' ? '1' : '0');
+  const sigStart = token.indexOf('.') + 1;
+  const tampered = [token + 'x', token.slice(0, -1) + flip(token.slice(-1)), token.slice(0, sigStart) + flip(token[sigStart]) + token.slice(sigStart + 1)];
+  check(tampered.every((t) => t !== token) && (await Promise.all(tampered.map((t) => readToken(env, t)))).every((r) => r === null), 'token: any change to the signature is refused');
   check(await readToken({ ...env, DEEP_RESEARCH_HMAC_KEY: 'other' }, token) === null, 'token: a different key refuses it');
   check(await readToken(env, token, Date.now() + 3601 * 1000) === null && await readToken(env, 'garbage') === null && await readToken(env, null) === null, 'token: expired after an hour; junk refused');
   const forged = (await makeToken(env, 'f'.repeat(64), crypto.randomUUID())).split('.')[0] + '.' + token.split('.')[1];

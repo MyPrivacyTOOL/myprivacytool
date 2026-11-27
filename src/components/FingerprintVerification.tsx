@@ -24,6 +24,7 @@ import {
   BatteryStatusResult,
   MediaDevicesResult,
 } from '@/lib/fingerprintDetection';
+import { measuredFingerprint, measuredAdvanced, MeasuredFingerprint, MeasuredScreen } from '@/lib/measuredOnly';
 
 interface TestResult {
   method: string;
@@ -34,16 +35,15 @@ interface TestResult {
 
 interface StoredTestData {
   timestamp: number;
-  fingerprint: CompositeFingerprint;
+  fingerprint: MeasuredFingerprint;
   advancedFP: {
     webrtc: WebRTCLeakResult | null;
     hardware: HardwareConcurrencyResult | null;
-    screen: ScreenPropertiesResult | null;
+    screen: MeasuredScreen | null;
     timezone: TimezoneLocaleResult | null;
     battery: BatteryStatusResult | null;
     mediaDevices: MediaDevicesResult | null;
   };
-  uniqueness: string;
 }
 
 interface FingerprintVerificationProps {
@@ -97,9 +97,8 @@ export default function FingerprintVerification({
   const saveCurrentData = () => {
     const newData: StoredTestData = {
       timestamp: Date.now(),
-      fingerprint: currentFingerprint,
-      advancedFP: currentAdvancedFP,
-      uniqueness: currentFingerprint.uniqueness,
+      fingerprint: measuredFingerprint(currentFingerprint),
+      advancedFP: measuredAdvanced(currentAdvancedFP),
     };
 
     const stored = localStorage.getItem(STORAGE_KEY);
@@ -318,11 +317,6 @@ export default function FingerprintVerification({
           result = fp2.webgl?.renderer?.substring(0, 20) + '...' || 'N/A';
           break;
         }
-        case 'uniqueness': {
-          const fp3 = await calculateFingerprintUniqueness();
-          result = fp3.uniqueness;
-          break;
-        }
       }
       
       // Brief display of result
@@ -343,12 +337,19 @@ export default function FingerprintVerification({
     const report = {
       timestamp: new Date().toISOString(),
       currentTest: {
-        fingerprint: currentFingerprint,
-        advancedFP: currentAdvancedFP,
+        fingerprint: measuredFingerprint(currentFingerprint),
+        advancedFP: measuredAdvanced(currentAdvancedFP),
       },
       comparison: comparison,
       improvementScore: improvementScore,
-      testHistory: previousData ? [previousData] : [],
+      // History saved before CK-8324 may still hold the estimate, so it is cleaned on the way out too.
+      testHistory: previousData
+        ? [{
+            timestamp: previousData.timestamp,
+            fingerprint: measuredFingerprint(previousData.fingerprint),
+            advancedFP: measuredAdvanced(previousData.advancedFP),
+          }]
+        : [],
     };
     
     const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
@@ -369,29 +370,6 @@ export default function FingerprintVerification({
     const hours = Math.floor(minutes / 60);
     if (hours < 24) return `${hours}h ago`;
     return `${Math.floor(hours / 24)}d ago`;
-  };
-
-  // Calculate uniqueness change
-  const getUniquenessChange = () => {
-    if (!previousData) return null;
-    
-    const parseBefore = previousData.uniqueness.match(/1 in ([\d,]+)/);
-    const parseAfter = currentFingerprint.uniqueness.match(/1 in ([\d,]+)/);
-    
-    if (!parseBefore || !parseAfter) return null;
-    
-    const before = parseInt(parseBefore[1].replace(/,/g, ''));
-    const after = parseInt(parseAfter[1].replace(/,/g, ''));
-    
-    if (before === after) return { change: 0, text: 'No change' };
-    
-    if (after < before) {
-      const percent = Math.round((1 - after / before) * 100);
-      return { change: percent, text: `${percent}% less unique! 🎉`, improved: true };
-    } else {
-      const percent = Math.round((after / before - 1) * 100);
-      return { change: -percent, text: `${percent}% more unique`, improved: false };
-    }
   };
 
   // Protection checklist
@@ -434,7 +412,6 @@ export default function FingerprintVerification({
   const checklist = getProtectionChecklist();
   const checkedCount = checklist.filter(c => c.checked).length;
   const hasRegressions = comparison.some(c => c.status === 'regressed');
-  const uniquenessChange = getUniquenessChange();
 
   return (
     <Card className="bg-risk-low-soft border-risk-low/30 overflow-hidden">
@@ -544,30 +521,6 @@ export default function FingerprintVerification({
                 </TableBody>
               </Table>
             </div>
-
-            {/* Improvement Score */}
-            {uniquenessChange && (
-              <div className={`p-4 rounded-xl border ${
-                uniquenessChange.improved ? 'bg-risk-low-soft border-risk-low/30' : 'bg-risk-high-soft border-risk-high/30'
-              }`}>
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm text-muted-foreground">Uniqueness Change</span>
-                  <span className={`font-bold ${uniquenessChange.improved ? 'text-risk-low' : 'text-foreground'}`}>
-                    {uniquenessChange.text}
-                  </span>
-                </div>
-                <div className="grid grid-cols-2 gap-4 text-center">
-                  <div className="p-2 bg-secondary rounded-lg">
-                    <p className="text-xs text-muted-foreground">Before</p>
-                    <p className="text-sm font-medium text-foreground">{previousData?.uniqueness}</p>
-                  </div>
-                  <div className="p-2 bg-secondary rounded-lg">
-                    <p className="text-xs text-muted-foreground">After</p>
-                    <p className="text-sm font-medium text-foreground">{currentFingerprint.uniqueness}</p>
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
         )}
 
@@ -619,20 +572,6 @@ export default function FingerprintVerification({
                 <span className="mr-2">🎮</span>
               )}
               Test WebGL
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => handleSingleTest('uniqueness')}
-              disabled={testingMethod === 'uniqueness'}
-              className="border-risk-low/30 text-risk-low hover:brightness-95"
-            >
-              {testingMethod === 'uniqueness' ? (
-                <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-              ) : (
-                <span className="mr-2">🔢</span>
-              )}
-              Test Uniqueness
             </Button>
           </div>
         </div>

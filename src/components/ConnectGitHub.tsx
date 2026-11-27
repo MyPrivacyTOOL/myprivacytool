@@ -89,7 +89,7 @@ export default function ConnectGitHub() {
       {state.kind === "session_ended" && (
         <div className="mb-4 text-sm text-foreground" data-testid="session-ended" role="status">
           <p>
-            Your browser session ended (it lasts 7 days). If you connected GitHub before, we may still hold that connection until you remove it.
+            Your browser session ended (it lasts 7 days). If you connected GitHub before, we may still hold that connection until you remove it. We delete a stored token automatically if it is not used for 90 days.
             You can remove it now: sign in with GitHub and we delete the stored token and the copy of your snapshot, and revoke our access.
             Nothing is read and nothing new is saved. Or connect again to see your snapshot.
           </p>
@@ -152,13 +152,13 @@ export default function ConnectGitHub() {
               <span data-testid="valid-until">{(state.profile.expires_at ?? "").slice(0, 10) || "30 days after it was made"}</span>
               {" "}(our verify check refuses a copy after that date)
             </Row>
-            <Row label="Connection kept">Until you disconnect</Row>
+            <Row label="Connection kept">Until you disconnect, or until the token goes unused for 90 days and we delete it automatically</Row>
             <Row label="Checksum (not a signature)">
               <code className="break-all text-xs">{state.profile.cryptographic_receipt}</code>
             </Row>
           </dl>
           <p className="mb-4 text-sm text-muted-foreground" data-testid="what-we-keep">
-            What we keep: an encrypted access token until you disconnect (we stop using it 90 days after you connected and ask you to connect again), and a copy of this snapshot for 24 hours. Your browser stays signed in for 7 days.
+            What we keep: an encrypted access token until you disconnect (we stop using it 90 days after you connected and ask you to connect again, and delete it automatically if it is not used for 90 days), and a copy of this snapshot for 24 hours. Your browser stays signed in for 7 days.
             Disconnecting deletes the token, revokes our access at GitHub and clears the copy.
           </p>
           <Button variant="outline" onClick={onDisconnect} disabled={busy}>

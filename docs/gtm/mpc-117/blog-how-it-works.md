@@ -37,7 +37,7 @@ It also states its own limits:
 "privacy_boundaries": { "data_retention_days": 30, "revocable": true }
 ```
 
-The 30 days is how long a snapshot is valid. It is not how long we keep your token: the token is kept until you disconnect.
+The 30 days is how long a snapshot is valid. It is not how long we keep your token: the token is kept until you disconnect, and we delete it automatically if it is not used for 90 days.
 
 ## Step 5: Your token is locked away
 Your GitHub token is encrypted (AES-256-GCM) before it is stored, and the database only holds ciphertext that no one can read without a key we keep separately. Profiles are cached for 24 hours so we don't hit GitHub repeatedly.

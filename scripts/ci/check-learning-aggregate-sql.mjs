@@ -9,7 +9,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-export const SQL_DIRS = ["supabase/migrations", "supabase/proposed", "supabase/sql", "supabase/backfill", "scripts"];
+export const SQL_DIRS = ["supabase/migrations", "supabase/migrations_archive", "supabase/proposed", "supabase/sql", "supabase/backfill", "scripts"];
 const TABLE = /learning_aggregate_daily/;
 const FORBIDDEN_COLUMN = /\b(scan_id|web_scan_id|scan_number|email|email_hash|ip|ip_address|user_agent|person_key|fingerprint|uuid|session_id)\b/i;
 

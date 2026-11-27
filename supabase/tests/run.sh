@@ -34,17 +34,19 @@ psql_ "$TEST_URL" -f supabase/sql/mpt-score-baselines.sql
 # mpt-purge-expired-scan-results.sql needs pg_cron (not available in plain Postgres); it is documentation of the live job.
 # MPC-8671 is applied below, after the KPI view chain it replaces (supabase/sql/*, which production got through the SQL editor/MCP, not through migrations).
 # MPC-8737: the ledger migration has its own stage further down (fingerprint before / after, rollback, re-apply), so it is excluded here too.
-for f in $(ls supabase/migrations/*.sql | grep -v -e mpc_8671_kpi_views_hourly_counter -e mpc_8737_data_point_ledger_v1 -e mpc_8753_ledger_risk_axis -e mpc_8737_m3_ledger_erase_parity -e mpc_8689_brokers_rows -e exclude_test_scans_from_kpi -e mpc_11547_hexagon_scorecard_views | sort); do echo "   migration $(basename "$f")"; psql_ "$TEST_URL" -f "$f"; done
+for f in $(ls supabase/migrations_archive/*.sql | grep -v -e mpc_8671_kpi_views_hourly_counter -e mpc_8737_data_point_ledger_v1 -e mpc_8753_ledger_risk_axis -e mpc_8737_m3_ledger_erase_parity -e mpc_8689_brokers_rows -e exclude_test_scans_from_kpi -e mpc_11547_hexagon_scorecard_views | sort); do echo "   migration $(basename "$f")"; psql_ "$TEST_URL" -f "$f"; done
+# MPC-9896: migrations added after the baseline (supabase/migrations/, version above 20261127060000) are part of the chain too.
+for f in $(ls supabase/migrations/*.sql | awk -F/ '{v=$NF; sub(/_.*/,"",v); if (v+0 > 20261127060000) print $0}' | grep -v -e mpc_11547_hexagon_scorecard_views | sort); do echo "   migration $(basename "$f")"; psql_ "$TEST_URL" -f "$f"; done
 echo "   KPI view chain (supabase/sql), in the order production received it"
 for f in mpt-raw-metrics mpt-youtube-daily-metrics mpt-youtube-daily-join mpt-hk-days mpt-hubspot-daily mpt-cloudflare-daily-metrics mpt-cloudflare-daily-join; do echo "   sql $f.sql"; psql_ "$TEST_URL" -f "supabase/sql/$f.sql"; done
 echo "   migration 20261028120001_mpc_8671_kpi_views_hourly_counter.sql"
-psql_ "$TEST_URL" -f supabase/migrations/20261028120001_mpc_8671_kpi_views_hourly_counter.sql
+psql_ "$TEST_URL" -f supabase/migrations_archive/20261028120001_mpc_8671_kpi_views_hourly_counter.sql
 # Test scans out of the KPIs: redefines the two views above, so it has to come after them.
 echo "   migration 20261127060000_exclude_test_scans_from_kpi.sql"
-psql_ "$TEST_URL" -f supabase/migrations/20261127060000_exclude_test_scans_from_kpi.sql
+psql_ "$TEST_URL" -f supabase/migrations_archive/20261127060000_exclude_test_scans_from_kpi.sql
 # MPC-11547: the scorecard views call mpt_is_test_address (above), so they come after it.
-echo "   migration 20261127070000_mpc_11547_hexagon_scorecard_views.sql"
-psql_ "$TEST_URL" -f supabase/migrations/20261127070000_mpc_11547_hexagon_scorecard_views.sql
+echo "   migration 20261127075144_mpc_11547_hexagon_scorecard_views.sql"
+psql_ "$TEST_URL" -f supabase/migrations/20261127075144_mpc_11547_hexagon_scorecard_views.sql
 # CK-8493: migrations proposed but not yet released (not read by deploy-supabase.yml). Tested here against the throwaway database only.
 # MPC-7471-F4 is excluded here: it drops mpt_score_baselines_email_hash_key, which schema.test.sql still needs, and it has its own stage further down.
 for f in $(ls supabase/proposed/*.sql 2>/dev/null | grep -v mpc_7471_f4_baseline_score_version | sort); do echo "   proposed $(basename "$f")"; psql_ "$TEST_URL" -f "$f"; done
@@ -104,6 +106,17 @@ psql_ "$TEST_URL" -At -f supabase/tests/deep-research.test.sql
 psql_ "$TEST_URL" -At -f supabase/tests/mpc-9887-scan-consents.test.sql
 echo "== purge of channel tokens unused for 90 days: dry run by default, guards, grants (MPC-11258)"
 psql_ "$TEST_URL" -At -f supabase/tests/mpc-11258-purge-stale-channel-tokens.test.sql
+echo "== daily schedule for the 90-day token purge: applies twice, one job (MPC-11258)"
+SCHEDULE=supabase/migrations/20261127074149_mpc_11258_schedule_stale_channel_token_purge.sql
+psql_ "$TEST_URL" -f "$SCHEDULE"   # as written (the loop above applied it once already)
+sched_file="$SCHEDULE"
+if [ "$(psql_ "$TEST_URL" -At -c "select count(*) from pg_extension where extname = 'pg_cron'")" = 0 ]; then
+  # pg_cron is absent, so the file above does nothing here. Force only its guard open and let the test supply a stand-in cron schema.
+  sched_file="${TMPDIR:-/tmp}/mpc-11258-schedule-guard-open.sql"
+  sed "s/if exists (select 1 from pg_extension where extname = 'pg_cron') then/if true then/" "$SCHEDULE" > "$sched_file"
+  grep -q 'if true then' "$sched_file" || { echo "::error::the pg_cron guard in $SCHEDULE was not found"; exit 1; }
+fi
+psql_ "$TEST_URL" -At -v mig="$sched_file" -f supabase/tests/mpc-11258-schedule-stale-channel-token-purge.test.sql
 echo "== scan funnel link columns (CK-11491)"
 psql_ "$TEST_URL" -At -f supabase/tests/ck-11491-funnel-links.test.sql
 echo "== recipient log follows the scan (MPC-9893)"
@@ -132,11 +145,11 @@ psql_ "$TEST_URL" -At -f supabase/tests/proposed-mpc-8528-support-cases.test.sql
 echo "== proposed schema: support follow-up watchdog (MPC-8529)"
 psql_ "$TEST_URL" -At -f supabase/tests/proposed-mpc-8529-support-followup.test.sql
 
-# MPC-8673: the PROPOSED Flip Point schema (supabase/migrations/20261028110001_mpc_8673_flip_point_consents.sql, applied by the migrations loop above).
+# MPC-8673: the PROPOSED Flip Point schema (supabase/migrations_archive/20261028110001_mpc_8673_flip_point_consents.sql, applied by the migrations loop above).
 echo "== proposed schema: Flip Point consents (MPC-8673)"
 psql_ "$TEST_URL" -At -f supabase/tests/proposed-mpc-8673-flip-point.test.sql
 
-# MPC-8659: the PROPOSED scans retention migration (supabase/migrations/20261027150000_mpc_8659_scans_retention.sql, applied by the migrations loop above).
+# MPC-8659: the PROPOSED scans retention migration (supabase/migrations_archive/20261027150000_mpc_8659_scans_retention.sql, applied by the migrations loop above).
 echo "== proposed migration: scans retention (MPC-8659)"
 psql_ "$TEST_URL" -At -f supabase/tests/proposed-mpc-8659-scans-retention.test.sql
 
@@ -164,8 +177,11 @@ psql_ "$TEST_URL" -At -f supabase/tests/mpc-8671-kpi-views-hourly-counter.test.s
 echo "== test-mailbox scans stay out of the KPIs; raw counts and access unchanged"
 # The MPC-8659 stage above re-runs its own migration, which puts the old counting function back. Production runs that file once, before this one,
 # so apply this one again before testing it (it is idempotent).
-psql_ "$TEST_URL" -f supabase/migrations/20261127060000_exclude_test_scans_from_kpi.sql
+psql_ "$TEST_URL" -f supabase/migrations_archive/20261127060000_exclude_test_scans_from_kpi.sql
 psql_ "$TEST_URL" -At -f supabase/tests/exclude-test-scans.test.sql
+echo "== scorecard daily table: no stand-in zero, one row per measure per day, no public access (MPC-11567)"
+psql_ "$TEST_URL" -At -f supabase/tests/mpc-11567-metrics-daily.test.sql
+
 echo "== hexagon scorecard views: M1, M2, M3, G on fixtures (MPC-11547)"
 # The MPC-8659 stage re-ran an older counting function but does not touch the scorecard views, which only read tables.
 psql_ "$TEST_URL" -At -f supabase/tests/mpc-11547-scorecard.test.sql
@@ -192,7 +208,7 @@ echo "   PASS 8 simultaneous requests with 8 DIFFERENT request ids -> still 1 sc
 
 # MPC-8737: data-point ledger v1. Additive proof, constraint / guard assertions, tested rollback, re-apply.
 echo "== data-point ledger v1 (MPC-8737)"
-LEDGER=supabase/migrations/20261028130000_mpc_8737_data_point_ledger_v1.sql
+LEDGER=supabase/migrations_archive/20261028130000_mpc_8737_data_point_ledger_v1.sql
 fp() { pg_dump -s --no-comments -n public "$TEST_URL" | grep -v -E '^.(un)?restrict '; }
 fp > "${TMPDIR:-/tmp}/ledger-before.sql"
 psql_ "$TEST_URL" -f "$LEDGER"
@@ -252,7 +268,7 @@ echo "   legacy tables unchanged by dry run, apply, re-apply and reversal ($lega
 
 # MPC-8753: ledger risk axis + 366 registry (design MPC-7898 A3 + A3.9). Applied on top of ledger v1; additive proof, assertions, tested rollback, re-apply.
 echo "== ledger risk axis, education-before-acceptance, 366 registry (MPC-8753)"
-RISK=supabase/migrations/20261028200000_mpc_8753_ledger_risk_axis.sql
+RISK=supabase/migrations_archive/20261028200000_mpc_8753_ledger_risk_axis.sql
 ledger_fp() { pg_dump -s --no-comments -n ledger "$TEST_URL" | grep -v -E '^.(un)?restrict '; }
 ledger_fp > "${TMPDIR:-/tmp}/risk-before.sql"
 fp > "${TMPDIR:-/tmp}/risk-public-before.sql"
@@ -275,7 +291,7 @@ psql_ "$TEST_URL" -At -c "select 'risk axis re-applied after rollback: ' || coun
 
 # MPC-8737 M3: erase parity. The live erase functions also erase the ledger record. Tested, then rolled back to the exact pre-M3 functions, then re-applied.
 echo "== erase parity: mpt_dsar_erase / mpt_erase_chat_sender / mpt_erase_social_contact erase the ledger too (MPC-8737 M3)"
-M3=supabase/migrations/20261028210000_mpc_8737_m3_ledger_erase_parity.sql
+M3=supabase/migrations_archive/20261028210000_mpc_8737_m3_ledger_erase_parity.sql
 fnfp() { psql_ "$TEST_URL" -At -c "select md5(string_agg(pg_get_functiondef(p.oid), '|' order by p.proname)) from pg_proc p where p.pronamespace = 'public'::regnamespace and p.proname in ('mpt_dsar_erase','mpt_erase_chat_sender','mpt_erase_social_contact')"; }
 m3_before=$(fnfp)
 psql_ "$TEST_URL" -f "$M3"
@@ -291,26 +307,31 @@ psql_ "$TEST_URL" -f "$M3"
 
 # MPC-8689: the 2 records-about-a-person rows join hexagon_catalogue and the ledger registry (366 -> 368). Applied last, after MPC-8753 (which asserts exactly 366 when it runs); applied twice to prove it is idempotent.
 echo "== records-about-a-person rows: catalogue and ledger registry at 368 (MPC-8689)"
-BROKERS=supabase/migrations/20261029120000_mpc_8689_brokers_rows.sql
+BROKERS=supabase/migrations_archive/20261029120000_mpc_8689_brokers_rows.sql
 psql_ "$TEST_URL" -f "$BROKERS"
 psql_ "$TEST_URL" -f "$BROKERS"   # idempotent
 psql_ "$TEST_URL" -At -f supabase/tests/mpc-8689-brokers-rows.test.sql
 
+# MPC-11541: hexagon_catalogue is marked DEPRECATED by comment only. Applied by the loop above; applied again here to prove it is idempotent. Row count is the 368 left by MPC-8689.
+echo "== hexagon_catalogue marked deprecated (MPC-11541)"
+psql_ "$TEST_URL" -f supabase/migrations/20261127080000_mpc_11541_hexagon_catalogue_deprecated.sql
+psql_ "$TEST_URL" -At -f supabase/tests/hexagon-catalogue-deprecated.test.sql
+
 # MPC-9817: accounts and sign-in. The migration is applied by the loop above; applied again here to prove it is idempotent, then the assertions (RLS, no IP column, consent carry, link/claim, 7-day exit, can(), real delete).
 echo "== accounts and sign-in (MPC-9817)"
-psql_ "$TEST_URL" -f supabase/migrations/20261108120000_mpc_9817_accounts_and_signin.sql
+psql_ "$TEST_URL" -f supabase/migrations_archive/20261108120000_mpc_9817_accounts_and_signin.sql
 psql_ "$TEST_URL" -At -f supabase/tests/mpc-9817-accounts.test.sql
 
 # MPC-9818: entitlements as data (20 rows) and monthly scan allowances. Applied by the loop above; applied again to prove it is idempotent, then the assertions.
 echo "== entitlements and scan allowances (MPC-9818)"
-psql_ "$TEST_URL" -f supabase/migrations/20261108140000_mpc_9818_entitlements_and_scan_allowances.sql
+psql_ "$TEST_URL" -f supabase/migrations_archive/20261108140000_mpc_9818_entitlements_and_scan_allowances.sql
 psql_ "$TEST_URL" -At -f supabase/tests/mpc-9818-entitlements.test.sql
 
 # MPC-9824: business teams. Applied by the loop above; the summary fix is applied again to prove it is idempotent, then the assertions (RLS closed, no IP column,
 # data-only-when-authorised, summary excludes non-authorised, revoke clears results, remove by member_id, delete team).
 echo "== business teams (MPC-9824)"
-psql_ "$TEST_URL" -f supabase/migrations/20261108160000_mpc_9824_business_teams.sql
-psql_ "$TEST_URL" -f supabase/migrations/20261115000000_mpc_9824_summary_member_id.sql
+psql_ "$TEST_URL" -f supabase/migrations_archive/20261108160000_mpc_9824_business_teams.sql
+psql_ "$TEST_URL" -f supabase/migrations_archive/20261115000000_mpc_9824_summary_member_id.sql
 psql_ "$TEST_URL" -At -f supabase/tests/mpc-9824-business-teams.test.sql
 
 psql_ "$ADMIN_URL" -c "drop database if exists $TEST_DB"
