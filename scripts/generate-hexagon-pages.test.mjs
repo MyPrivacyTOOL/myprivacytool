@@ -1,4 +1,4 @@
-// MPC-8689: every hexagon gets its own page with a unique, stable address; the master page lists all of them (654 since the 2026-11-27 registry export, MPC-11541).
+// MPC-8689: every hexagon gets its own page with a unique, stable address; the master page lists all of them (650 since the 2026-11-27 registry export, MPC-11541).
 import assert from 'node:assert/strict';
 import { mkdtempSync, readFileSync, existsSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -7,8 +7,8 @@ import { HEXAGON_CATALOGUE } from '../shared/hexagon-registry/catalogue.js';
 import { writeHexagonPages, hexagonPage, misuse } from './generate-hexagon-pages.mjs';
 
 const out = mkdtempSync(path.join(tmpdir(), 'hex-pages-'));
-assert.equal(writeHexagonPages(out), 655);
-assert.equal(readdirSync(path.join(out, 'hexagon')).length, 655);
+assert.equal(writeHexagonPages(out), 651);
+assert.equal(readdirSync(path.join(out, 'hexagon')).length, 651);
 for (const h of HEXAGON_CATALOGUE) {
   const f = path.join(out, 'hexagon', h.slug, 'index.html');
   assert.ok(existsSync(f), `page for ${h.id}`);
@@ -20,10 +20,10 @@ for (const h of HEXAGON_CATALOGUE) {
   assert.equal(hexagonPage(h).includes('<script>'), false, 'hexagon pages need no script');
 }
 const master = readFileSync(path.join(out, 'hexagon', 'index.html'), 'utf8');
-assert.equal((master.match(/<tr data-r=/g) || []).length, 654);
+assert.equal((master.match(/<tr data-r=/g) || []).length, 650);
 assert.ok(master.includes('54 run in the scan'), 'master page carries the one count sentence');
-assert.ok(!/\b(654|653|662|368|366)\b/.test(master.replace(/<tr data-r=[\s\S]*<\/tbody>/, '')), 'no headline total in the master page copy (MPC-11541)');
-assert.ok(master.includes('285 High') && master.includes('269 Medium') && master.includes('100 Low'));
+assert.ok(!/\b(650|654|653|662|368|366)\b/.test(master.replace(/<tr data-r=[\s\S]*<\/tbody>/, '')), 'no headline total in the master page copy (MPC-11541)');
+assert.ok(master.includes('284 High') && master.includes('268 Medium') && master.includes('98 Low'));
 // A registry row with no access recorded says so instead of printing an empty access line.
 const noAccess = HEXAGON_CATALOGUE.find((h) => !h.access);
 assert.ok(noAccess && hexagonPage(noAccess).includes('<dt>Access</dt><dd>Not recorded yet</dd>'));
@@ -35,7 +35,10 @@ const SHARE = ['webrtc-leak', 'name-in-your-address', 'at-username', 'sms-phone-
 // MPC-9791: connected-devices is a draft entry (owner review pending), not one of the 14 owner-reviewed share-list pages.
 const DRAFTS = ['connected-devices'];
 assert.deepEqual(Object.keys(REVIEWED).sort(), [...SHARE, ...DRAFTS].sort());
-for (const slug of SHARE) {
+// MPC-11541: the owner dropped 'If they email us: signature block' (Decision = Dropped), so it has no page any more; its reviewed text stays on file.
+const UNPUBLISHED = ['if-they-email-us-signature-block'];
+for (const slug of UNPUBLISHED) assert.ok(!HEXAGON_CATALOGUE.some((x) => x.slug === slug), `${slug} is not published`);
+for (const slug of SHARE.filter((x) => !UNPUBLISHED.includes(x))) {
   const h = HEXAGON_CATALOGUE.find((x) => x.slug === slug);
   assert.ok(h, `${slug} is in the catalogue`);
   assert.equal(REVIEWED[slug].uses.length, 4, `${slug}: four uses`);

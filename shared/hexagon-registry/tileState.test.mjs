@@ -9,7 +9,7 @@ assert.deepEqual(TILE_LABEL, { live: 'Live', in_build: 'In build', planned: 'Pla
 const by = (s) => HEXAGON_CATALOGUE.filter((i) => tileState(i) === s);
 assert.equal(HEXAGON_COUNT, 54);
 assert.deepEqual(by('live').map((i) => i.id).sort(), HEXAGONS.map((h) => h.id).sort(), 'Live = the 54 web scan checks, no more, no fewer');
-assert.deepEqual([by('live').length, by('in_build').length, by('planned').length], [54, 137, 463]);
+assert.deepEqual([by('live').length, by('in_build').length, by('planned').length], [54, 137, 459]);
 assert.equal(by('live').length + by('in_build').length + by('planned').length, HEXAGON_CATALOGUE.length, 'every tile has exactly one badge');
 // In build = the 90 built extras (off until their switch is on) + the 47 defined items outside the 54 (email 7, Telegram 30, X 10).
 for (const id of EXTRA_HEXAGON_IDS) assert.equal(tileState(HEXAGON_CATALOGUE.find((i) => i.id === id)), 'in_build', `${id} is built but off`);
