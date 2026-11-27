@@ -10,7 +10,7 @@ Code: `shared/hexagon-registry/scoreV2.js` (types `scoreV2.d.ts`, tests `scoreV2
 |---|---|---|
 | Scored set | 54 web hexagons | **60** = the 54 web + the 6 built email checks |
 | Formula, severities, bands, rounding | `score.js` | unchanged, imported from `score.js` |
-| Weights | nine categories, sum 100 | the same nine, plus `email` 10 (**PROPOSED**) |
+| Weights | nine categories, sum 100 | the same nine, plus `email` 10 (**interim, approved by the owner 2026-11-27**; revisit with real data) |
 | `email-breaches` | not scored | **not scored**: registry `build_status` is "not built: terms unconfirmed" (rejected with reason `not_built`) |
 | Version stamp | `exposure-v1` | `exposure-v2` |
 
@@ -33,14 +33,16 @@ Live = the 54 web checks + the 6 built email checks = **60**. In build 131 (was 
 
 ## Not done on purpose
 
-* **No consumer reads v2 yet.** The page ring, popup, PDF, report JSON and baseline Worker still use v1. Wiring v2 into the scan-report Worker's `web_scan.exposure` (where web and email results meet), accepting `exposure-v2` in `mpt-leads` baselines (`saveBaseline` compares versions and never mixes them), and the migration question for `mpt_score_baselines` are the sign-off step. Merging `shared/hexagon-registry/**` triggers `deploy-scan-report.yml` (see `exposure-score-spec.md` section 8), so this PR is not merged.
+* **No user-visible score reads v2 yet.** The page ring, popup, PDF, email body and baseline Worker still use v1. The only consumer is the additive `web_scan.exposure_v2_shadow` field in the report JSON attachment (shadow, not shown). Making v2 the headline, accepting `exposure-v2` in `mpt-leads` baselines (`saveBaseline` compares versions and never mixes them), and the migration question for `mpt_score_baselines` are the flip step. Merging `shared/hexagon-registry/**` triggers `deploy-scan-report.yml` (see `exposure-score-spec.md` section 8), so this PR is not merged.
 * The user-facing explanation is built and gated: `ScoreVersionNotice` renders only when the score on screen is `exposure-v2` (mounted in `FinalSummaryPanel`), so it appears exactly when v2 does.
 * Telegram 30 and X 10 (the rest of MPC-11569) are separate and untouched.
 
-## Decisions for Chris
+## Decisions (owner, 2026-11-27)
 
-1. **Email category weight (the one question, also written to the task's `Next_Steps`).** v2 uses 10, with the nine v1 weights unchanged. Confirm or give another number; it is `EMAIL_CATEGORY_WEIGHT` in `scoreV2.js`.
-2. Z when no email address was given: v2's default Z is 60 (`opts.total` overrides). A page-only scan therefore shows coverage 9 of 60, not 9 of 54, unless the caller passes Z.
+1. **Email category weight: 10, interim** (approved), with the nine v1 weights unchanged. Revisit once real scan data exists. It is `EMAIL_CATEGORY_WEIGHT` in `scoreV2.js`.
+2. **Z follows whether the email checks can apply** (`totalForV2` in `scoreV2.js`): 60 when an address was given, 54 for a page-only scan, so coverage is not lowered by checks that never applied.
+3. **Shadow first, flip later.** The report JSON now carries `web_scan.exposure_v2_shadow` next to `web_scan.exposure` (v1, still the headline). Nothing is shown to users from it. Flipping a user-visible score to v2 is a separate step that needs the owner's explicit go: compare shadow against v1 on real reports first, then switch (with `mpt-leads` storing `exposure-v2` as its own baseline version, never subtracted from v1).
+4. **Before the flip:** a `found` probe for each of the five email checks that has only ever returned `clear` (own address, local run, recorded in `docs/probe-results/`), and the copy review of the notice and release-note wording. Telegram 30 and X 10 come after the flip, and only the checks observed returning data.
 
 ## Release notes (draft, not published)
 

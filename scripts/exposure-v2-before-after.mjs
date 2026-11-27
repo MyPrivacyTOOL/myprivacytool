@@ -79,7 +79,7 @@ Reading it: a scan that runs no email check scores **exactly** what v1 scores ($
 
 ## One row per hexagon
 
-"v1 score" and "v2 score" = the score of a scan that contains only that hexagon, with its fixture status, run through each version (\`no score\` = nothing checked, so no score, never 0). "Category exposure" = that hexagon's category in the whole fixture scan, v1 to v2. Whole-scan v1 = ${v1.score}; whole-scan v2 = ${v2.score}. Active weights in the whole scan: v1 ${activeW1}, v2 ${activeW2} (the nine v1 weights unchanged, plus email ${CATEGORY_WEIGHTS_V2.email}, PROPOSED and awaiting approval; v1 weights sum ${Object.values(CATEGORY_WEIGHTS).reduce((a, b) => a + b, 0)}).
+"v1 score" and "v2 score" = the score of a scan that contains only that hexagon, with its fixture status, run through each version (\`no score\` = nothing checked, so no score, never 0). "Category exposure" = that hexagon's category in the whole fixture scan, v1 to v2. Whole-scan v1 = ${v1.score}; whole-scan v2 = ${v2.score}. Active weights in the whole scan: v1 ${activeW1}, v2 ${activeW2} (the nine v1 weights unchanged, plus email ${CATEGORY_WEIGHTS_V2.email}, interim and approved 2026-11-27; v1 weights sum ${Object.values(CATEGORY_WEIGHTS).reduce((a, b) => a + b, 0)}).
 
 | # | Hexagon | Channel | Fixture status | v1 score (alone) | v2 score (alone) | Category exposure, v1 to v2 | Why it differs |
 |---|---|---|---|---|---|---|---|

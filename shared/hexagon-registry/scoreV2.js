@@ -2,7 +2,7 @@
 // exposure-v1 (score.js) is NOT edited: it stays the shipped score and its tests keep pinning the 54. This file imports v1's constants
 // (weights, severities, bands, rounding) and adds only what changed:
 //   * the scored set = the 54 web hexagons (HEXAGONS) + the email hexagons whose build_status is "built" (6 today);
-//   * one new weight category, `email`, for those checks (PROPOSED weight, see EMAIL_CATEGORY_WEIGHT; needs the owner's approval);
+//   * one new weight category, `email`, for those checks (weight 10, interim: approved by the owner on 2026-11-27, to be revisited with real data; see EMAIL_CATEGORY_WEIGHT);
 //   * `email-breaches` is NOT scored: it is "not built: terms unconfirmed" in the registry. It is rejected with reason `not_built`.
 // Nothing here changes what any scan detects, HEXAGON_COUNT (still 54), scanCounts, or the Notion registry.
 //
@@ -13,7 +13,7 @@
 // Consequence that matters for the user-facing sentence: a scan that checks no email item has an inactive `email` category, so its
 // score is EXACTLY the v1 score (tested). Only the coverage denominator grows (54 to 60). When email items are checked, the score can
 // move up or down; that is more checks in the mix, not a change in what the person reveals.
-import { HEXAGONS, EMAIL_HEXAGONS } from './registry.js';
+import { HEXAGONS, HEXAGON_COUNT, EMAIL_HEXAGONS } from './registry.js';
 import { CAPTURE_STATUS } from './status.js';
 import { CATEGORY_WEIGHTS, CATEGORY_OF, SEVERITY_OF_SENSITIVITY, bandFor, percentHalfUp } from './score.js';
 
@@ -29,11 +29,18 @@ export const EMAIL_NOT_SCORED = Object.freeze(Object.fromEntries(EMAIL_HEXAGONS.
 export const SCORED_HEXAGONS_V2 = Object.freeze([...HEXAGONS, ...EMAIL_SCORED_HEXAGONS]);
 export const HEXAGON_COUNT_V2 = SCORED_HEXAGONS_V2.length;
 
-/** PROPOSED, not approved: relative weight of the new `email` category, on the same whole-percent scale as v1's nine weights (which stay as they are). */
+/** Relative weight of the new `email` category, on the same whole-percent scale as v1's nine weights (which stay as they are). Interim, approved by the owner on 2026-11-27 (MPC-11569); revisit once real scan data exists. Changing it means a new label and a new SCORE_VERSION. */
 export const EMAIL_CATEGORY_WEIGHT = 10;
 export const CATEGORY_WEIGHTS_V2 = Object.freeze({ ...CATEGORY_WEIGHTS, email: EMAIL_CATEGORY_WEIGHT });
 export const CATEGORY_OF_V2 = Object.freeze({ ...CATEGORY_OF, email: 'email' });
-export const WEIGHTS_LABEL_V2 = 'weights v2 (PROPOSED: the nine v1 weights unchanged, email 10; awaiting owner approval)';
+export const WEIGHTS_LABEL_V2 = 'weights v2 (interim, approved 2026-11-27: the nine v1 weights unchanged, email 10)';
+
+/**
+ * Z for a scan: the full v2 total (60) only when the email checks can apply to it, i.e. an address was given. A page-only scan, where the email
+ * checks cannot run, keeps Z at the web total (54), so its coverage is not lowered by checks that never applied (decided with the owner, 2026-11-27).
+ * @param {boolean} emailChecksApply
+ */
+export const totalForV2 = (emailChecksApply) => (emailChecksApply ? HEXAGON_COUNT_V2 : HEXAGON_COUNT);
 
 const BY_ID = new Map(SCORED_HEXAGONS_V2.map((h) => [h.id, h]));
 export const getScoredHexagonV2 = (id) => BY_ID.get(id);
