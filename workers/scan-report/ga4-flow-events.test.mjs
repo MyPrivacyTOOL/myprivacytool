@@ -15,7 +15,8 @@ const baseEnv = { UNSUBSCRIBE_SECRET: 'test-secret', EMAIL_CONFIRM_GATE_ENABLED:
 const ON = { GA4_SERVER_EVENTS_ENABLED: 'true', GA4_API_SECRET: 'test-secret-not-real' };
 const quiet = async (fn) => { const k = [console.log, console.warn, console.error]; console.log = console.warn = console.error = () => {}; try { return await fn(); } finally { [console.log, console.warn, console.error] = k; } };
 const json = (b, status = 200) => new Response(JSON.stringify(b), { status, headers: { 'content-type': 'application/json' } });
-const enableGa4Registry = () => { const reg = structuredClone(recipientsData); const r = reg.recipients.find((x) => x.key === 'ga4-measurement-protocol'); r.enabled = true; delete r.reason; return setBundledRegistryForTests(parseRegistry(reg)); };
+const ga4Registry = (enabled) => { const reg = structuredClone(recipientsData); const r = reg.recipients.find((x) => x.key === 'ga4-measurement-protocol'); r.enabled = enabled; delete r.reason; return setBundledRegistryForTests(parseRegistry(reg)); };
+const enableGa4Registry = () => ga4Registry(true);
 
 let ga4 = [];
 globalThis.fetch = async (url, init = {}) => { url = String(url); if (url.includes('google-analytics.com')) { ga4.push({ url, body: JSON.parse(String(init.body)) }); return new Response(null, { status: 204 }); } return json([], 404); };
@@ -33,10 +34,12 @@ const confirm = async (env, scanRow) => {
 const unconfirmed = { id: SCAN, email_scanned: 'zelda.quillfeather@example.test', email_confirm_required: true, email_confirmed_at: null };
 
 ga4 = [];
+let restore = ga4Registry(false);   // explicit, so this stays true whichever way the shipped file is set
 let res = await confirm({ ...baseEnv, ...ON }, unconfirmed);
-check(res.status === 200 && ga4.length === 0, 'shipped state (registry entry disabled), env switch and secret set: the click is confirmed and NO GA4 call is made');
+check(res.status === 200 && ga4.length === 0, 'registry entry disabled (the shipped state), env switch and secret set: the click is confirmed and NO GA4 call is made');
+restore();
 
-let restore = enableGa4Registry();
+restore = enableGa4Registry();
 ga4 = []; res = await confirm({ ...baseEnv }, unconfirmed);
 check(res.status === 200 && ga4.length === 0, 'registry on but env switch and secret missing: nothing sent');
 ga4 = []; res = await confirm({ ...baseEnv, ...ON }, unconfirmed);
@@ -59,8 +62,10 @@ const deliver = async (env, { onScan, type = 'email.delivered' } = {}) => {
 };
 
 ga4 = [];
+restore = ga4Registry(false);
 res = await deliver({ ...baseEnv, ...ON }, { onScan: 1 });
-check(res.status === 200 && ga4.length === 0, 'shipped state: a delivery receipt is stored and NO GA4 call is made');
+check(res.status === 200 && ga4.length === 0, 'registry entry disabled (the shipped state): a delivery receipt is stored and NO GA4 call is made');
+restore();
 restore = enableGa4Registry();
 ga4 = []; res = await deliver({ ...baseEnv, ...ON }, { onScan: 1 });
 check(res.status === 200 && ga4.length === 1 && ga4[0].body.events[0].name === 'report_delivered', 'every gate open: a delivery that moved the report row sends one report_delivered');
