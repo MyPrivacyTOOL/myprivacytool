@@ -78,15 +78,28 @@ export function linksToResolve(html) {
  */
 export const BOT_BLOCKED_VERIFIED_HOSTS = {
   'www.truthfinder.com': { verified: '2026-11-27', saw: 'redirects to the PeopleConnect Suppression Center (the opt-out form)' },
+  'www.beenverified.com': { verified: '2026-11-27', saw: 'checked by a person in their own browser: the people-search opt-out page with its record search form' },
+  'www.mylife.com': { verified: '2026-11-27', saw: 'checked by a person in their own browser: the deletion and opt-out form' },
+  'www.intelius.com': { verified: '2026-11-27', saw: 'checked by a person in their own browser: the PeopleConnect Suppression Center (the opt-out form)' },
+};
+// Not listed on purpose: www.whitepages.com and www.fastpeoplesearch.com showed a block page, not the opt-out page, in that browser check (2026-11-27 HKT).
+
+/**
+ * MPC-10608 (decided 2026-11-27 HKT): one more exception, for one host and one error only. This server sends its certificate without the intermediate one.
+ * Browsers fetch the missing certificate and open the page; Node does not and refuses the connection. Same rules as above: browser-checked monthly, reported
+ * as "automated check blocked". Any other error on this host (expired or wrong-name certificate, DNS, timeout, any HTTP status) still fails.
+ */
+export const CERT_CHAIN_VERIFIED_HOSTS = {
+  'help.whitepages.com.au': { code: 'UNABLE_TO_VERIFY_LEAF_SIGNATURE', verified: '2026-11-27', saw: 'the "My residential listing" help page' },
 };
 
 const hostOf = (u) => { try { return new URL(u).hostname; } catch { return ''; } };
 
 /**
  * A link "resolves" when it answers 2xx or redirects (3xx) to somewhere that does. A 404/410/5xx or a network error does not.
- * Returns the failures. A tolerated 403 (see above) is not a failure and is pushed to `blocked`, so the caller can count it separately.
+ * Returns the failures. A tolerated refusal (see above) is not a failure and is pushed to `blocked` as "host (reason)", so the caller can count it separately.
  */
-export async function resolveLinks(urls, fetchImpl = fetch, { timeoutMs = 10000, blocked = [], allowedHosts = BOT_BLOCKED_VERIFIED_HOSTS } = {}) {
+export async function resolveLinks(urls, fetchImpl = fetch, { timeoutMs = 10000, blocked = [], allowedHosts = BOT_BLOCKED_VERIFIED_HOSTS, certHosts = CERT_CHAIN_VERIFIED_HOSTS } = {}) {
   const bad = [];
   for (const u of urls) {
     try {
@@ -94,9 +107,13 @@ export async function resolveLinks(urls, fetchImpl = fetch, { timeoutMs = 10000,
       if (res.status >= 200 && res.status < 300) continue;
       // The refusal must come from the listed host itself: a redirect that ends in a 403 somewhere else is not covered.
       const host = hostOf(u);
-      if (res.status === 403 && Object.hasOwn(allowedHosts, host) && (!res.url || hostOf(res.url) === host)) blocked.push(host);
+      if (res.status === 403 && Object.hasOwn(allowedHosts, host) && (!res.url || hostOf(res.url) === host)) blocked.push(`${host} (HTTP 403)`);
       else bad.push(`${u.replace(/[?#].*/, '')} -> HTTP ${res.status}`);
-    } catch (e) { bad.push(`${u.replace(/[?#].*/, '')} -> ${String(e.name || 'error')}`); }
+    } catch (e) {
+      const host = hostOf(u); const code = typeof e.cause?.code === 'string' ? e.cause.code : '';
+      if (code && Object.hasOwn(certHosts, host) && certHosts[host].code === code) blocked.push(`${host} (incomplete certificate chain)`);
+      else bad.push(`${u.replace(/[?#].*/, '')} -> ${String(e.name || 'error')}${code ? ` (${code})` : ''}`);
+    }
   }
   return bad;
 }

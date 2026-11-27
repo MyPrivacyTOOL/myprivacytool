@@ -2,7 +2,7 @@
 // Run: node scripts/nightly-chain/nightly-chain.test.mjs
 import { createHash } from 'node:crypto';
 import { runChain, metricsRow, hkDay } from './run.mjs';
-import { fixtureScan, checkReport, scanRequestBody, consentRequestBody, consentVersion, resolveLinks, linksToResolve, BOT_BLOCKED_VERIFIED_HOSTS } from './checks.mjs';
+import { fixtureScan, checkReport, scanRequestBody, consentRequestBody, consentVersion, resolveLinks, linksToResolve, BOT_BLOCKED_VERIFIED_HOSTS, CERT_CHAIN_VERIFIED_HOSTS } from './checks.mjs';
 import { isTestAddress, testAddress, excludeTestFilter, onlyTestFilter } from '../../shared/test-records.js';
 import { buildReportEmail } from '../../workers/scan-report/lib/email.js';
 
@@ -212,6 +212,18 @@ for (const [name, opts, step] of broken) {
   for (const code of [401, 404, 410, 429, 500, 503]) check(is(await probe('https://broker.invalid/optout', status(code)), 1, 0), `403 rule: ${code} from a listed host fails`);
   for (const name of ['TimeoutError', 'TypeError']) check(is(await probe('https://broker.invalid/optout', async () => { throw Object.assign(new Error('x'), { name }); }), 1, 0), `403 rule: ${name} (timeout, DNS, TLS) on a listed host fails`);
   check(is(await probe('https://constructor/x', status(403)), 1, 0), '403 rule: an inherited object key is not a listed host');
+  const tls = (code) => async () => { throw Object.assign(new TypeError('fetch failed'), { cause: { code } }); };
+  const certHosts = { 'chain.invalid': { code: 'UNABLE_TO_VERIFY_LEAF_SIGNATURE' } };
+  const probeTls = async (url, impl) => { const blocked = []; const bad = await resolveLinks([url], impl, { blocked, allowedHosts, certHosts }); return { bad: bad.length, blocked: blocked.length, text: [...bad, ...blocked].join() }; };
+  const chain = await probeTls('https://chain.invalid/help', tls('UNABLE_TO_VERIFY_LEAF_SIGNATURE'));
+  check(is(chain, 0, 1) && /chain\.invalid \(incomplete certificate chain\)/.test(chain.text), 'certificate rule: the missing-intermediate error on the listed host is "automated check blocked"');
+  for (const code of ['CERT_HAS_EXPIRED', 'ERR_TLS_CERT_ALTNAME_INVALID', 'DEPTH_ZERO_SELF_SIGNED_CERT', 'ENOTFOUND', 'ECONNREFUSED']) check(is(await probeTls('https://chain.invalid/help', tls(code)), 1, 0), `certificate rule: ${code} on the listed host fails`);
+  const elsewhere = await probeTls('https://broker.invalid/optout', tls('UNABLE_TO_VERIFY_LEAF_SIGNATURE'));
+  check(is(elsewhere, 1, 0) && /TypeError \(UNABLE_TO_VERIFY_LEAF_SIGNATURE\)/.test(elsewhere.text), 'certificate rule: the same error on any other host fails, and the failure names the error code');
+  check(is(await probeTls('https://chain.invalid/help', status(403)), 1, 0), 'certificate rule: a 403 from the certificate-listed host is not covered by it');
+  check(Object.keys(CERT_CHAIN_VERIFIED_HOSTS).join() === 'help.whitepages.com.au' && Object.values(CERT_CHAIN_VERIFIED_HOSTS).every((v) => v.code === 'UNABLE_TO_VERIFY_LEAF_SIGNATURE' && v.saw), 'certificate rule: one host, one error code');
+  check(Object.keys(BOT_BLOCKED_VERIFIED_HOSTS).sort().join() === 'www.beenverified.com,www.intelius.com,www.mylife.com,www.truthfinder.com', '403 rule: exactly the four hosts whose opt-out page opened in a browser');
+  for (const host of ['www.whitepages.com', 'www.fastpeoplesearch.com']) { const blocked = []; check((await resolveLinks([`https://${host}/x`], status(403), { blocked })).length === 1 && !blocked.length, `403 rule: ${host} showed a block page in the browser check, so its 403 still fails`); }
   check(Object.values(BOT_BLOCKED_VERIFIED_HOSTS).every((v) => /^\d{4}-\d{2}-\d{2}$/.test(v.verified) && v.saw), '403 rule: every listed host records when it was opened in a browser and what was seen');
 }
 {

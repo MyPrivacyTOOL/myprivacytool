@@ -170,7 +170,7 @@ export async function runChain(env, { fetchImpl = fetch, sleep = (ms) => new Pro
       if (bad.length) result.facts.links_failed = bad;   // every failing link, not only the first three the step detail has room for
       if (bad.length) throw new Error(`${bad.length} of ${urls.length} links do not resolve: ${bad.slice(0, 3).join('; ')}`);
       if (!blocked.length) return `${urls.length} links resolve`;
-      return `${urls.length - blocked.length} links resolve; ${blocked.length} automated check blocked (HTTP 403, browser-verified host, not proven by this run): ${blocked.join(', ')}`;
+      return `${urls.length - blocked.length} links resolve; ${blocked.length} automated check blocked (browser-verified host, not proven by this run): ${blocked.join(', ')}`;
     },
     // MPC-7556: proves the Resend webhook is delivering events every night. The report email (sent through the real provider to the test mailbox) must come back as a
     // stored 'delivered' event on its per-send row (email_sends, written by the webhook). No event in the wait = the webhook, the secret or the migration is broken.
