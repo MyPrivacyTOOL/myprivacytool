@@ -1,2 +1,0 @@
--- History placeholder (MPC-9896 Option B). Version 20261127112742 (mpc_11567_metrics_daily) is already applied on the live database.
--- Intentionally empty: it was applied by hand through the connector. If its SQL belongs in the repo, add it as a migration with a version LATER than live's newest, not here. Do not add statements to this file.
