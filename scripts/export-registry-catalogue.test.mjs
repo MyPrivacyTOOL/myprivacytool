@@ -47,4 +47,17 @@ assert.throws(() => exportCatalogue(rows.slice(1), { dataPointRows: 6, previous 
 // Re-running on its own output changes nothing.
 assert.deepEqual(exportCatalogue(rows, { dataPointRows: 7, previous: out }), out);
 assert.equal(clean('[x.dm](http://x.dm)\\_media'), 'x.dm_media');
+// A dropped row keeps its old decision record under excluded[].was (nothing is deleted), and a re-run keeps it too.
+{
+  const prev = { version: 'old', total: 1, risk_tiers_approved: 'x', items: [
+    { id: 'web.gone', registry_id: 5, channel: 'web', channel_label: 'Web scan', group: 'Core', code: 'A1', arrival: 'A', risk: 'low', label: 'Gone', reveals: '', field: '', status: 'new', access: '', source: '', slug: 'gone', decision: 'dropped', decision_reason: 'because', decided: '2026-10-29' },
+    { id: 'web.keep', registry_id: 6, channel: 'web', channel_label: 'Web scan', group: 'Core', code: 'A2', arrival: 'A', risk: 'low', label: 'Keep', reveals: '', field: '', status: 'new', access: '', source: '', slug: 'keep' },
+  ] };
+  const rs = [row(5, { Footprint: 'Gone', 'Catalogue Code': 'web.gone', Decision: 'Dropped' }), row(6, { Footprint: 'Keep', 'Catalogue Code': 'web.keep' })];
+  const first = exportCatalogue(rs, { dataPointRows: 2, previous: prev });
+  assert.deepEqual(first.registry.excluded[0].was, { id: 'web.gone', decision: 'dropped', decision_reason: 'because', decided: '2026-10-29' });
+  assert.deepEqual(first.items.map((i) => i.id), ['web.keep']);
+  const second = exportCatalogue(rs, { dataPointRows: 2, previous: first });
+  assert.deepEqual(second.registry.excluded[0].was, first.registry.excluded[0].was, 'a re-run keeps the record');
+}
 console.log('export-registry-catalogue.test.mjs ok');
