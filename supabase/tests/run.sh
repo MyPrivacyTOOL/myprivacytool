@@ -107,7 +107,7 @@ psql_ "$TEST_URL" -At -f supabase/tests/mpc-9887-scan-consents.test.sql
 echo "== purge of channel tokens unused for 90 days: dry run by default, guards, grants (MPC-11258)"
 psql_ "$TEST_URL" -At -f supabase/tests/mpc-11258-purge-stale-channel-tokens.test.sql
 echo "== daily schedule for the 90-day token purge: applies twice, one job (MPC-11258)"
-SCHEDULE=supabase/migrations/20261126010000_mpc_11258_schedule_stale_channel_token_purge.sql
+SCHEDULE=supabase/migrations/20261127074149_mpc_11258_schedule_stale_channel_token_purge.sql
 psql_ "$TEST_URL" -f "$SCHEDULE"   # as written (the loop above applied it once already)
 sched_file="$SCHEDULE"
 if [ "$(psql_ "$TEST_URL" -At -c "select count(*) from pg_extension where extname = 'pg_cron'")" = 0 ]; then
