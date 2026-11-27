@@ -1,0 +1,2 @@
+-- History placeholder (MPC-9896 Option B). Version 20260802230030 (tighten_subscribers_rls_deny_by_default) is already applied on the live database.
+-- Intentionally empty: what it contributed is recorded in 20261127060000_mpc_9896_option_b_baseline.sql. Do not add statements here.

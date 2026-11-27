@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import BrokerPanel from "@/components/BrokerPanel";
+import { trackReportView, trackScanComplete } from "@/lib/analytics";
 import { confirmEmailResult, fetchLive, type BrokerPanel as Panel, type LiveItem, type LiveKind, type LiveStatus } from "@/lib/liveScan";
 
 // MPC-8452: what happens on the thank-you screen. Alice draws back the curtain, and the checks appear behind it one by one as the Worker finishes them.
@@ -66,8 +67,11 @@ export default function LiveScanPanel({ token, kind = "stream" }: { token: strin
         setItems((prev) => (snap.items.length >= prev.length ? snap.items : prev)); // never take a result away from the visitor
         if (snap.confirmRequired !== undefined) { setConfirmRequired(snap.confirmRequired); setConfirmed(snap.confirmed === true); }
         if (snap.brokerPanel) setPanel(snap.brokerPanel);
+        // CK-11491: the report page opened from the email, once the report has gone out. Both events obey the analytics consent gate.
+        if (kind === "verified" && snap.reportSent) trackReportView();
         if (snap.done) {
           setDone(true);
+          if (kind === "stream") trackScanComplete("scan_page");
           if (kind !== "verified") return; // the first view stops here; the email-link view keeps watching for new or changed findings
           if (polls < MAX_WATCH_POLLS) timer = window.setTimeout(tick, snap.brokerPanel?.pending ? POLL_MS : WATCH_POLL_MS);   // MPC-9813: pages are being read, look often
           return;

@@ -1,5 +1,5 @@
 // MPC-9825: queue for the staffed Business "results within 48 hours" service. No new secrets: reuses SUPABASE_SERVICE_ROLE_KEY (+ SUPABASE_URL),
-// SLACK_BOT_TOKEN and SLACK_CHANNEL_ID that this Worker already holds. Table: public.mpt_business_requests (supabase/migrations/20261108070000_*).
+// SLACK_BOT_TOKEN and SLACK_CHANNEL_ID that this Worker already holds. Table: public.mpt_business_requests (supabase/migrations_archive/20261108070000_*).
 import { callRecipient } from '../../shared/recipients/outbound.ts';
 import { workerRecipientContext } from '../../shared/recipients/worker-ctx.ts';
 import { dueAt, formatHKT, makeRef, buildDigest, hoursLeft, delayEmail, DELAY_NOTICE_AT_HOURS, OPEN_STATUSES } from '../../shared/business/sla.js';

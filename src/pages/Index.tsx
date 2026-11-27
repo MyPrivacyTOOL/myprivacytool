@@ -24,6 +24,7 @@ import {
   trackDeviceProfile,
   analyticsAllowed,
   startSessionTimer,
+  trackScanStart,
   trackSessionDuration,
   trackError,
   trackScrollToFooter,
@@ -74,6 +75,7 @@ const Index = () => {
     try {
       await giveScanConsent();
       setChoice(true);          // Scan me also counts as the analytics choice (design 8.1); the banner stays for visitors who never scan
+      trackScanStart('home');   // CK-11491: after both choices, so the gate is open
       void loadTurnstile();     // Cloudflare's script loads now, at the click (design 8.2)
     } catch (err) {
       setConsentError(err instanceof ConsentError && err.kind === 'stale' ? 'This page is out of date. Please reload it and try again.' : 'We could not record your agreement just now, so nothing was scanned. Please press the button to try again.');

@@ -117,11 +117,11 @@ describe('PathTrailPreview: email, breach and threat monitoring, WhatsApp and Me
     expect(grid.textContent?.toLowerCase()).not.toContain('dark web');
     expect(screen.getByText(/Email, breach and threat monitoring, WhatsApp/)).toBeTruthy();
   });
-  it('shows four groups with 21, 6, 22 and 8 tiles', () => {
+  it('shows four groups with 19, 6, 22 and 8 tiles', () => {
     render(<PathTrailPreview />);
     const grid = screen.getByTestId('path-trail-channels');
     expect(grid.querySelectorAll('figure')).toHaveLength(4);
-    expect(grid.querySelectorAll('[role=img]')).toHaveLength(21 + 6 + 22 + 8);
+    expect(grid.querySelectorAll('[role=img]')).toHaveLength(19 + 6 + 22 + 8);
   });
   it('says today that Messenger is not planned, WhatsApp profile name is planned, and email has live tiles held', () => {
     render(<PathTrailPreview />);

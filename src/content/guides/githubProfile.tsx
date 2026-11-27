@@ -22,7 +22,7 @@ export const faqs: { q: string; a: string }[] = [
   },
   {
     q: "How long is my data kept?",
-    a: "The profile snapshot carries an expiry date 30 days after it was made, and our check refuses it after that. It is cached for 24 hours so we do not call GitHub repeatedly. We keep your GitHub connection token, encrypted, until you disconnect, but we stop using it 90 days after you connected and ask you to connect again. Disconnecting deletes the token and revokes our access at GitHub.",
+    a: "The profile snapshot carries an expiry date 30 days after it was made, and our check refuses it after that. It is cached for 24 hours so we do not call GitHub repeatedly. We keep your GitHub connection token, encrypted, until you disconnect, but we stop using it 90 days after you connected and ask you to connect again. We delete a stored token automatically if it is not used for 90 days. Disconnecting deletes the token and revokes our access at GitHub.",
   },
   {
     q: "How do I disconnect?",
@@ -130,7 +130,8 @@ const Content = () => (
       Your GitHub connection token is encrypted with AES-256-GCM before it is stored, so the database holds ciphertext
       only. The finished profile is cached for 24 hours to avoid calling GitHub repeatedly; the cache never contains
       tokens or raw GitHub responses. The profile snapshot expires after 30 days. The token itself is kept until you
-      disconnect, but we stop using it 90 days after you connected and ask you to connect again.
+      disconnect, but we stop using it 90 days after you connected and ask you to connect again. We delete a stored
+      token automatically if it is not used for 90 days.
     </p>
     <p>
       To leave, choose Disconnect GitHub on the connect page. We delete the stored token first, clear the cached

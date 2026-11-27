@@ -66,7 +66,7 @@
               {
                 "key": "github-channel",
                 "name": "GitHub connect channel (channels.myprivacytool.io)",
-                "text": "GitHub connect channel (channels.myprivacytool.io) receives usernames you typed. Why: Shows the GitHub profile you chose to connect, and disconnects it on request. Kept: Until you disconnect."
+                "text": "GitHub connect channel (channels.myprivacytool.io) receives usernames you typed. Why: Shows the GitHub profile you chose to connect, and disconnects it on request. Kept: Until you disconnect; a stored token not used for 90 days is deleted automatically."
               },
               {
                 "key": "oauth-session",
@@ -528,7 +528,7 @@
               {
                 "key": "github-channel",
                 "name": "GitHub connect channel (channels.myprivacytool.io)",
-                "text": "GitHub connect channel (channels.myprivacytool.io) receives usernames you typed. Why: Shows the GitHub profile you chose to connect, and disconnects it on request. Kept: Until you disconnect."
+                "text": "GitHub connect channel (channels.myprivacytool.io) receives usernames you typed. Why: Shows the GitHub profile you chose to connect, and disconnects it on request. Kept: Until you disconnect; a stored token not used for 90 days is deleted automatically."
               },
               {
                 "key": "oauth-session",
@@ -990,7 +990,7 @@
               {
                 "key": "github-channel",
                 "name": "GitHub connect channel (channels.myprivacytool.io)",
-                "text": "GitHub connect channel (channels.myprivacytool.io) receives usernames you typed. Why: Shows the GitHub profile you chose to connect, and disconnects it on request. Kept: Until you disconnect."
+                "text": "GitHub connect channel (channels.myprivacytool.io) receives usernames you typed. Why: Shows the GitHub profile you chose to connect, and disconnects it on request. Kept: Until you disconnect; a stored token not used for 90 days is deleted automatically."
               },
               {
                 "key": "oauth-session",
@@ -1452,7 +1452,7 @@
               {
                 "key": "github-channel",
                 "name": "GitHub connect channel (channels.myprivacytool.io)",
-                "text": "GitHub connect channel (channels.myprivacytool.io) receives usernames you typed. Why: Shows the GitHub profile you chose to connect, and disconnects it on request. Kept: Until you disconnect."
+                "text": "GitHub connect channel (channels.myprivacytool.io) receives usernames you typed. Why: Shows the GitHub profile you chose to connect, and disconnects it on request. Kept: Until you disconnect; a stored token not used for 90 days is deleted automatically."
               },
               {
                 "key": "oauth-session",
@@ -1914,7 +1914,7 @@
               {
                 "key": "github-channel",
                 "name": "GitHub connect channel (channels.myprivacytool.io)",
-                "text": "GitHub connect channel (channels.myprivacytool.io) receives usernames you typed. Why: Shows the GitHub profile you chose to connect, and disconnects it on request. Kept: Until you disconnect."
+                "text": "GitHub connect channel (channels.myprivacytool.io) receives usernames you typed. Why: Shows the GitHub profile you chose to connect, and disconnects it on request. Kept: Until you disconnect; a stored token not used for 90 days is deleted automatically."
               },
               {
                 "key": "oauth-session",
@@ -2376,7 +2376,7 @@
               {
                 "key": "github-channel",
                 "name": "GitHub connect channel (channels.myprivacytool.io)",
-                "text": "GitHub connect channel (channels.myprivacytool.io) receives usernames you typed. Why: Shows the GitHub profile you chose to connect, and disconnects it on request. Kept: Until you disconnect."
+                "text": "GitHub connect channel (channels.myprivacytool.io) receives usernames you typed. Why: Shows the GitHub profile you chose to connect, and disconnects it on request. Kept: Until you disconnect; a stored token not used for 90 days is deleted automatically."
               },
               {
                 "key": "oauth-session",
@@ -2838,7 +2838,7 @@
               {
                 "key": "github-channel",
                 "name": "GitHub connect channel (channels.myprivacytool.io)",
-                "text": "GitHub connect channel (channels.myprivacytool.io) receives usernames you typed. Why: Shows the GitHub profile you chose to connect, and disconnects it on request. Kept: Until you disconnect."
+                "text": "GitHub connect channel (channels.myprivacytool.io) receives usernames you typed. Why: Shows the GitHub profile you chose to connect, and disconnects it on request. Kept: Until you disconnect; a stored token not used for 90 days is deleted automatically."
               },
               {
                 "key": "oauth-session",
@@ -3300,7 +3300,7 @@
               {
                 "key": "github-channel",
                 "name": "GitHub connect channel (channels.myprivacytool.io)",
-                "text": "GitHub connect channel (channels.myprivacytool.io) receives usernames you typed. Why: Shows the GitHub profile you chose to connect, and disconnects it on request. Kept: Until you disconnect."
+                "text": "GitHub connect channel (channels.myprivacytool.io) receives usernames you typed. Why: Shows the GitHub profile you chose to connect, and disconnects it on request. Kept: Until you disconnect; a stored token not used for 90 days is deleted automatically."
               },
               {
                 "key": "oauth-session",
@@ -3762,7 +3762,7 @@
               {
                 "key": "github-channel",
                 "name": "GitHub connect channel (channels.myprivacytool.io)",
-                "text": "GitHub connect channel (channels.myprivacytool.io) receives usernames you typed. Why: Shows the GitHub profile you chose to connect, and disconnects it on request. Kept: Until you disconnect."
+                "text": "GitHub connect channel (channels.myprivacytool.io) receives usernames you typed. Why: Shows the GitHub profile you chose to connect, and disconnects it on request. Kept: Until you disconnect; a stored token not used for 90 days is deleted automatically."
               },
               {
                 "key": "oauth-session",
@@ -4224,7 +4224,7 @@
               {
                 "key": "github-channel",
                 "name": "GitHub connect channel (channels.myprivacytool.io)",
-                "text": "GitHub connect channel (channels.myprivacytool.io) receives usernames you typed. Why: Shows the GitHub profile you chose to connect, and disconnects it on request. Kept: Until you disconnect."
+                "text": "GitHub connect channel (channels.myprivacytool.io) receives usernames you typed. Why: Shows the GitHub profile you chose to connect, and disconnects it on request. Kept: Until you disconnect; a stored token not used for 90 days is deleted automatically."
               },
               {
                 "key": "oauth-session",

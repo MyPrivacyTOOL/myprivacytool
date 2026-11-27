@@ -25,8 +25,8 @@ class Boom:
         raise RuntimeError("bq down")
 
 
-def svc(source, notion=None, slack=None, env="staging"):
-    return AuditService(Settings(environment=env, min_coverage=0), source, signing.PassportSigner(PRIV, "urn:t#1"), notion, slack)
+def svc(source, notion=None, slack=None, env="staging", queue=None):
+    return AuditService(Settings(environment=env, min_coverage=0), source, signing.PassportSigner(PRIV, "urn:t#1"), notion, slack, queue)
 
 
 class DetectorTests(unittest.TestCase):

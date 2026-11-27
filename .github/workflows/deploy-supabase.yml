@@ -1,11 +1,19 @@
 name: Deploy Supabase migrations
 
+# MPC-9896 (Pass 2): supabase/migrations now holds ONE baseline migration (the live structure, recorded as already applied on live)
+# plus empty placeholder files for the older live versions; the old chain is in supabase/migrations_archive/ (not applied).
+# See supabase/MIGRATIONS.md. Use dry_run=true first: it lists what is pending and applies nothing.
 # MPC-9896: AUTOMATIC DEPLOY IS SWITCHED OFF. This workflow runs ONLY by manual dispatch with an explicit
 # confirmation input (type DEPLOY). It never runs on push or merge. It is switched back on in Pass 2 of MPC-9896,
 # after the clean baseline migration is in place (Option B decided by Chris 2026-11-17).
 #
 # CK-006 (FLEET-TASK-V4.2): `supabase db push` against the live MyPrivacyTOOL (MPT)
 # Supabase project, so supabase/migrations/*.sql is the single source of schema truth.
+#
+# MPC-9896 (2026-11-27 19:56 HKT): the first dry run failed with the CLI's own message "--password only applies to a linked project ...
+# To use the linked project instead, pass --remote", and `supabase link` says it ignores --password. The database password is read from the
+# SUPABASE_DB_PASSWORD environment variable this job already sets, so --password is gone and db push now says --remote. If a later CLI release
+# changes these flags again, the dry run fails at its own step before anything is applied; fix the flags here, do not pass --password again.
 #
 # Repo secrets required (Settings -> Secrets and variables -> Actions); values are never printed:
 #   SUPABASE_ACCESS_TOKEN  personal access token (supabase.com/dashboard/account/tokens)
@@ -21,6 +29,11 @@ on:
       confirm:
         description: 'Type DEPLOY to apply pending migrations to the LIVE database'
         required: true
+        type: string
+      dry_run:
+        description: 'true = only list the pending migrations (supabase db push --dry-run), apply nothing'
+        required: false
+        default: 'false'
         type: string
 
 permissions:
@@ -78,12 +91,12 @@ jobs:
 
       - name: Link project
         if: steps.secrets.outputs.ready == 'true'
-        run: supabase link --project-ref "$SUPABASE_PROJECT_ID" --password "$SUPABASE_DB_PASSWORD"
+        run: supabase link --project-ref "$SUPABASE_PROJECT_ID"
 
       - name: Pending migrations (dry run)
         if: steps.secrets.outputs.ready == 'true'
-        run: supabase db push --dry-run --password "$SUPABASE_DB_PASSWORD"
+        run: supabase db push --dry-run --remote
 
       - name: Apply migrations
-        if: steps.secrets.outputs.ready == 'true'
-        run: supabase db push --password "$SUPABASE_DB_PASSWORD"
+        if: steps.secrets.outputs.ready == 'true' && inputs.dry_run != 'true'
+        run: supabase db push --remote

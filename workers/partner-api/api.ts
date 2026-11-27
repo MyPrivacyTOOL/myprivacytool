@@ -9,7 +9,7 @@ import { workerRecipientContext, type WorkerRecipientContext } from '../../share
 
 // MPC-7651: B2B partner API. Routes (all under /v1, JSON, Bearer API key except health and openapi.json):
 //   POST /v1/scan   GET /v1/report/:id   POST|GET /v1/monitors   DELETE /v1/monitors/:id   GET /v1/usage
-// Keys are stored only as SHA-256 hashes (supabase/migrations/20261013010001_mpc_7651_partner_api.sql). Server-to-server only.
+// Keys are stored only as SHA-256 hashes (supabase/migrations_archive/20261013010001_mpc_7651_partner_api.sql). Server-to-server only.
 
 export interface PartnerEnv {
   SUPABASE_URL?: string;

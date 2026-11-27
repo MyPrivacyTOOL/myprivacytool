@@ -1,0 +1,2 @@
+-- History placeholder (MPC-9896 Option B). Version 20261028060711 (ck_8502_social_event_idempotency) is already applied on the live database.
+-- Intentionally empty: what it contributed is recorded in 20261127060000_mpc_9896_option_b_baseline.sql. Do not add statements here.

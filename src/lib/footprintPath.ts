@@ -1,5 +1,5 @@
 // MPC-10614: the pure rules of the Footprint Path (design brief v1). No React, no network, no storage: state lives in memory in the component.
-// LEDGER FINDING (recorded on the task row): the ledger holds the risk axis and education events (supabase/migrations/20261028200000_mpc_8753_ledger_risk_axis.sql)
+// LEDGER FINDING (recorded on the task row): the ledger holds the risk axis and education events (supabase/migrations_archive/20261028200000_mpc_8753_ledger_risk_axis.sql)
 // but no S1-S5 shade, no client-callable write path, and no tg.* sensitivities (MPC-9901). So this module keeps the path's state LOCAL; it adds no table.
 import { ARRIVAL_PRINTS, PATH_TILES, SHADES, type PathTile, type Shade } from '@/config/footprintPathTiles';
 

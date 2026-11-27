@@ -49,6 +49,13 @@ async function rateLimited(env, request, prefix = '', who = null) {
 }
 
 // MPC-8452: the live view is polled every few seconds, so it has its own, wider limit (wrangler.toml LIVE_LIMITER); fails open like the others.
+// MPC-10612: wide per-address flood cap for the employee invitation routes (wrangler.toml JOIN_LIMITER, 300 / 60s). Without the binding it falls back to the narrower 40 / 60s LIVE_LIMITER
+// per-address cap (still a cap, not open); like the other limiters it fails open only if a binding call throws.
+async function joinFloodLimited(env, request) {
+  if (!env.JOIN_LIMITER) return liveLimited(env, request, 'bizjoin-ip:');
+  try { return !(await env.JOIN_LIMITER.limit({ key: 'join:' + (request.headers.get('CF-Connecting-IP') || 'unknown') })).success; } catch { return false; }
+}
+
 async function liveLimited(env, request, prefix = '', who = null) {
   if (!env.LIVE_LIMITER) return false;
   try { return !(await env.LIVE_LIMITER.limit({ key: 'live:' + prefix + (who ?? (request.headers.get('CF-Connecting-IP') || 'unknown')) })).success; } catch { return false; }
@@ -102,7 +109,7 @@ export default {
     }
     // MPC-9824 (F6): business teams. Admin routes use the account session; employee routes use the token from the invite email. 404 unless BUSINESS_TEAMS_ENABLED and ACCOUNTS_ENABLED are "true".
     if (request.method === 'POST' && url.pathname.startsWith('/api/business/') && BUSINESS_ROUTES[url.pathname]) {
-      return BUSINESS_ROUTES[url.pathname](env, ctx, request, origin, json, { allowedOrigins: ALLOWED_ORIGINS, rateLimited, liveLimited, sb: db(env), allowed: recipientAllowed });
+      return BUSINESS_ROUTES[url.pathname](env, ctx, request, origin, json, { allowedOrigins: ALLOWED_ORIGINS, rateLimited, liveLimited, joinFloodLimited, sb: db(env), allowed: recipientAllowed });
     }
     // CK-8503: Resend's signed delivery / bounce events for the report email. 404 unless RESEND_WEBHOOK_SECRET is set.
     // MPC-7554: "I have fixed this" (stops the follow-ups for one report; never an unsubscribe). 404 unless FOLLOWUP_STATE_ENABLED is "true".
@@ -470,7 +477,17 @@ async function processScan(env, sb, job, fetchImpl, rctx) {
   if (referralsEnabled(env)) await completeReferral(env, sb, job.user_id, fetchImpl, recipientAllowed, rctx);   // MPC-7645: this report finishing is what earns the friend who invited them a month of Pro
   const hs = await pushScanActivity(env, { email, scanId: job.id, score: result.score, riskLevel: result.risk_level, signalsFound: result.signals_found, breachStatus: hibp.status, breachCount: breaches.length }, fetchImpl, rctx);
   if (hs.failed) console.error('HubSpot activity push failed:', hs.failed);
+  if (hs.contactId) await linkHubSpotContact(sb, job.id, hs.contactId);
   return { sent: true, signals: inserted.length };
+}
+
+// CK-11491: the scan -> CRM contact link, filled from the lookup the report job already makes. It happens here, after the report, on purpose: before the
+// confirm click no check may use the visitor's details, so nothing asks HubSpot about them at capture. Best effort; the row (and the link) is deleted
+// by the same retention rules as before.
+async function linkHubSpotContact(sb, scanId, contactId) {
+  if (!/^[0-9]{1,20}$/.test(String(contactId))) return;
+  try { await sb.patch(`scans?id=eq.${scanId}&hubspot_contact_id=is.null`, { hubspot_contact_id: String(contactId) }); }
+  catch (e) { console.error('scan to HubSpot link failed:', e.status || 'error'); }
 }
 
 // MPC-7645: the "Invite 3 friends" block in the report. Needs UNSUBSCRIBE_SECRET (it signs the private invite link). Never lets the programme break the report.

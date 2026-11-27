@@ -734,13 +734,13 @@ const Privacy = () => {
               <ul className="list-inside list-disc space-y-2 text-muted-foreground" data-testid="connected-accounts">
                 <li>
                   <strong>GitHub:</strong> when you connect, we ask GitHub for the <code>read:user</code> permission only and read your public profile
-                  activity. We keep your GitHub account number and an encrypted access token (and refresh token) until you disconnect, and we stop using the token 90 days after you
+                  activity. We keep your GitHub account number and an encrypted access token (and refresh token) until you disconnect (we delete them automatically if the token is not used for 90 days), and we stop using the token 90 days after you
                   connected, until you connect again; a copy of the
                   snapshot we derive for 24 hours; and a signed session cookie in your browser for 7 days. The snapshot holds derived values only
                   (languages, topics, counts and a role label), not your email address, name, username, location, company or picture.
                 </li>
                 <li>
-                  <strong>Reddit:</strong> works the same way: encrypted token until you disconnect (not used after 90 days without connecting again), a 24-hour copy of the derived snapshot and a 7-day
+                  <strong>Reddit:</strong> works the same way: encrypted token until you disconnect (not used after 90 days without connecting again, and deleted automatically if not used for 90 days), a 24-hour copy of the derived snapshot and a 7-day
                   session cookie.
                 </li>
                 <li>
@@ -752,7 +752,8 @@ const Privacy = () => {
                   24-hour copy and ends the session. If your 7-day session has ended, you can still remove the stored connection: sign in with the provider
                   again on the Connect page (or its &ldquo;remove&rdquo; link) and we delete the token and the copy and revoke our access, without
                   reading your profile, saving anything new or signing you in. If the provider tells us you revoked access, we delete our copy of the
-                  token. The cookies are named in the Cookie Policy.
+                  token. Even if you do not disconnect, we automatically delete a stored GitHub or Reddit token that has not been used for 90 days.
+                  The cookies are named in the Cookie Policy.
                 </li>
               </ul>
 

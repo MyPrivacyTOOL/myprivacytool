@@ -4,6 +4,8 @@
 // Allowed to name the schema:
 //   functions/_visit-log.*                      the module (and its test)
 //   supabase/migrations/*visit_log*.sql         the schema, the policy and the purge job
+//   supabase/migrations_archive/*visit_log*.sql  the same files, retired by MPC-9896 (kept for reference)
+//   supabase/migrations/<ver>_mpc_9896_option_b_baseline.sql  the baseline that records the whole live schema
 //   supabase/tests/visit-log.test.sql           the database test
 //   this script and its test
 // Everything else in code (src, functions, workers, shared, scripts, supabase, e2e, .github) fails. Prose in docs/ is not code and is not scanned.
@@ -21,6 +23,8 @@ export const PATTERN = /\bvisit_log\b/;
 export const ALLOWED = [
   /^functions\/_visit-log\.[a-z.]+$/,
   /^supabase\/migrations\/[^/]*visit_log[^/]*\.sql$/,
+  /^supabase\/migrations_archive\/[^/]*visit_log[^/]*\.sql$/, // MPC-9896: the retired chain, kept for reference
+  /^supabase\/migrations\/\d+_mpc_9896_option_b_baseline\.sql$/, // MPC-9896: the one baseline migration records the whole live schema
   /^supabase\/tests\/visit-log\.test\.sql$/,
   /^scripts\/ci\/check-visit-log-isolation(\.[a-z]+)*\.mjs$/,
 ];

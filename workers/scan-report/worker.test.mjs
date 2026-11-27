@@ -106,6 +106,8 @@ check((await checkBreaches('a@b.co', { HIBP_API_KEY: 'k', HIBP_MIN_INTERVAL_MS: 
   const args = { email: EMAIL, scanId: 's1', score: 80, riskLevel: 'low', signalsFound: 2, breachStatus: 'checked', breachCount: 2 };
   const r1 = await pushScanActivity({ HUBSPOT_TOKEN: 'h' }, args, stub([{ id: '77' }]));
   const note = seen.find((c) => c.url.endsWith('/notes'));
+  check(r1.contactId === '77', 'CK-11491: the contact id comes back so it can be kept on the scan row');
+  check((await pushScanActivity({ HUBSPOT_TOKEN: 'h' }, args, async (u) => (String(u).endsWith('/search') ? { ok: true, status: 200, json: async () => ({ results: [{ id: '78' }] }), text: async () => '' } : { ok: false, status: 500, json: async () => ({}), text: async () => '' }))).contactId === '78', 'CK-11491: a failed note still returns the contact id');
   check(r1.pushed && note.body.associations[0].to.id === '77' && /80\/100/.test(note.body.properties.hs_note_body) && !note.body.properties.hs_note_body.includes(EMAIL), 'HubSpot: scan result pushed as a note on the contact (no email address in the body)');
   check((await pushScanActivity({}, args, stub([]))).skipped && (await pushScanActivity({ HUBSPOT_TOKEN: 'h' }, args, stub([]))).skipped, 'HubSpot: no token or no contact => skipped, no throw');
   check((await pushScanActivity({ HUBSPOT_TOKEN: 'h' }, args, async () => { throw new Error('boom'); })).failed, 'HubSpot: network error => reported, not thrown');
