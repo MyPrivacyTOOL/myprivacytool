@@ -7,7 +7,7 @@ const env = { SUPABASE_URL: 'https://x.supabase.co', SUPABASE_SERVICE_ROLE_KEY: 
 let pages, calls, supa, paceGap, nextId;
 const reset = () => { pages = []; calls = []; nextId = 1; paceGap = -99.2; supa = {
   daily: { day: '2026-10-09', ga4_sessions: 40, ga4_active_users: 31, new_users: 1, new_subscribers: 2 },
-  weekly: { week_of: '2026-10-05', cumulative_scans: 1, weekly_new_scans: 1, conversion_rate_pct: 12.5, current_mrr: null, ga4_active_users: 77, blog_posts_published: 3, x_threads_posted: null, engagement_sessions: 4, engagement_full_scans: 1, ga4_scan_events: null },
+  weekly: { week_of: '2026-10-05', cumulative_scans: 1, weekly_new_scans: 1, test_scans_excluded: 2, conversion_rate_pct: 12.5, current_mrr: null, ga4_active_users: 77, blog_posts_published: 3, x_threads_posted: null, engagement_sessions: 4, engagement_full_scans: 1, ga4_scan_events: null },
   counts: { leads: 1 },
 }; };
 const rt = (v) => ({ rich_text: [{ plain_text: v }] });
@@ -59,7 +59,7 @@ let w = pages[0].props;
 check(r.action === 'created' && pages.length === 1 && w.Entry.title[0].text.content === 'Week of 2026-10-05' && w['Cumulative Scans'].number === 1, 'weekly row created');
 check(pages[0].props['Week Of'].date.start === '2026-10-05' && w['Conversion Rate %'].number === 0.125 && w['GA4 Active Users'].number === 77 && w['Blog Posts Published'].number === 3, 'weekly numbers mapped (percent stored as fraction)');
 check(w['Current MRR'].number === null && w['X Threads Posted'].number === null, 'missing sources left blank');
-check(w['Agent Insights'].rich_text[0].text.content.includes('2026-10-12T00:20:00.000Z') && /rows in public\.scans/.test(w['Agent Insights'].rich_text[0].text.content) && /X Threads Posted: blank/.test(w['Agent Insights'].rich_text[0].text.content), 'Agent Insights has source and read time per number');
+check(w['Agent Insights'].rich_text[0].text.content.includes('2026-10-12T00:20:00.000Z') && /without the test mailbox, 2 test scans left out to date/.test(w['Agent Insights'].rich_text[0].text.content) && /X Threads Posted: blank/.test(w['Agent Insights'].rich_text[0].text.content), 'Agent Insights has source and read time per number');
 check(w['Pace Status'].select.name === '🔴 Behind' && r.paceStatus === '🔴 Behind', 'Pace Status set from Notion Pace Gap %');
 const created = calls.find((c) => c.url.endsWith('/v1/pages') && c.method === 'POST');
 check(created.body.properties.Entry.title[0].text.content === 'Week of 2026-10-05' && created.body.properties['Linked Objective'].multi_select[0].name === 'O3 — KPI pace', 'title and objective on create');
@@ -68,6 +68,11 @@ r = await publishWeekly(env, '2026-10-05', now);
 check(r.action === 'updated' && pages.length === 1, 're-run updates the same week row');
 const patch = calls.filter((c) => c.method === 'PATCH' && c.body.properties['Agent Insights'])[0];
 check(patch.body.properties.Entry === undefined && patch.body.properties['Linked Objective'] === undefined, 'update does not touch Entry or Linked Objective');
+
+// A view without the test_scans_excluded column must not be described as test-free
+const beforeOld = supa.weekly; reset(); delete supa.weekly.test_scans_excluded; await publishWeekly(env, '2026-10-05', now);
+check(/INCLUDES test scans/.test(pages[0].props['Agent Insights'].rich_text[0].text.content), 'old view shape => figure is labelled as including test scans');
+reset(); supa.weekly = beforeOld; await publishWeekly(env, '2026-10-05', now);
 
 // Next week links the previous one; pace thresholds drive the status
 supa.weekly = { ...supa.weekly, week_of: '2026-10-12', cumulative_scans: 5 }; paceGap = -10;

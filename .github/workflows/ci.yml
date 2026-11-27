@@ -39,6 +39,8 @@ jobs:
         run: npm run test:coverage
       - name: Existing node:test suites (github-channel, oauth-poc, mpt-leads, scan-report)
         run: npm run test:workers:node
+      - name: Metrics collector deploy-gate tests (same script the deploy workflow runs)
+        run: npm run test:workers:metrics
       - name: Coverage summary
         if: always()
         run: |
