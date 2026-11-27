@@ -24,10 +24,10 @@ Two candidate designs:
 
 | # | Step | Evidence |
 |---|---|---|
-| 1 | `scan_request` | synthetic Worker answers success + scan number |
+| 1 | `scan_request` | (MPC-10608) the synthetic Worker records a scan consent (`POST /api/consent`, as the site's consent block does), then accepts the scan carrying its `consent_id`: success + scan number |
 | 2 | `saved_scan` | `web_scans` row with the sent hexagon count |
 | 3 | `linked_contact_consent` | `web_scan_contacts` row with `save_consent_at` and wording version |
-| 4 | `report_request` | `scans` row, source `web_scan`, attached to a test address (refuses to continue otherwise) |
+| 4 | `report_request` | `scans` row, source `web_scan`, attached to a test address (refuses to continue otherwise), carrying this run's `consent_id` (the report job refuses a request without one) |
 | 5 | `first_email_accepted` | `scans.confirmation_sent_at` set (the provider accepted it; **accepted is not inbox receipt**) |
 | 6 | `report_sent` | `report_status = sent` and `resend_message_id` (waits up to 15 min for the cron) |
 | 7 | `report_checks` | sent HTML/text read back from Resend (falls back to a rebuild from the saved scan, flagged in the result): two parts, bridge line, honest statuses, scan number in HTML + text + JSON, JSON valid and agreeing with the scan, HTML under 100 KB, no unsupported markup, plain-text parity |

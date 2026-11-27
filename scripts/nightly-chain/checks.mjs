@@ -1,4 +1,6 @@
 // MPC-7557: pure checks for the nightly chain test. No network, no secrets: every function takes data and returns problems, so CI can prove them.
+import { readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { checkEmail, htmlLinks, HARD_LIMIT_BYTES } from '../../workers/scan-report/lib/renderChecks.js';
 import { HEXAGONS } from '../../shared/hexagon-registry/registry.js';
 import { captureStatus } from '../../shared/hexagon-registry/status.js';
@@ -19,7 +21,19 @@ export function fixtureScan() {
   });
 }
 
-/** The request body for POST /api/scan (the same shape the /scan page sends). */
+/** The scan-consent wording version the Worker accepts, read from the one place it lives (plain node cannot import the .ts), so a wording change needs no edit here. */
+export function consentVersion() {
+  const v = readFileSync(new URL('../../shared/recipients/consent-config.ts', import.meta.url), 'utf8').match(/consent_version:\s*"([^"]+)"/)?.[1];
+  if (!v) throw new Error('consent_version not found in shared/recipients/consent-config.ts');
+  return v;
+}
+
+/** The request body for POST /api/consent. Nobody is shown wording in this test, so the text hash names a synthetic text rather than posing as the real one. */
+export function consentRequestBody(scanId) {
+  return { scan_id: scanId, consent_version: consentVersion(), consent_text_sha256: createHash('sha256').update('nightly-chain synthetic consent').digest('hex'), locale: 'en' };
+}
+
+/** The request body for POST /api/scan (the same shape the /scan page sends). The caller adds the consent_id that POST /api/consent returned. */
 export function scanRequestBody(email, hexagons, { requestId } = {}) {
   return {
     email, consent: true, consent_source: 'synthetic_nightly', scan: hexagons, save_consent: true, save_consent_version: '2026-10-12-v1',

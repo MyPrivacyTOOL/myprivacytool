@@ -2,7 +2,7 @@
 // Run: node scripts/nightly-chain/nightly-chain.test.mjs
 import { createHash } from 'node:crypto';
 import { runChain, metricsRow, hkDay } from './run.mjs';
-import { fixtureScan, checkReport, scanRequestBody, resolveLinks, linksToResolve } from './checks.mjs';
+import { fixtureScan, checkReport, scanRequestBody, consentRequestBody, consentVersion, resolveLinks, linksToResolve } from './checks.mjs';
 import { isTestAddress, testAddress, excludeTestFilter, onlyTestFilter } from '../../shared/test-records.js';
 import { buildReportEmail } from '../../workers/scan-report/lib/email.js';
 
@@ -14,12 +14,18 @@ const json = (o, status = 200) => ({ ok: status < 400, status, json: async () =>
 
 // ------------------------------------------------------------ fake world
 function world(opts = {}) {
-  const db = { webScans: {}, links: [], scans: {}, users: {}, suppressions: new Set(), erased: [], deleted: [], posts: [], gets: [] };
+  const db = { webScans: {}, links: [], scans: {}, users: {}, suppressions: new Set(), erased: [], deleted: [], posts: [], gets: [], consents: [] };
   let polls = 0;
   const html = {};
   const f = async (url, init = {}) => {
     url = String(url); const method = init.method || 'GET';
     db.gets.push(`${method} ${url.replace(/[?#].*/, '')}`);
+    if (url === 'https://synth.invalid/api/consent') {   // MPC-10608 (the real handler's contract is proven in consent-contract.vitest.mjs)
+      if (opts.consentRefused) return json({ error: 'Unknown consent wording' }, 400);
+      const row = { id: `22222222-2222-4222-8222-${String(db.consents.length + 1).padStart(12, '0')}`, ...JSON.parse(init.body) };
+      db.consents.push(row);
+      return json({ consent_id: row.id, scan_id: row.scan_id }, 201);
+    }
     if (url.startsWith('https://synth.invalid/api/scan')) {
       if (opts.synthMissing) return json({}, 404);
       const b = JSON.parse(init.body); db.posts.push(b);
@@ -27,7 +33,8 @@ function world(opts = {}) {
       const sid = `00000000-0000-4000-8000-${String(Object.keys(db.scans).length + 1).padStart(12, '0')}`;
       const wid = `11111111-1111-4111-8111-${String(Object.keys(db.webScans).length + 1).padStart(12, '0')}`;
       db.users[b.email] = { email: b.email, email_opt_out_at: null };
-      db.scans[sid] = { id: sid, source: 'web_scan', report_status: 'pending', email: b.email, confirmation_sent_at: null, report_sent_at: null, resend_message_id: null };
+      if (b.consent_id && !db.consents.some((c) => c.id === b.consent_id)) return json({ error: 'Consent required' }, 403);
+      db.scans[sid] = { id: sid, source: 'web_scan', consent_id: opts.consentDropped ? null : b.consent_id ?? null, report_status: 'pending', email: b.email, confirmation_sent_at: null, report_sent_at: null, resend_message_id: null };
       db.webScans[wid] = { id: wid, hexagon_count: b.scan.length, results_bytes: 100, results: opts.mutateSaved ? opts.mutateSaved(b.scan) : b.scan, created_at: NOW.toISOString() };
       if (!opts.noLink) db.links.push({ web_scan_id: wid, channel: 'email', contact_id: sid, save_consent_at: opts.noConsent ? null : NOW.toISOString(), save_consent_version: opts.noConsent ? null : '2026-10-12-v1' });
       return json({ success: true, duplicate: false, scan_saved: true, scan_number: wid });
@@ -53,6 +60,8 @@ function world(opts = {}) {
         polls++;
         if (!opts.neverConfirm && polls >= 2) s.confirmation_sent_at = NOW.toISOString();
         if (!opts.neverSend && polls >= 4) { s.report_status = opts.failReport ? 'failed' : 'sent'; s.report_sent_at = NOW.toISOString(); s.resend_message_id = 'msg_1'; s.report_last_error = opts.failReport ? 'boom for someone@example.com' : null; s.report_attempts = 5; }
+        // The production report job's consent gate: a request with no consent is refused before any attempt, whatever the synthetic Worker accepted.
+        if (!s.consent_id && polls >= 4) Object.assign(s, { report_status: 'failed', resend_message_id: null, report_last_error: 'consent: no consent on record for this scan', report_attempts: 0 });
         return json([{ ...s, users: { email: opts.realAddress ? 'real.person@example.com' : s.email } }]);
       }
       if (path.startsWith('email_sends?provider_message_id=eq.')) {   // MPC-7556: the row the Resend webhook updates
@@ -97,6 +106,10 @@ check(hkDay(NOW) === '20261029', 'run day is the Hong Kong date (16:00 UTC is al
   check(isTestAddress(b.email) && b['cf-turnstile-response'] === 'XXXX.DUMMY.TOKEN.XXXX' && b.consent === true && b.save_consent === true && b.scan.length === fixtureScan().length, 'nightly: request is a consented test-alias scan carrying the Turnstile TEST token');
   check(w.db.gets.every((g) => !g.startsWith('POST https://prod.invalid/api/scan')), 'nightly: nothing is ever POSTed to the production /api/scan');
   check(r.facts.report_source === 'provider' && r.facts.html_bytes < 100000 && r.facts.links_checked >= 2, 'nightly: report read back from the provider, under 100 KB, links fetched');
+  check(w.db.consents.length === 1 && b.consent_id === w.db.consents[0].id, 'nightly: a scan consent is recorded first and its id is sent with the scan');
+  check(w.db.gets.indexOf('POST https://synth.invalid/api/consent') >= 0 && w.db.gets.indexOf('POST https://synth.invalid/api/consent') < w.db.gets.indexOf('POST https://synth.invalid/api/scan') && w.db.gets.every((g) => !g.startsWith('POST https://prod.invalid/api/consent')), 'nightly: the consent goes to the synthetic Worker, before the scan');
+  const cb = consentRequestBody(w.db.consents[0].scan_id);
+  check(Object.keys(cb).sort().join() === 'consent_text_sha256,consent_version,locale,scan_id' && cb.consent_version === consentVersion() && /^[0-9a-f]{64}$/.test(cb.consent_text_sha256), 'consent request: the four fields the Worker accepts, current wording version');
   const row = metricsRow(r, NOW);
   check(row.status === 'ok' && row.source === 'nightly_chain' && !/@/.test(JSON.stringify(row)), 'metrics row: ok, counts only, no email address');
 }
@@ -104,6 +117,8 @@ check(hkDay(NOW) === '20261029', 'run day is the Hong Kong date (16:00 UTC is al
 // ------------------------------------------------------------ nightly, one broken link each
 const broken = [
   ['synthetic Worker not deployed', { synthMissing: true }, 'scan_request'],
+  ['the Worker refuses the scan consent', { consentRefused: true }, 'scan_request'],
+  ['the Worker does not attach the consent to the request', { consentDropped: true }, 'report_request'],
   ['no contact link', { noLink: true }, 'linked_contact_consent'],
   ['no consent record on the link', { noConsent: true }, 'linked_contact_consent'],
   ['first email never accepted', { neverConfirm: true }, 'first_email_accepted'],
