@@ -19,13 +19,13 @@ describe('hexagon registry', () => {
     expect(HEXAGON_CONDITIONAL_COUNT).toBe(13);
   });
 
-  it('has the required fields on every entry and leaves the trust score empty', () => {
+  it('has the required fields on every entry and a trust_score that follows user_can_check', () => {
     for (const h of HEXAGONS) {
       for (const k of ['id', 'label', 'group', 'captures', 'value_to_user', 'value_type'] as const) expect(h[k], `${h.id}.${k}`).toBeTruthy();
       expect(['always', 'conditional']).toContain(h.presence);
       expect(['yes', 'partly', 'no']).toContain(h.user_can_check);
       expect(TRUTH_LEVELS).toContain(h.truth.level);
-      expect(h.trust_score).toBeNull();
+      expect(h.trust_score).toBe({ yes: 100, partly: 50, no: 0 }[h.user_can_check]);
       expect(h.status.allowed.every(s => STATUSES.includes(s))).toBe(true);
       expect(h.artwork.emoji).toBeTruthy();
     }
