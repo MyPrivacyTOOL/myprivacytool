@@ -10,6 +10,9 @@ import { FOLLOW_LINE } from "./src/mirror-bot";
 import { classifyTheme } from "./src/funnel";
 import { CONSENT_MESSAGE, GUESS_NOTICE, INTENT_REPLIES, WELCOME_BODY, WELCOME_MESSAGE, branded, greeting, buildMirrorMessage, describeShape, extractMirrorDms, parseBareReply, parseMirrorCommand } from "./src/mirror-bot";
 import { openGuess } from "../../shared/email-guess";
+import { setBundledRegistryForTests } from "../../shared/recipients/outbound";
+import { parseRegistry } from "../../shared/recipients/registry";
+import recipientsData from "../../shared/recipients/recipients.data.js";
 
 const sig = (body: string) => "sha256=" + createHmac("sha256", "xs").update(body).digest("base64");
 const dm = (sender: string, text: string, forUser = "999") =>
@@ -718,5 +721,91 @@ describe("magic guess in the Mirror bridge link (MPC-11111)", () => {
   });
   it("is the same message as before when nothing is sealed", () => {
     expect(buildMirrorMessage({ description: "hello", protected: false })).toContain(`Next step: run a free full scan at ${PLAIN}\n\n`);
+  });
+});
+
+// MPC-11111: the X bot answers its DMs here and never passes them to core-brain (where dm_received is sent for the other channels), so this Worker sends it for X.
+describe("GA4 dm_received for X DMs (MPC-11111)", () => {
+  const GA4_ON = { GA4_SERVER_EVENTS_ENABLED: "true", GA4_API_SECRET: "test-secret-not-real" };
+  let restoreRegistry: (() => void) | undefined;
+  /** The registry entry is set explicitly, so these tests stay true whatever state the shipped file is in. */
+  const registry = (enabled: boolean) => {
+    restoreRegistry?.();
+    const reg = parseRegistry(JSON.parse(JSON.stringify(recipientsData)));
+    reg.recipients.find((r) => r.key === "ga4-measurement-protocol")!.enabled = enabled;
+    restoreRegistry = setBundledRegistryForTests(reg);
+  };
+  afterEach(() => { restoreRegistry?.(); restoreRegistry = undefined; });
+  const stub = (ga4: () => Response = () => new Response(null, { status: 204 })) =>
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (u) => (String(u).includes("google-analytics.com") ? ga4() : new Response("{}")));
+  const ga4Calls = (f: { mock: { calls: unknown[][] } }) => f.mock.calls.filter((c) => String(c[0]).includes("google-analytics.com")) as [string, RequestInit][];
+  const consentSent = (f: { mock: { calls: unknown[][] } }) => f.mock.calls.some((c) => String(c[0]).includes("/dm_conversations/with/42/messages"));
+  /** Background work, real WebCrypto: wait for the answer to go out, then give any event time to land. */
+  const answered = async (f: { mock: { calls: unknown[][] } }) => {
+    await vi.waitFor(() => { if (!consentSent(f)) throw new Error("the DM has not been sent yet"); });
+    await new Promise((x) => setTimeout(x, 25));
+  };
+  const several = (...items: [string, string][]) =>
+    JSON.stringify({ for_user_id: "999", direct_message_events: items.map(([sender, text]) => ({ type: "message_create", message_create: { sender_id: sender, message_data: { text } } })) });
+
+  it("sends nothing while the registry entry is disabled (the shipped state), even with the switch and the secret set; the DM is still answered", async () => {
+    registry(false);
+    const f = stub();
+    expect((await post(dm("42", "MIRROR"), { ...env(), ...GA4_ON })).status).toBe(200);
+    await answered(f);
+    expect(ga4Calls(f)).toHaveLength(0);
+  });
+  it("sends nothing unless every gate is open", async () => {
+    for (const [on, extra] of [[true, {}], [true, { GA4_SERVER_EVENTS_ENABLED: "true" }], [true, { GA4_API_SECRET: "s" }], [true, { GA4_SERVER_EVENTS_ENABLED: "TRUE", GA4_API_SECRET: "s" }]] as const) {
+      registry(on);
+      vi.restoreAllMocks();   // a fresh spy per round
+      const f = stub();
+      await post(dm("42", "MIRROR"), { ...env(), ...extra });
+      await answered(f);
+      expect(ga4Calls(f), JSON.stringify(extra)).toHaveLength(0);
+    }
+  });
+  it("with every gate open sends one dm_received for the DM, the channel and nothing else", async () => {
+    registry(true);
+    const f = stub();
+    await post(dm("42", "MIRROR"), { ...env(), ...GA4_ON });
+    await vi.waitFor(() => { if (ga4Calls(f).length < 1) throw new Error("no GA4 call yet"); });
+    await answered(f);
+    const sent = ga4Calls(f);
+    expect(sent).toHaveLength(1);
+    const u = new URL(sent[0][0]);
+    expect(u.origin + u.pathname).toBe("https://www.google-analytics.com/mp/collect");
+    const body = JSON.parse(String(sent[0][1].body));
+    expect(Object.keys(body).sort()).toEqual(["client_id", "events"]);   // no other field can carry a sender id or text
+    expect(body.events).toEqual([{ name: "dm_received", params: { channel: "x" } }]);
+    expect(body.client_id).toMatch(/^[0-9a-f]{32}$/);
+  });
+  it("counts each DM the bot answers: a MIRROR command, an ordinary message and DELETE are three events", async () => {
+    registry(true);
+    const f = stub();
+    await post(several(["42", "MIRROR"], ["43", "hello"], ["44", "DELETE"]), { ...env(), ...GA4_ON });
+    await vi.waitFor(() => { if (ga4Calls(f).length < 3) throw new Error("fewer than three GA4 calls so far"); });
+    await answered(f);
+    expect(ga4Calls(f)).toHaveLength(3);
+  });
+  it("GA4 being down never changes what the person gets", async () => {
+    registry(true);
+    const f = stub(() => { throw new Error("GA4 down"); });
+    expect((await post(dm("42", "MIRROR"), { ...env(), ...GA4_ON })).status).toBe(200);
+    await answered(f);
+    const consent = f.mock.calls.find((c) => String(c[0]).includes("/dm_conversations/with/42/messages")) as [string, RequestInit];
+    expect(JSON.parse(String(consent[1].body)).text).toContain("reply Y");
+  });
+  it("counts nothing for what it forwards to core-brain (counted there, never twice), nor for events that are not DMs", async () => {
+    registry(true);
+    const b = brain();
+    const f = stub();
+    const noSelfId = JSON.stringify({ direct_message_events: [{ type: "message_create", message_create: { sender_id: "42", message_data: { text: "hello" } } }] });
+    expect((await post(noSelfId, { ...env(b), ...GA4_ON })).status).toBe(200);
+    expect(b.fetch).toHaveBeenCalledTimes(1);
+    const mention = JSON.stringify({ for_user_id: "999", tweet_create_events: [{ text: "hi" }] });
+    expect((await post(mention, { ...env(b), ...GA4_ON })).status).toBe(200);
+    await new Promise((x) => setTimeout(x, 50));
+    expect(ga4Calls(f)).toHaveLength(0);
   });
 });
