@@ -119,7 +119,7 @@ describe("HK Stop Spam policy copy (en and zh-HK)", () => {
     const b = c.blocks.find((x) => /^15\.3/.test(x.heading));
     expect(b, "15.3 block").toBeTruthy();
     expect((b?.paragraphs ?? []).join(" ")).toContain(String(HK_RETENTION_DAYS));
-    expect(HK_RETENTION_DAYS).toBe(90); // supabase/migrations/20261013000000_mpc_7538_hk_spam_consent_and_retention.sql: hk_spam_retention.days = 90
+    expect(HK_RETENTION_DAYS).toBe(90); // supabase/migrations_archive/20261013000000_mpc_7538_hk_spam_consent_and_retention.sql: hk_spam_retention.days = 90
   });
 });
 

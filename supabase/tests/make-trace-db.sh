@@ -11,5 +11,7 @@ psql -X -q -v ON_ERROR_STOP=1 "$DATABASE_URL" -c "drop database if exists ck8492
 psql -X -q -v ON_ERROR_STOP=1 "$TRACE_URL" -f supabase/tests/bootstrap.sql >/dev/null
 psql -X -q -v ON_ERROR_STOP=1 "$TRACE_URL" -f supabase/sql/mpt-operational-rls.sql >/dev/null
 psql -X -q -v ON_ERROR_STOP=1 "$TRACE_URL" -f supabase/sql/mpt-score-baselines.sql >/dev/null
-for f in $(ls supabase/migrations/*.sql | sort); do psql -X -q -v ON_ERROR_STOP=1 "$TRACE_URL" -f "$f" >/dev/null; done
+for f in $(ls supabase/migrations_archive/*.sql | sort); do psql -X -q -v ON_ERROR_STOP=1 "$TRACE_URL" -f "$f" >/dev/null; done
+# MPC-9896: plus the migrations added after the baseline (version above 20261127060000)
+for f in $(ls supabase/migrations/*.sql | awk -F/ '{v=$NF; sub(/_.*/,"",v); if (v+0 > 20261127060000) print $0}' | sort); do psql -X -q -v ON_ERROR_STOP=1 "$TRACE_URL" -f "$f" >/dev/null; done
 echo "$TRACE_URL"

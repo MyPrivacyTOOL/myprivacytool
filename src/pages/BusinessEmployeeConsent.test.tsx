@@ -38,7 +38,7 @@ describe("/dpa: employee privacy checks", () => {
 
 describe("the text matches the code", () => {
   const worker = readFileSync("workers/scan-report/lib/business.js", "utf8");
-  const sql = readFileSync("supabase/migrations/20261108160000_mpc_9824_business_teams.sql", "utf8");
+  const sql = readFileSync("supabase/migrations_archive/20261108160000_mpc_9824_business_teams.sql", "utf8");
   it("an employee must consent before the check runs, and detail is shown to the admin only when shared", () => {
     expect(worker).toContain("if (b.consent !== true) return json({ error: 'Consent required' }, 400);");
     expect(sql).toContain("case when m.status = 'authorised' and m.share_detail then m.results else null end");

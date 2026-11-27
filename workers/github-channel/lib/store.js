@@ -23,7 +23,7 @@ async function sb(env, method, path, body, fetchFn, extra = {}) {
 }
 
 // Table shape (shared with the existing public.channel_tokens): user_id = the provider's stable user id
-// (text), provider = 'github' | 'reddit'. See supabase/migrations/20261006120000_channel_tokens_worker_columns.sql.
+// (text), provider = 'github' | 'reddit'. See supabase/migrations_archive/20261006120000_channel_tokens_worker_columns.sql.
 const PROVIDER = 'github';
 // AAD binds a ciphertext to its provider, account and column, so a row copied to another account/provider fails to decrypt.
 const aad = (subjectId, column, provider = PROVIDER) => `${provider}:${subjectId}:${column}`;

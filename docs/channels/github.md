@@ -118,7 +118,7 @@ access tokens last about 8 hours (GitHub) or 1 hour (Reddit), so `updated_at` is
 is not use. No usable connection is deleted: a refresh never moves `consented_at`, so a row this stale is already refused (see above). The result is provider and counts only, never an id,
 token or email. The function is still a dry run by default; only `p_dry_run => false` deletes. `p_days` under 30 is refused, a null mode is refused, and no other provider is touched.
 
-**Schedule.** `20261126010000_mpc_11258_schedule_stale_channel_token_purge.sql` creates the `pg_cron` job `mpt-purge-stale-channel-tokens`, daily at 03:17 UTC (11:17 HKT), which runs
+**Schedule.** `20261127074149_mpc_11258_schedule_stale_channel_token_purge.sql` creates the `pg_cron` job `mpt-purge-stale-channel-tokens`, daily at 03:17 UTC (11:17 HKT), which runs
 `select * from public.mpt_purge_stale_channel_tokens(false, 90);` and so **deletes** (Chris approved the schedule on 2026-11-26). It is skipped where `pg_cron` is absent. Apply that one file
 by itself, not with `supabase db push`. Deleted rows cannot be restored; the person connects again. Stop it with `select cron.unschedule('mpt-purge-stale-channel-tokens');`.
 Check it with `select jobname, schedule, command from cron.job where jobname = 'mpt-purge-stale-channel-tokens';`. Dry run: `select * from public.mpt_purge_stale_channel_tokens();`

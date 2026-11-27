@@ -6,7 +6,7 @@ export interface RestAccountLookupConfig { baseUrl: string; serviceKey: string; 
 
 /**
  * Resolves the email address of a customer to their account over PostgREST: `public.users` (id uuid, unique on lower(email);
- * supabase/migrations/20261005120000_scan_report_pipeline.sql). The "subject" of a verified support identity is that `users.id`, the same
+ * supabase/migrations_archive/20261005120000_scan_report_pipeline.sql). The "subject" of a verified support identity is that `users.id`, the same
  * id `ScansReportStatusReader` filters `scans.user_id` on (decision recorded in MPC-8530, D-3). MPT is single-tenant, so the tenant is the constant "mpt".
  *
  * DORMANT: only `requestProof` calls it, and nothing calls `requestProof` yet. Read-only; selects only `id` and `email`; service_role key.
