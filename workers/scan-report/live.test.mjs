@@ -56,6 +56,33 @@ const warn = console.error; console.error = () => {};
 check((await run(get(fresh), { sb: { select: async () => { throw new Error('db down for a@b.com'); } } })).status === 503, 'database error => 503, not a crash');
 console.error = warn;
 
+// ---- CK-11491: the first report view after the report went out is kept once, and counted anonymously
+{
+  const verifyToken = new URL((await makeLiveLink(env, ID)).replace('#v=', '?v=')).searchParams.get('v');
+  const viewDb = ({ status = 'sent', email = 'ada@example.com', failPatch = false } = {}) => {
+    const log = { patches: [], rpcs: [] }; let viewed = false;
+    return { log,
+      select: async (p) => (p.startsWith('signals?') ? rows : p.startsWith('scans?') ? [{ report_status: status, email_scanned: email }] : []),
+      patch: async (p, row) => { if (failPatch) throw Object.assign(new Error('column missing'), { status: 400 }); log.patches.push([p, row]); if (viewed) return []; viewed = true; return [{ id: ID }]; },
+      rpc: async (fn, args) => { if (fn === 'mpt_learning_count') log.rpcs.push([fn, args]); return null; } };   // the live read makes other calls too
+  };
+  const open = (sb, headers) => run(new Request('https://x/api/scan/live', { headers: { Origin: ORIGINS[0], ...headers } }), { sb });
+  const bearer = { Authorization: `Bearer ${verifyToken}` };
+  let d = viewDb(); await open(d, bearer); await open(d, bearer);
+  check(d.log.patches.length === 2 && d.log.patches[0][0] === `scans?id=eq.${ID}&report_viewed_at=is.null` && Object.keys(d.log.patches[0][1]).join() === 'report_viewed_at', 'report view: only the timestamp is written, only while empty');
+  check(d.log.rpcs.length === 1 && d.log.rpcs[0][0] === 'mpt_learning_count' && d.log.rpcs[0][1].p_dimension === 'funnel_step' && d.log.rpcs[0][1].p_key === 'report_viewed' && !JSON.stringify(d.log.rpcs).includes(ID) && !JSON.stringify(d.log.rpcs).includes('ada'), 'report view: counted once; the counter gets no scan id or address');
+  d = viewDb({ email: 'testingnt69+nightly-20261127@gmail.com' }); await open(d, bearer);
+  check(d.log.rpcs[0]?.[1].p_key === 'report_viewed_test', 'report view: a test address is counted apart');
+  d = viewDb({ status: 'pending' }); await open(d, bearer);
+  check(d.log.patches.length === 0 && d.log.rpcs.length === 0, 'report view: nothing before the report is sent');
+  d = viewDb(); await run(get(await makeLiveToken(env, ID)), { sb: d });
+  check(d.log.patches.length === 0, 'report view: the on-screen stream token is not a report view');
+  const quiet = console.error; console.error = () => {};
+  const failed = await open(viewDb({ failPatch: true }), bearer);
+  console.error = quiet;
+  check(failed.status === 200, 'report view: a failed write never costs the reader the page');
+}
+
 // ---- running the checks
 const calls = [];
 const written = [];

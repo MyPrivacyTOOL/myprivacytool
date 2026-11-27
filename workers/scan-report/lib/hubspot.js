@@ -9,13 +9,14 @@ export async function pushScanActivity(env, { email, scanId, score, riskLevel, s
   if (!env.HUBSPOT_TOKEN) return { skipped: 'no HUBSPOT_TOKEN' };
   const ctx = rcx(env, fetchImpl, rctx);
   const headers = { Authorization: `Bearer ${env.HUBSPOT_TOKEN}`, 'Content-Type': 'application/json' };
+  let contactId;   // CK-11491: returned (even if the note then fails) so the caller can keep it on the scan row
   try {
     const found = await callRecipient('hubspot', { url: `${API}/crm/v3/objects/contacts/search`, sent: ['email'], init: {
       method: 'POST', headers,
       body: JSON.stringify({ filterGroups: [{ filters: [{ propertyName: 'email', operator: 'EQ', value: email }] }], limit: 1 }),
     } }, ctx);
     if (!found.ok) return { failed: `contact search ${found.status}` };
-    const contactId = (await found.json()).results?.[0]?.id;
+    contactId = (await found.json()).results?.[0]?.id;
     if (!contactId) return { skipped: 'contact not found' };
     const breaches = breachStatus === 'checked' ? `${breachCount} breach(es) found` : 'breaches not checked';
     const body = `MyPrivacyTOOL scan report sent (scan ${scanId}). ${score == null ? 'No score (partial scan)' : `Privacy score ${score}/100, risk ${riskLevel}`}; ${signalsFound} signal(s); ${breaches}.`;
@@ -27,9 +28,9 @@ export async function pushScanActivity(env, { email, scanId, score, riskLevel, s
         associations: [{ to: { id: contactId }, types: [{ associationCategory: 'HUBSPOT_DEFINED', associationTypeId: CONTACT_TO_NOTE }] }],
       }),
     } }, ctx);
-    return note.ok ? { pushed: true } : { failed: `note ${note.status}` };
+    return note.ok ? { pushed: true, contactId } : { failed: `note ${note.status}`, contactId };
   } catch (e) {
-    return { failed: String(e).replace(/\S+@\S+/g, '[email]').slice(0, 200) };
+    return { failed: String(e).replace(/\S+@\S+/g, '[email]').slice(0, 200), ...(contactId ? { contactId } : {}) };
   }
 }
 

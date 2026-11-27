@@ -258,7 +258,7 @@ export default function FinalSummaryPanel({
         if (label.includes('google')) {
           concerns.push({
             title: 'Google Tracking Active',
-            description: 'Google can track you across 80% of websites',
+            description: 'Sites that use Google services can tell Google about your visit',
             severity: 'high',
             category: 'social',
             fix: 'Log out of Google when not in use',
@@ -279,7 +279,7 @@ export default function FinalSummaryPanel({
       if (hex.category === 'behavior' && label.includes('mouse')) {
         concerns.push({
           title: 'Mouse Tracking Active',
-          description: 'Your movement patterns create a 97% unique signature',
+          description: 'A page can record how you move your mouse',
           severity: 'medium',
           category: 'behavior',
         });

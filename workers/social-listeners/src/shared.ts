@@ -6,6 +6,11 @@ export interface Env {
   /** MPC-11111 the magic guess: the Mirror seals an email address found in the person's own public bio into the bridge link. Needs EMAIL_GUESS_ENABLED exactly "true" AND the EMAIL_GUESS_KEY secret (same value as on mpt-scan-report). Off by default. */
   EMAIL_GUESS_ENABLED?: string;
   EMAIL_GUESS_KEY?: string;
+  /** MPC-11111 GA4 server events (shared/ga4-server-events.ts). The X handler sends dm_received for the DMs it answers, because those never reach core-brain. Needs GA4_SERVER_EVENTS_ENABLED exactly "true", the GA4_API_SECRET secret and the registry entry ga4-measurement-protocol enabled. Off by default. GA4_MEASUREMENT_ID picks another stream; GA4_DEBUG_MODE "true" shows the event in DebugView. */
+  GA4_SERVER_EVENTS_ENABLED?: string;
+  GA4_API_SECRET?: string;
+  GA4_MEASUREMENT_ID?: string;
+  GA4_DEBUG_MODE?: string;
   X_CONSUMER_SECRET?: string;
   /** CK-8502 owner decision D1: "on" stores the hexagon values an X event carries (profile fields, post/DM text) with the event. Default off. Needs legal sign-off and the wording change first. */
   X_CAPTURE_HEXAGONS?: string;

@@ -33,6 +33,7 @@ function world({ expiryDays = 30, pageStatus = 'invited', inviteSent = 1 } = {})
   };
   const browser = async () => ({
     newPage: async () => ({
+      on: () => {},
       goto: async () => ({ status: () => 200 }),
       waitForSelector: async () => {},
       locator: (sel) => ({ count: async () => (sel.includes('authorise-form') ? (pageStatus === 'invited' ? 1 : 0) : sel.includes('gone') ? (pageStatus === 'gone' ? 1 : 0) : 1), first: () => ({ getAttribute: async () => (pageStatus === 'gone' ? null : pageStatus) }) }),
@@ -104,5 +105,47 @@ describe('clean mode', () => {
     expect(r).toMatchObject({ ok: true, kept_invitations_removed: 1 });
     expect(calls.some((c) => c.includes('a2'))).toBe(false);
     expect(calls.some((c) => c.startsWith('DELETE') && c.includes('accounts?id=eq.a1'))).toBe(true);
+  });
+});
+
+// a scripted browser for the journey: `rateLimitFrom` = the Nth join call and every later one returns 429 and the page shows the alert
+function journeyBrowser({ rateLimitFrom = Infinity } = {}) {
+  let state = 'invited', n = 0, handler = () => {}, alert = '';
+  const hit = (path) => { n++; const status = n >= rateLimitFrom ? 429 : 200; handler({ url: () => `https://worker.test/api/business/join/${path}`, status: () => status }); alert = status === 429 ? 'We could not open the invitation just now. Please refresh in a moment.' : ''; };
+  const page = {
+    on: (_e, h) => { handler = h; },
+    goto: async () => { hit('view'); return { status: () => 200 }; },
+    reload: async () => { hit('view'); },
+    waitForSelector: async () => {},
+    screenshot: async () => {},
+    locator: (sel) => ({
+      count: async () => (sel.includes('authorise-form') ? (state === 'invited' && !alert ? 1 : 0) : 0),
+      first: () => ({ getAttribute: async () => (alert ? null : state) }),
+      allInnerTexts: async () => (alert ? [alert] : []),
+      click: async () => { if (sel.includes('authorise')) { hit('authorise'); state = 'authorised'; } else if (sel.includes('revoke')) { hit('revoke'); state = 'revoked'; hit('view'); } },
+    }),
+  };
+  return async () => ({ newPage: async () => page, close: async () => {} });
+}
+
+describe('journey mode', () => {
+  it('walks open, authorise, reload x2, withdraw, reload; every state as expected; consumed invitation removed', async () => {
+    const w = world();
+    const r = await keep({ ...ENV, JOURNEY: '1' }, w.fetchImpl, journeyBrowser());
+    expect(r.ok).toBe(true);
+    expect(r.mode).toBe('journey');
+    expect(r.journey.states.map((x) => x.invitation)).toEqual(['invited', 'authorised', 'authorised', 'authorised', 'revoked', 'revoked']);
+    expect(r.journey.calls_not_200_or_404).toEqual([]);
+    expect(r.kept).toBeUndefined();
+    expect(w.calls.some((c) => c.startsWith('DELETE'))).toBe(true);   // consumed, so removed
+  });
+  it('records the status of the failing call and fails when the page shows "could not open" after a 429', async () => {
+    const w = world();
+    const r = await keep({ ...ENV, JOURNEY: '1' }, w.fetchImpl, journeyBrowser({ rateLimitFrom: 5 }));
+    expect(r.ok).toBe(false);
+    expect(r.error).toMatch(/7_journey_every_state_as_expected/);
+    expect(r.steps['7_journey_every_state_as_expected'].detail.calls_not_200_or_404.some((c) => c.status === 429)).toBe(true);
+    expect(r.steps['7_journey_every_state_as_expected'].detail.states.some((x) => /could not open/.test(x.alert))).toBe(true);
+    expect(r.cleanup).toMatch(/removed/);
   });
 });

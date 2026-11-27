@@ -12,7 +12,7 @@ export interface ChannelGroup {
 }
 
 export const CHANNEL_GROUPS: ChannelGroup[] = [
-  { key: 'email', title: 'Email', rows: [2, 3, 2, 3, 2, 3, 2, 3, 1], story: 'How they reach us, then what the address and domain reveal, then attachments, then public traces.' },
+  { key: 'email', title: 'Email', rows: [2, 3, 2, 3, 2, 3, 2, 2], story: 'How they reach us, then what the address and domain reveal, then attachments, then public traces.' },
   { key: 'breach-threat', title: 'Breach and threat monitoring', rows: [2, 3, 1], story: 'What leaked and since when, then where it circulates. Needs a licensed data provider, so nothing runs yet.' },
   { key: 'whatsapp', title: 'WhatsApp', rows: [2, 3, 2, 3, 2, 3, 2, 3, 2], story: 'Chris, 2026-11-08: eight tiles are planned (what arrives with a message, or what the person shares). The other 14 stay not planned.' },
   { key: 'messenger', title: 'Facebook Messenger', rows: [3, 2, 3], story: 'Owner decision: not planned today (needs Meta platform partner approval).' },
@@ -47,10 +47,15 @@ export function todayFor(h: Pick<CatalogueHexagon, 'status' | 'plan'>): { state:
   return { state: 'notyet', caption: 'Planned' };
 }
 
+/** MPC-11541: the three lanes keep the members chosen on 2026-11-08 (matched by id prefix). The registry export files catalogue rows by Channel Key (for example email-domain-record is
+ *  on web, x.email on email) and adds documented-only rows; neither may move a tile in or out of these hand-laid lanes. */
+const LANE_IDS: Record<string, RegExp> = { email: /^email[.-]/, whatsapp: /^wa\./, messenger: /^fb\./ };
+
 export function channelTiles(key: string): ChannelTile[] {
   if (key === 'breach-threat') return BREACH_THREAT;
   return (HEXAGON_CATALOGUE as CatalogueHexagon[])
-    .filter((h) => h.channel === key)
+    .filter((h) => (LANE_IDS[key] ? LANE_IDS[key].test(h.id) : h.channel === key))
+    .sort((x, y) => x.arrival.localeCompare(y.arrival)) // arrival order (A, B, C, D); stable, so the catalogue order holds within a class
     .map((h) => {
       const t = todayFor(h);
       return { id: h.id, label: h.label, sensitivity: h.risk, today: t.state, caption: t.caption };

@@ -6,6 +6,10 @@
 //   CLEAN:  CLEAN_KEPT=1 SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY node scripts/business-live-check/keep.mjs     (removes every kept invitation, team and account)
 //   optional: BUSINESS_SCAN_URL (default: the PRODUCTION Worker), RUN_ID, NO_BROWSER=1 (skip the Playwright step), EVIDENCE_DIR (default keep-evidence)
 //
+// JOURNEY mode (JOURNEY=1): the same invitation, but a real browser then walks the whole employee journey (open, authorise, reload twice, withdraw, reload) and the run records
+// the HTTP status of every /api/business/join/* call and what the page shows after each action. It CONSUMES the invitation, so it removes everything at the end. Used to find out why a
+// page showed "We could not open the invitation just now" (MPC-10612).
+//
 // Synthetic only: admin testingnt69+biz-keep-admin-<tag>@gmail.com, employee testingnt69+biz-keep-e1-<tag>@gmail.com (every address checked with isTestAddress before anything is written
 // or deleted). Steps: 1 admin signs in by emailed link  2 admin creates the team  3 admin invites ONE person (one email, one member row, only a hash stored)  3b the stored expiry is 30 days
 // 3c the invitation email is read back from the provider and its link is the live site's /business/join link  4 opening it through the API reads nothing  5 a real browser opens the
@@ -60,7 +64,7 @@ export async function keep(env, fetchImpl = fetch, browserImpl = null) {
   const tag = `${day}-${String(env.RUN_ID || Math.floor(now / 1000)).replace(/[^a-z0-9]/gi, '').slice(0, 20)}`;
   const admin = `${KEEP_ADMIN_LIKE}${tag}@gmail.com`, e1 = `testingnt69+biz-keep-e1-${tag}@gmail.com`;
   if (![admin, e1].every(isTestAddress)) return { notConfigured: 'not a test address' };
-  const out = { hkt_start: new Date(now.getTime() + 8 * 3600000).toISOString().replace('Z', ' HKT'), mode: 'keep', steps: {} };
+  const out = { hkt_start: new Date(now.getTime() + 8 * 3600000).toISOString().replace('Z', ' HKT'), mode: env.JOURNEY === '1' ? 'journey' : 'keep', steps: {} };
   const step = (name, ok, detail) => { out.steps[name] = { ok: Boolean(ok), ...(detail !== undefined ? { detail } : {}) }; if (!ok) throw new Error(`step failed: ${name}`); };
   let adminId = null, teamId = null;
 
@@ -117,14 +121,43 @@ export async function keep(env, fetchImpl = fetch, browserImpl = null) {
       const b = await launch();
       try {
         const page = await b.newPage({ viewport: { width: 1280, height: 900 } });
+        const calls = [];
+        page.on('response', (r) => { const u = r.url(); if (u.includes('/api/business/join/')) calls.push({ path: u.split('/api/business/join/')[1], status: r.status() }); });
         const resp = await page.goto(link, { waitUntil: 'networkidle', timeout: 45000 });
         await page.waitForSelector('[data-testid=invitation], [data-testid=gone], [role=alert]', { timeout: 20000 }).catch(() => {});
         const shown = { form: await page.locator('[data-testid=authorise-form]').count(), gone: await page.locator('[data-testid=gone]').count(), status: await page.locator('[data-testid=invitation]').first().getAttribute('data-status').catch(() => null) };
         await page.screenshot({ path: `${dir}/invitation-page.png`, fullPage: true });
         step('5_browser_opens_the_link', resp?.status() === 200 && shown.form === 1 && shown.gone === 0 && shown.status === 'invited', { http: resp?.status(), authorise_form: shown.form, not_valid_message: shown.gone, page_status: shown.status, screenshot: `${dir}/invitation-page.png` });
+
+        if (env.JOURNEY === '1') {
+          // what the page shows right now: the invitation status, the "not valid" box, or the text of any alert (e.g. "We could not open the invitation just now")
+          const sample = async (after) => {
+            await page.waitForSelector('[data-testid=invitation], [data-testid=gone], [role=alert]', { timeout: 20000 }).catch(() => {});
+            return { after, invitation: await page.locator('[data-testid=invitation]').first().getAttribute('data-status').catch(() => null), gone: await page.locator('[data-testid=gone]').count(), alert: (await page.locator('[role=alert]').allInnerTexts().catch(() => [])).join(' | ').slice(0, 120) };
+          };
+          const states = [await sample('open')];
+          await page.locator('[data-testid=authorise]').click();
+          await page.waitForSelector('[data-testid=authorised-view], [role=alert]', { timeout: 20000 }).catch(() => {});
+          states.push(await sample('authorise'));
+          for (const name of ['reload_1', 'reload_2']) { await page.reload({ waitUntil: 'networkidle' }); states.push(await sample(name)); }
+          await page.locator('[data-testid=revoke]').click().catch(() => {});
+          await page.waitForSelector('[data-testid=revoked], [role=alert]', { timeout: 20000 }).catch(() => {});
+          states.push(await sample('withdraw'));
+          await page.reload({ waitUntil: 'networkidle' }); states.push(await sample('reload_after_withdraw'));
+          await page.screenshot({ path: `${dir}/journey-end.png`, fullPage: true });
+          const want = ['invited', 'authorised', 'authorised', 'authorised', 'revoked', 'revoked'];
+          const bad = calls.filter((c) => c.status !== 200 && c.status !== 404);
+          out.journey = { states, calls, calls_total: calls.length, calls_not_200_or_404: bad };
+          step('7_journey_every_state_as_expected', states.every((x, i) => x.invitation === want[i] && x.gone === 0 && !x.alert) && bad.length === 0, out.journey);
+        }
       } finally { await b.close(); }
     }
 
+    if (env.JOURNEY === '1') {
+      out.ok = true; out.mode = 'journey';
+      out.cleanup = (await removeKept(env, fetchImpl, sb, H, admin, [e1], adminId)) ? 'journey run: the consumed invitation, team and account were removed' : 'not a test address, nothing removed';
+      return out;
+    }
     // 6 looking did not use it up
     const after = (await sel(`mpt_business_members?team_id=eq.${teamId}&select=status,token_expires_at,consent_at`))[0];
     step('6_still_invited_and_unused', after?.status === 'invited' && after.consent_at === null && after.token_expires_at === expiresAt, { status: after?.status });

@@ -117,17 +117,66 @@ export function adsEfficiency(rows) {
   return { days: byDay.size, cost, scan_started: scans, paid_conversions: paid, cost_per_scan: ratio(cost, scans), cac: ratio(cost, paid) };
 }
 
-export function weeklyProperties(weekOf, v, readAt, previousId, ads = null) {
+// CK-11491: the week's funnel. GA4 event counts come from the stored ga4/daily_events rows (latest row per HK day); report views come from the database,
+// because GA4 cannot see the report page opened from the email. Event counts, not people. A part that was not collected is blank, never estimated.
+export const FUNNEL_EVENTS = ['scan_start', 'scan_complete', 'report_view', 'pricing_view', 'checkout_start'];
+export const FUNNEL_LIVE_FROM = '2026-11-27';
+export function funnelCounts(ga4Rows) {
+  const byDay = new Map();
+  for (const r of ga4Rows ?? []) if (r?.payload) byDay.set(r.period_start, r.payload);   // rows arrive oldest capture first
+  const counts = Object.fromEntries(FUNNEL_EVENTS.map((e) => [e, 0]));
+  for (const p of byDay.values()) for (const row of p.rows ?? []) {
+    const name = row.dimensionValues?.[0]?.value;
+    if (Object.hasOwn(counts, name)) counts[name] += Number(row.metricValues?.[0]?.value) || 0;
+  }
+  return { days: byDay.size, counts };
+}
+export function funnelLine(weekOf, f) {
+  if (!f || addDays(weekOf, 6) < FUNNEL_LIVE_FROM) return null;   // before the events existed, a zero would read as "nobody"
+  const rate = (n, d) => (d > 0 ? `${Math.round((1000 * n) / d) / 10}%` : 'blank (nothing to divide by)');
+  const shown = (n) => (n === null || n === undefined ? 'blank' : n);
+  const partial = weekOf < FUNNEL_LIVE_FROM ? ` PARTIAL: these events went live ${FUNNEL_LIVE_FROM}.` : '';
+  const c = f.ga4?.days ? f.ga4.counts : null;
+  const ga4 = c
+    ? `GA4 (consented visitors only, ${f.ga4.days}/7 days): ${FUNNEL_EVENTS.map((e) => `${e} ${c[e]}`).join(', ')}. Scan completion rate ${rate(c.scan_complete, c.scan_start)}. checkout_start = paid plan chosen (waitlist, no live checkout).`
+    : 'GA4: blank (no daily_events rows for the week).';
+  const viewRate = f.reportEmails === null || f.reportViews === null ? 'blank' : rate(f.reportViews, f.reportEmails);
+  return `Funnel (CK-11491).${partial} ${ga4} Database (real addresses only): report emails ${shown(f.reportEmails)}, report pages viewed ${shown(f.reportViews)}. Report view rate ${viewRate}.`;
+}
+
+export async function readFunnel(env, weekOf) {
+  const from = encodeURIComponent(hkDayStartOf(weekOf).toISOString());
+  const to = encodeURIComponent(hkDayStartOf(addDays(weekOf, 7)).toISOString());
+  const read = (path) => supa(env, path).catch(() => null);
+  const [ga4Rows, emails, views, column] = await Promise.all([
+    read(`mpt_raw_metrics?source=eq.ga4&report=eq.daily_events&status=eq.ok&period_start=gte.${from}&period_start=lt.${to}&order=captured_at.asc&select=period_start,payload`),
+    read(`email_sends?email_type=eq.report&is_test=is.false&sent_at=gte.${from}&sent_at=lt.${to}&select=id`),
+    read(`learning_aggregate_daily?dimension=eq.funnel_step&key=eq.report_viewed&day=gte.${weekOf}&day=lt.${addDays(weekOf, 7)}&select=n`),
+    read('scans?select=report_viewed_at&limit=1'),   // fails while migration 20261127040000 is not applied: no view can be recorded then, so the count is blank, not 0
+  ]);
+  return {
+    ga4: ga4Rows ? funnelCounts(ga4Rows) : null,
+    reportEmails: emails ? emails.length : null,
+    reportViews: views && column ? views.reduce((n, r) => n + (Number(r.n) || 0), 0) : null,
+  };
+}
+
+export function weeklyProperties(weekOf, v, readAt, previousId, ads = null, funnel = null) {
   const pct = num(v?.conversion_rate_pct);
   const src = (label, value, source) => (value === null ? `${label}: blank (${source} not collected or errored; not estimated)` : `${label}: ${value} (${source})`);
   const cumulative = num(v?.cumulative_scans);
+  // The view has test_scans_excluded only once migration 20261127060000 is applied; until then the figure still includes test scans, and the row says so.
+  const excluded = num(v?.test_scans_excluded);
+  const scanSource = excluded === null
+    ? 'public.scan_hourly_counts, decision D5; INCLUDES test scans'
+    : `public.scan_hourly_counts without the test mailbox, ${excluded} test scans left out to date; scans with no evidence either way are counted, so an upper bound`;
   const active = num(v?.ga4_active_users);
   const mrr = num(v?.current_mrr);
   const blog = num(v?.blog_posts_published);
   const xt = num(v?.x_threads_posted);
   const insights = [
     `${MARKER} Week of ${weekOf}. Every number read ${readAt} from Supabase view mpt_weekly_metrics (project xmdmkumwxpgahmlweuug).`,
-    src('Cumulative Scans', cumulative, 'rows in public.scans, decision D5'),
+    src('Cumulative Scans', cumulative, scanSource),
     src('Conversion Rate %', pct, 'paid users / scans, current week only'),
     src('Current MRR', mrr, 'raw revenue/mrr pull'),
     src('GA4 Active Users', active, 'raw ga4 weekly_overview pull, property 515216281'),
@@ -135,6 +184,7 @@ export function weeklyProperties(weekOf, v, readAt, previousId, ads = null) {
     src('X Threads Posted', xt, 'raw x/threads_posted pull'),
     ...(ads?.cost_per_scan ? [`Ad cost per scan: ${ads.cost_per_scan} (Google Ads cost ${ads.cost} / ${ads.scan_started} scan_started, ${ads.days} days)`] : []),
     ...(ads?.cac ? [`CAC: ${ads.cac} (Google Ads cost ${ads.cost} / ${ads.paid_conversions} paid conversions)`] : []),
+    ...[funnelLine(weekOf, funnel)].filter(Boolean),
     `Other signals, not merged into Cumulative Scans: engagement sessions ${num(v?.engagement_sessions) ?? 'blank'}, full scans ${num(v?.engagement_full_scans) ?? 'blank'}, GA4 scan events ${num(v?.ga4_scan_events) ?? 'blank'}.`,
   ].join('\n');
   return {
@@ -158,7 +208,8 @@ export async function publishWeekly(env, weekOf, now = new Date()) {
   const [prev] = await findPage(env, ds, 'Week Of', addDays(weekOf, -7));
   // Google Ads rows are optional: a read failure leaves the fields out, it never blocks the weekly row.
   const ads = await supa(env, `mpt_raw_metrics?source=eq.google-ads&report=eq.account_daily&status=eq.ok&period_start=gte.${encodeURIComponent(hkDayStartOf(weekOf).toISOString())}&period_start=lt.${encodeURIComponent(hkDayStartOf(addDays(weekOf, 7)).toISOString())}&order=captured_at.asc&select=period_start,payload`).then(adsEfficiency).catch(() => null);
-  const properties = weeklyProperties(weekOf, view, readAt, prev?.id, ads);
+  const funnel = addDays(weekOf, 6) >= FUNNEL_LIVE_FROM ? await readFunnel(env, weekOf) : null;
+  const properties = weeklyProperties(weekOf, view, readAt, prev?.id, ads, funnel);
   const r = await upsert(env, ds, {
     key: weekOf, keyProperty: 'Week Of', markerProperty: 'Agent Insights', titleProperty: 'Entry', title: `Week of ${weekOf}`,
     properties, createOnly: { 'Linked Objective': { multi_select: [{ name: OBJECTIVE }] } },

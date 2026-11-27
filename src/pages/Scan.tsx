@@ -21,7 +21,7 @@ import LiveScanPanel from "@/components/LiveScanPanel";
 import ShareButtons from "@/components/ShareButtons";
 import ScanNumberNotice from "@/components/ScanNumberNotice";
 import ScanRecipientsPanel from "@/components/ScanRecipientsPanel";   // MPC-9893
-import { trackStartSignup, trackReportRequested, trackReportFailed, trackEmailGuessShown, trackMagicGuessSubmitted } from "@/lib/analytics";
+import { trackStartSignup, trackReportRequested, trackReportFailed, trackEmailGuessShown, trackMagicGuessSubmitted, trackScanStart } from "@/lib/analytics";
 import EmailGuessCard from "@/components/EmailGuessCard";   // MPC-11111: the magic guess, off unless VITE_EMAIL_GUESS_ENABLED is "true"
 import { emailGuessEnabled, fetchEmailGuess, takeGuessToken } from "@/lib/emailGuess";
 import { canOfferScanSave, recognitionEnabled, reportStep } from "@/lib/webScan";
@@ -121,6 +121,7 @@ const Scan = () => {
       return;
     }
     setChoice(true);   // pressing the button also counts as the analytics choice for a visitor who never scanned (design 8.1)
+    trackScanStart("scan_page");   // CK-11491
     setSubmitting(false);
     if (!tsToken) {
       const ts = await Promise.race([loadTurnstile(), new Promise<undefined>((r) => setTimeout(() => r(undefined), 4000))]);   // the script loads now, at the click; a blocked or slow script never holds the form
