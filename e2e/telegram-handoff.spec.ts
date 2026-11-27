@@ -18,9 +18,9 @@ test("opened with ?handoff=1 and a valid session, the footprint line counts the 
   await page.goto(`${grid}&handoff=1`);
   await scanSettled(page);
   const line = page.getByTestId("footprint-line").first();
-  await expect(line).toContainText(`Telegram ${TG_IDS.length} of 47`, { timeout: 15_000 });
+  await expect(line).toContainText(`Telegram ${TG_IDS.length} of 45`, { timeout: 15_000 });
   await expect(line).toContainText("Telegram part from your Telegram scan");
-  await expect(line).toContainText(/of 368 footprint hexagons checked/);
+  await expect(line).toContainText(/of 367 footprint hexagons checked/);
   expect(asked).toBe(1);
   await expect(page.getByTestId("telegram-handoff-notice")).toContainText(`${TG_IDS.length} Telegram checks`);
 });

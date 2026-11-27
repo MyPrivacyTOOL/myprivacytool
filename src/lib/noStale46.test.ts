@@ -1,4 +1,4 @@
-// MPC-9832: "46" was a hard-coded display number, never a count of the list (54 run in the scan, 368 are in the catalogue).
+// MPC-9832: "46" was a hard-coded display number, never a count of the list (54 run in the scan).
 // This fails if a 46-hexagon claim comes back anywhere in the shipped code or content. Changelogs and historical notes
 // under docs/ are exempt; so are the two tests that quote the old phrase on purpose.
 import { describe, expect, it } from "vitest";
@@ -25,7 +25,7 @@ describe("no 46-hexagon claim (MPC-9832)", () => {
     for (const bad of ["46 hexagons", "all 46 hexagon", "The 46 Things Tracking", "46 data points", "46-hexagon model"]) {
       expect(STALE_46.test(bad)).toBe(true);
     }
-    expect(STALE_46.test("54 run in the scan, 368 in the catalogue")).toBe(false);
+    expect(STALE_46.test("54 run in the scan")).toBe(false);
   });
 
   it("appears nowhere in shipped code or content", () => {
