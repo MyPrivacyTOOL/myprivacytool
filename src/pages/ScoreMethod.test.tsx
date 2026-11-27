@@ -53,3 +53,14 @@ describe("MPC-9792: weights version label and open score questions", () => {
     expect(screen.getByRole("heading", { name: /channels and places/ })).toBeInTheDocument();
   });
 });
+
+describe("MPC-11569: exposure-v2 explanation", () => {
+  it("says we now check more and the person did not become more exposed, and states the 61 and the email weight", () => {
+    renderPage();
+    const sec = screen.getByTestId("score-v2-section");
+    expect(sec.textContent).toContain("We now check more things than before, so your score can change. You did not become more exposed.");
+    expect(sec.textContent).toContain("61 in all");
+    expect(sec.textContent).toContain("weight of 10%");
+    expect(sec.textContent).toContain("exposure-v2");
+  });
+});

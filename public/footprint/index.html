@@ -338,8 +338,9 @@ const REG=[{"id":"location","label":"Location","group":"Device & Network","cat":
    without it, only the built-in 54 are live and everything else is planned, so nothing is ever shown as Live by default. */
 const WEB_IDS=new Set(REG.map(r=>r.id));
 const TL={live:'Live',in_build:'In build',planned:'Planned'};
-const TNOTE={live:'One of the checks the free web scan runs today.',in_build:'Built, but not one of the web scan checks yet.',planned:'Documented only. MPT does not check it yet.'};
-const tileOf=(id,t)=>TL[t]?(t==='live'&&!WEB_IDS.has(id)?'planned':t):(WEB_IDS.has(id)?'live':'planned');
+const TNOTE={live:'One of the checks MPT runs today (the web scan, or the email report).',in_build:'Built or being built, but not one of the checks MPT runs today.',planned:'Documented only. MPT does not check it yet.'};
+const LIVE_EXTRA_IDS=new Set(['email-name','email-provider','email-profile','email-libravatar','email-domain-record','email-github-commits']); /* MPC-11569: the email checks that run at first contact; mirrors LIVE_EMAIL_IDS_V2 in shared/hexagon-registry/score-v2.js (tested) */
+const tileOf=(id,t)=>TL[t]?(t==='live'&&!WEB_IDS.has(id)&&!LIVE_EXTRA_IDS.has(id)?'planned':t):(WEB_IDS.has(id)?'live':'planned');
 const pill=t=>`<span class="tb tb-${t}" data-feature-status="${t}">${TL[t]}</span>`;
 const START_ORDER=['location','webrtc-leak','demographic','isp','browser','dns-leak','tls-config','primary-language','timezone-locale'];
 const START={location:'ask','webrtc-leak':'ask',demographic:'ask',isp:'ask',browser:'confirmed','dns-leak':'confirmed','tls-config':'confirmed','primary-language':'told','timezone-locale':'told'};

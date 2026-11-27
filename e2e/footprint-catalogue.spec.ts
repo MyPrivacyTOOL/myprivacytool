@@ -2,14 +2,14 @@ import { test, expect } from "./fixtures";
 
 // MPC-8689 / MPC-11541: the complete footprint. /footprint/ loads every published data point of the Hexagon Registry export (Row Type = Data point, less every row with Decision = Dropped),
 // each tile carries a Live / In build / Planned badge, and no headline total appears in the copy. Every hexagon has its own risk page.
-test("/footprint/ dataset: every registry data point, one badge each, Live = the 54 web checks", async ({ page }) => {
+test("/footprint/ dataset: every registry data point, one badge each, Live = the 54 web checks + the 6 email checks that run", async ({ page }) => {
   await page.goto("/footprint/");
   const data = await page.evaluate(async () => {
     const d = await (await fetch("/footprint/hexagons-366.json")).json();
     const by = (k: string) => d.reduce((m: Record<string, number>, i: Record<string, string>) => ((m[i[k]] = (m[i[k]] || 0) + 1), m), {});
     return { total: d.length, telegram: by("channel").Telegram, risk: by("sens"), tile: by("tile"), ids: new Set(d.map((i: { id: string }) => i.id)).size };
   });
-  expect(data).toEqual({ total: 650, telegram: 47, risk: { high: 284, medium: 268, low: 98 }, tile: { live: 54, in_build: 137, planned: 459 }, ids: 650 });
+  expect(data).toEqual({ total: 650, telegram: 47, risk: { high: 284, medium: 268, low: 98 }, tile: { live: 60, in_build: 131, planned: 459 }, ids: 650 });
 });
 
 test("/footprint/ renders a status badge on all 650 tiles and states no total", async ({ page }) => {
@@ -19,8 +19,8 @@ test("/footprint/ renders a status badge on all 650 tiles and states no total", 
   await page.getByRole("button", { name: "By pattern view" }).click();
   await expect(page.locator("#boxes .tile")).toHaveCount(650);
   await expect(page.locator("#boxes .tile .tb")).toHaveCount(650);
-  await expect(page.locator("#boxes .tile .tb-live")).toHaveCount(54);
-  await expect(page.locator("#boxes .tile .tb-in_build")).toHaveCount(137);
+  await expect(page.locator("#boxes .tile .tb-live")).toHaveCount(60);
+  await expect(page.locator("#boxes .tile .tb-in_build")).toHaveCount(131);
   await expect(page.locator("#boxes .tile .tb-planned")).toHaveCount(459);
   // A tile opens its panel with the same badge and one honest sentence.
   await page.locator("#boxes .tile .tb-planned").first().click({ force: true });

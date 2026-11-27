@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import BrokerPanel from "@/components/BrokerPanel";
 import { trackReportView, trackScanComplete } from "@/lib/analytics";
+import { SCORE_V2_EXPLANATION } from "../../shared/hexagon-registry/score-v2.js";
 import { confirmEmailResult, fetchLive, type BrokerPanel as Panel, type LiveItem, type LiveKind, type LiveStatus } from "@/lib/liveScan";
 
 // MPC-8452: what happens on the thank-you screen. Alice draws back the curtain, and the checks appear behind it one by one as the Worker finishes them.
@@ -137,6 +138,10 @@ export default function LiveScanPanel({ token, kind = "stream" }: { token: strin
       )}
       {waiting && kind !== "verified" && <p className="mt-3 text-center text-xs text-muted-foreground" data-testid="confirm-note">{CONFIRM_LINE}</p>}
       {panel && <BrokerPanel panel={panel} />}
+      {done && items.length > 0 && (
+        // MPC-11569: the explanation ships with exposure-v2: more checks can move a score, and that is not the person becoming more exposed.
+        <p className="mt-3 text-center text-xs text-muted-foreground" data-testid="score-v2-note">{SCORE_V2_EXPLANATION}</p>
+      )}
       <ul aria-live="polite" className="mt-3 space-y-2">
         {items.map((i) => (
           <li key={i.id} className="flex items-center justify-between gap-3 rounded-md border border-border bg-background px-3 py-2 text-sm animate-in fade-in duration-700">

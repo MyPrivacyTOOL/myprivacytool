@@ -4,6 +4,7 @@
 import HEX, { EMAIL } from './hexagons.generated.js';
 // MPC-7471-F4: the one exposure score. Imported from the shared registry module, never re-implemented here.
 import { computeExposure } from '../../../shared/hexagon-registry/score.js';
+import { computeExposureV2 } from '../../../shared/hexagon-registry/score-v2.js';
 // MPC-7561: each approved hexagon has its own guide page; the rest fall back to the generic guide below.
 import { hasGuide, guidePath } from '../../../shared/hexagon-registry/guides.js';
 
@@ -154,6 +155,9 @@ const outHex = (h) => ({ id: h.id, label: h.label, category: h.category, status:
 // A saved scan is final. `report.score` below is a different measure (the email-footprint privacy health score) and is left as it was.
 export const EXPOSURE_METHOD_URL = 'https://myprivacytool.io/how-we-calculate-your-score';
 export const webExposure = (web) => ({ ...computeExposure(web.map((h) => ({ id: h.id, status: h.status })), { final: true }), method_url: EXPOSURE_METHOD_URL });
+// MPC-11569: exposure-v2 over the 54 web hexagons AND the 7 email hexagons (61), from the statuses the report already shows. Additive: `web_scan.exposure` (exposure-v1,
+// 54) is unchanged. Only a saved web scan gets one, so Z = 61 is never reported for a scan that has no web half. It carries the sentence that explains why the number can move.
+export const webAndEmailExposure = (web, emailHexes) => ({ ...computeExposureV2([...web, ...emailHexes].map((h) => ({ id: h.id, status: h.status })), { final: true }), method_url: EXPOSURE_METHOD_URL });
 export function buildReportJson({ scanId, webScan, web, emailHexes, score, generatedAt = new Date().toISOString() }) {
   return {
     schema_version: REPORT_JSON_VERSION,
@@ -161,6 +165,7 @@ export function buildReportJson({ scanId, webScan, web, emailHexes, score, gener
     report_id: scanId || null,
     web_scan: webScan ? { saved: true, id: webScan.id ?? null, created_at: webScan.created_at ?? null, summary: tally(web), exposure: webExposure(web), hexagons: web.map(outHex) } : { saved: false, id: null, created_at: null, summary: null, exposure: null, hexagons: [] },
     email: { summary: tally(emailHexes), hexagons: emailHexes.map(outHex) },
+    exposure_v2: webScan ? webAndEmailExposure(web, emailHexes) : null,
     score: score ?? null,
   };
 }
