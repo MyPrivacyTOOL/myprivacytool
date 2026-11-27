@@ -4,7 +4,7 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
-const MIGRATION = fileURLToPath(new URL('../../../supabase/migrations/20261108140000_mpc_9818_entitlements_and_scan_allowances.sql', import.meta.url));
+const MIGRATION = fileURLToPath(new URL('../../../supabase/migrations_archive/20261108140000_mpc_9818_entitlements_and_scan_allowances.sql', import.meta.url));
 export const RANK = { free: 0, basic: 1, pro: 2, executive: 3 };
 
 /** The capability rows exactly as the migration seeds them: [{key, min_tier, cost, status}]. */

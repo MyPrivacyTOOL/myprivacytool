@@ -11,7 +11,7 @@
  * Rate limited per client address with the Cloudflare RATE_LIMITER binding (30 a minute; see wrangler.toml). Like the other Workers it fails open
  * if the binding is absent or errors, so tests/local runs work; the wrangler.toml syntax is pinned by workers/ratelimit-config.vitest.mjs.
  * Required before this is switched on in production: the Privacy Policy wording, and the migration
- * supabase/migrations/20261108210001_mpc_9892_learning_aggregate.sql.
+ * supabase/migrations_archive/20261108210001_mpc_9892_learning_aggregate.sql.
  */
 import { callMptRpc } from './supabase-client.js';
 import { corsFor } from './security.js';

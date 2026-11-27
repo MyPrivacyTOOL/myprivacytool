@@ -5,7 +5,7 @@ import { weeklyProperties } from './publishers/notion.js';
 import { readInputs } from './publishers/kpi-dashboard.js';
 
 let ok = true; const check = (c, m) => { console.log(c ? 'PASS' : 'FAIL', m); if (!c) ok = false; };
-const sql = fs.readFileSync(new URL('../../supabase/migrations/20261127060000_exclude_test_scans_from_kpi.sql', import.meta.url), 'utf8');
+const sql = fs.readFileSync(new URL('../../supabase/migrations_archive/20261127060000_exclude_test_scans_from_kpi.sql', import.meta.url), 'utf8');
 const rule = /btrim\(p_email\) ~\* '([^']+)'/.exec(sql)?.[1];
 const sqlRule = new RegExp(rule, 'i');
 const cases = ['testingnt69@gmail.com', 'TestingNT69+nightly-20261028@gmail.com', 'testingnt69+f1-20261107-123@gmail.com', ' testingnt69+a@gmail.com ', 'testingnt69@example.com', 'xtestingnt69+a@gmail.com',

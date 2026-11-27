@@ -1,7 +1,7 @@
 -- MPC-8753: assertions for the ledger risk axis, education-before-acceptance, scan-scoped decisions, the 366 registry and the risk-aware guard
--- (supabase/migrations/20261028200000_mpc_8753_ledger_risk_axis.sql, design MPC-7898 A3 + A3.9). Run by supabase/tests/run.sh against the THROWAWAY database.
+-- (supabase/migrations_archive/20261028200000_mpc_8753_ledger_risk_axis.sql, design MPC-7898 A3 + A3.9). Run by supabase/tests/run.sh against the THROWAWAY database.
 \set ON_ERROR_STOP on
-\i supabase/migrations/20261028200000_mpc_8753_ledger_risk_axis.sql
+\i supabase/migrations_archive/20261028200000_mpc_8753_ledger_risk_axis.sql
 
 create or replace function pg_temp.assert(ok boolean, msg text) returns void language plpgsql as $$ begin if ok is not true then raise exception 'FAIL: %', msg; end if; end $$;
 create or replace function pg_temp.rejects(stmt text, msg text, state text default null) returns void language plpgsql as $$

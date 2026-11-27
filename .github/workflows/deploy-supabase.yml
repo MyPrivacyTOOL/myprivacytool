@@ -1,5 +1,8 @@
 name: Deploy Supabase migrations
 
+# MPC-9896 (Pass 2): supabase/migrations now holds ONE baseline migration (the live structure, recorded as already applied on live)
+# plus empty placeholder files for the older live versions; the old chain is in supabase/migrations_archive/ (not applied).
+# See supabase/MIGRATIONS.md. Use dry_run=true first: it lists what is pending and applies nothing.
 # MPC-9896: AUTOMATIC DEPLOY IS SWITCHED OFF. This workflow runs ONLY by manual dispatch with an explicit
 # confirmation input (type DEPLOY). It never runs on push or merge. It is switched back on in Pass 2 of MPC-9896,
 # after the clean baseline migration is in place (Option B decided by Chris 2026-11-17).
@@ -21,6 +24,11 @@ on:
       confirm:
         description: 'Type DEPLOY to apply pending migrations to the LIVE database'
         required: true
+        type: string
+      dry_run:
+        description: 'true = only list the pending migrations (supabase db push --dry-run), apply nothing'
+        required: false
+        default: 'false'
         type: string
 
 permissions:
@@ -85,5 +93,5 @@ jobs:
         run: supabase db push --dry-run --password "$SUPABASE_DB_PASSWORD"
 
       - name: Apply migrations
-        if: steps.secrets.outputs.ready == 'true'
+        if: steps.secrets.outputs.ready == 'true' && inputs.dry_run != 'true'
         run: supabase db push --password "$SUPABASE_DB_PASSWORD"
