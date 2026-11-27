@@ -20,6 +20,7 @@ Add a PR here when a Notion row marks it held; remove it when the row is closed.
 | 732 | Draft for review: Privacy/DPA wording for Telegram email ask (MPC-9224) |
 | 572 | Draft, gated live-write test (MPC-7471-F3) |
 | 450 | Draft, seed/cleanup SQL touching live data (MPC-7385-F1) |
+| 909 | HOLD: turns the MPC-11111 gates on (production switches, Tier 3). Chris merges it himself on the day of the DebugView run (MPC-11112), after the privacy owner has signed off the two public registry entries and the real-people check is recorded, and reverts it straight after |
 
 ## Released
 - MPC-7385 scan go-live (PR 162): no longer held. PR 162 merged 2026-10-10 14:52 UTC (https://github.com/MyPrivacyTOOL/myprivacytool/pull/162); row MPC-7385 is Done.
