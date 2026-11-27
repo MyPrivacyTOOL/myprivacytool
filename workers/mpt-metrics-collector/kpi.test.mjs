@@ -30,14 +30,14 @@ globalThis.fetch = async (url, opts = {}) => {
   url = String(url); const method = opts.method || 'GET'; const body = opts.body ? JSON.parse(opts.body) : null;
   calls.push(`${method} ${url.replace(/^https:\/\/[^/]+/, '').split('?')[0]}`);
   if (url.includes('web_scan_contacts') && /select=scan_id(&|$)/.test(url)) badColumnCalls++;
-  if (url.includes('/rest/v1/scans')) return json([], 200, { 'content-range': '*/500' });
+  if (url.includes('/rest/v1/scans')) return json([], 200, { 'content-range': '*/999' });   // counting rows of public.scans must no longer feed the scorecard
   if (url.includes('/rest/v1/users')) return json([], 200, { 'content-range': '*/3' });
   // The real table has web_scan_id, not scan_id: asking for scan_id answered HTTP 400 in production (2026-11-02), so the scorecard never refreshed.
   if (url.includes('web_scan_contacts') && /select=scan_id(&|$)/.test(url)) return json({ message: 'column web_scan_contacts.scan_id does not exist' }, 400);
   if (url.includes('web_scan_contacts')) return json([], 200, { 'content-range': '*/7' });
   if (url.includes('/rest/v1/mpt_daily_metrics')) return json(daysRows);
   if (url.includes('current_mrr=not.is.null')) return json([{ current_mrr: 100 }]);
-  if (url.includes('/rest/v1/mpt_weekly_metrics')) return json([{ week_of: '2026-10-12', weekly_new_scans: 9 }, { week_of: '2026-10-05', weekly_new_scans: 60 }, { week_of: '2026-09-28', weekly_new_scans: 40 }]);
+  if (url.includes('/rest/v1/mpt_weekly_metrics')) return json([{ week_of: '2026-10-12', weekly_new_scans: 9, cumulative_scans: 500, test_scans_excluded: 12 }, { week_of: '2026-10-05', weekly_new_scans: 60 }, { week_of: '2026-09-28', weekly_new_scans: 40 }]);
   if (url.includes('daily_source_medium')) return json([{ period_start: '2026-10-10T16:00:00Z', payload: src([['google', 'organic', 8]]) }, { period_start: '2026-10-10T16:00:00Z', payload: src([['google', 'organic', 99]]) }, { period_start: '2026-10-11T16:00:00Z', payload: src([['google', 'organic', 2], ['bing', 'organic', 1]]) }]);
   const kids = /\/v1\/blocks\/([^/?]+)\/children/.exec(url);
   if (kids && method === 'GET') return json({ results: kids[1] === DASHBOARD_PAGE_ID ? page : (blocks[kids[1]] ?? []) });

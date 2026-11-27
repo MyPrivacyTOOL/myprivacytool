@@ -88,8 +88,10 @@ const readInvitation = (j: Json | null): Invitation | null => j && typeof j.comp
   shareDetail: j.share_detail === true, checkedAt: typeof j.checked_at === "string" ? j.checked_at : null, results: (Array.isArray(j.results) ? (j.results as Json[]) : []).map(readResult),
 } : null;
 
-export async function viewInvitation(token: string): Promise<Invitation | "gone" | "error"> {
-  const r = await post("join/view", { token }, null);
+// MPC-10612: a 429 on this read is a short-lived limit, not a failure; wait a moment and ask again (up to 3 times) before showing "We could not open the invitation just now".
+export async function viewInvitation(token: string, waitsMs: number[] = [1500, 3000]): Promise<Invitation | "gone" | "error"> {
+  let r = await post("join/view", { token }, null);
+  for (const w of waitsMs) { if (r.status !== 429) break; await new Promise((res) => setTimeout(res, w)); r = await post("join/view", { token }, null); }
   if (r.status === 404) return "gone";
   return r.status === 200 ? (readInvitation(r.json) ?? "error") : "error";
 }

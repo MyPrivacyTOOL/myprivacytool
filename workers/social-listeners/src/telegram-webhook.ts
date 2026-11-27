@@ -2,7 +2,7 @@
 import { baselineScanEnabled, baselineSender, isConsentConfirmation, isScanStatusRequest, replyScanStatus, runBaselineScan } from "./baseline-scan";
 import { handleRecordsCheck, isRecordsCommand } from "./records-check";
 import { eventExtrasActive, handleEventExtra, observeEventExtra } from "./event-extras";
-import { handleDeleteMyData, isDeleteMyDataRequest } from "./delete-my-data";
+import { handleDeleteMyData, isDeleteCommandText, isDeleteMyDataRequest } from "./delete-my-data";
 import { footprintCallbackAsMessage, handleDashboardCommand, handleFootprintCallback, handleFootprintCommand, isDashboardCommand, isFootprintCommand } from "./dashboard-link";
 import { handleDeepCommand, isDeepCommand } from "./deep-scan";
 import { isPhotoExifRequest, replyPhotoExif } from "./photo-exif";
@@ -11,7 +11,7 @@ import { createEventLog } from "./event-log";
 import { captureTelegram, eraseTelegramCapture, isCaptureDelete, replyCaptureErased, telegramCaptureEnabled } from "./telegram-capture";
 import { scanAllowed } from "./baseline-scan";
 import { createLogger } from "./logger";
-import { isProbeIdRequest, isProbeSender, probeMode, replyProbeId, runTelegramProbe } from "./probe-reader";
+import { eraseProbeCaptures, isProbeIdRequest, isProbeSender, probeMode, replyProbeId, runTelegramProbe, telegramSender } from "./probe-reader";
 import { sendTelegramReply } from "./reply";
 import { type Env, RATE_LIMITED, callCoreBrain, parseJson, readRawBody, timingSafeEqual } from "./shared";
 
@@ -61,6 +61,15 @@ export async function handleTelegramWebhook(request: Request, env: Env, ctx?: Ex
   } else if (telegramCaptureEnabled(env)) {
     const cap = captureTelegram(env, payload, log);
     if (ctx?.waitUntil) ctx.waitUntil(cap); else await cap;
+  }
+
+  // STOP with capture switched off, from a sender the scan features are not open to: the probe log still has to be cleared. The two STOP
+  // paths that clear it themselves are excluded; the message then goes on to core-brain as before.
+  const stopSender = telegramSender(payload);
+  if (stopSender && isDeleteCommandText((payload as { message?: { text?: unknown } }).message?.text) && !isCaptureDelete(env, payload) && !isDeleteMyDataRequest(env, payload)) {
+    const wipe = eraseProbeCaptures(env, stopSender.id).then((n) => { if (n === null) log.warn("probe_erase_failed"); });
+    if (ctx?.waitUntil) ctx.waitUntil(wipe);
+    else await wipe;
   }
 
   // MPC-8689 records check (default off, allow-listed test accounts): "/listing <url> <term>" and "/archive <url> <term>". Fetches that one address; core-brain never sees it.

@@ -40,6 +40,11 @@ Expect it to fire rarely: most X bios hold no address. That is the honest result
 `email_guess_shown` and `magic_guess_submitted` (`answer` yes or no). Both carry `basis: bio_email` and `source: scan_page`, never the address, and are sent only for a visitor who
 accepted analytics. `magic_guess_submitted` is stage 3 of the MPC-11111 flow check. The bridge click is already measurable as a GA4 session with medium `channel_osint`.
 
+Stage 1 (`dm_received`) is sent server-side. core-brain sends it for the channels it handles, but the X bot answers its own DMs inside `workers/social-listeners` (`src/x-webhook.ts`) and never
+passes them to core-brain, so that Worker sends `dm_received` (channel `x`, nothing else: no sender id, no text) once per X DM it answers; a DM it forwards to core-brain is counted there, never twice.
+It needs `GA4_SERVER_EVENTS_ENABLED` exactly `true`, the `GA4_API_SECRET` secret and the registry entry `ga4-measurement-protocol` enabled on social-listeners too, and sends nothing otherwise.
+(Found 2026-11-26 while writing the DebugView runbook; until then an X run would have shown no event for stage 1.)
+
 ## The four gates (all needed; any one missing = off)
 
 | Gate | Where | Who |

@@ -1,12 +1,25 @@
 // X (Twitter) Account Activity API listener: DM + mention events. Validate and route only.
+import { ga4ServerEventsOn, sendGa4ServerEvent } from "../../../shared/ga4-server-events";
 import { createLogger } from "./logger";
 import { type MirrorDm, describeShape, extractDms, extractMirrorDms, handleDeleteDm, handleMirrorDm, handleOrdinaryDm, isConsentPending, selfId } from "./mirror-bot";
 import { probeMode } from "./probe-reader";
 import { extractEngagement, isDeleteRequest, touchContact } from "./social";
-import { type Env, base64, forwardToCoreBrain, hmacSha256, parseJson, pick, readRawBody, timingSafeEqual } from "./shared";
+import { type Env, base64, forwardToCoreBrain, hmacSha256, parseJson, pick, readRawBody, recipientCtx, timingSafeEqual } from "./shared";
 import { runXProbe } from "./x-probe";
 
 const log = createLogger("social-listeners:x");
+
+/**
+ * MPC-11111: GA4 stage 1 (DM received) for the X channel. core-brain sends dm_received for the messages it handles, but this bot answers its own DMs here and never
+ * passes them on, so without this an X run shows no event for stage 1. One event per DM answered here (a DM forwarded to core-brain is counted there, never twice),
+ * carrying the channel name and nothing else: no sender id, no text. A no-op unless GA4_SERVER_EVENTS_ENABLED is exactly "true", GA4_API_SECRET is set and the registry
+ * entry ga4-measurement-protocol is enabled. Never throws, so it can never change the answer to X.
+ */
+function dmReceivedEvents(env: Env, count: number): Promise<unknown> {
+  if (count < 1 || !ga4ServerEventsOn(env)) return Promise.resolve();
+  const rctx = recipientCtx(env);
+  return Promise.all(Array.from({ length: count }, () => sendGa4ServerEvent(env, "dm_received", { params: { channel: "x" }, rctx })));
+}
 
 /** GET: CRC challenge. response_token = "sha256=" + base64(HMAC-SHA256(consumer secret, crc_token)). */
 async function handleCrc(request: Request, env: Env): Promise<Response> {
@@ -70,6 +83,7 @@ export async function handleXWebhook(request: Request, env: Env, ctx?: Execution
       ...mirrorDms.map((dm) => handleMirrorDm(env, dm, log)),
       ...welcomed.map((dm) => handleOrdinaryDm(env, dm, log)),
       ...deletes.map((dm) => handleDeleteDm(env, dm, log)),
+      dmReceivedEvents(env, mirrorDms.length + welcomed.length + deletes.length),
     ]);
     if (ctx?.waitUntil) ctx.waitUntil(work);
     else await work;
