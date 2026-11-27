@@ -1,6 +1,6 @@
 import { test, expect } from "./fixtures";
 
-// MPC-8689 / MPC-11541: the complete footprint. /footprint/ loads every published data point of the Hexagon Registry export (Row Type empty or Data point, less the rows with Decision = Dropped),
+// MPC-8689 / MPC-11541: the complete footprint. /footprint/ loads every published data point of the Hexagon Registry export (Row Type = Data point, less every row with Decision = Dropped),
 // each tile carries a Live / In build / Planned badge, and no headline total appears in the copy. Every hexagon has its own risk page.
 test("/footprint/ dataset: every registry data point, one badge each, Live = the 54 web checks", async ({ page }) => {
   await page.goto("/footprint/");
@@ -28,7 +28,7 @@ test("/footprint/ renders a status badge on all 650 tiles and states no total", 
   await expect(page.locator("#panel")).toContainText("Documented only. MPT does not check it yet.");
   // No headline total anywhere in the page text or its meta.
   const text = await page.evaluate(() => document.body.innerText + " " + [...document.querySelectorAll("meta")].map((m) => m.getAttribute("content")).join(" ") + document.title);
-  expect(text).not.toMatch(/\b(650|653|654|655|662|368|367|366)\b/);
+  expect(text).not.toMatch(/\b(650|653|654|655|662|368|367|366|363)\b/);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });
 

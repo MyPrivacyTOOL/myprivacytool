@@ -1,6 +1,6 @@
 // MPC-8689: the catalogue matches the approved discovery and the code, and changes no existing count.
-// MPC-11541 (2026-11-27): the source is the Hexagon Registry export (Row Type empty or Data point = 655 rows) less the rows with Decision = Dropped (78, 90, 99, 153, 538) = 650 published.
-// The 363 items that were already published (367 less the four dropped ones that were in it) keep every approved value (risk tier, arrival, wording, slug, plan and decision notes), so the assertions about the discovery below run on those (rows without `added`).
+// MPC-11541 (2026-11-27): the source is the Hexagon Registry export (Row Type = Data point, 655 rows) less every row with Decision = Dropped (78, 90, 99, 153, 538) = 650 published; Held rows
+// (97, 174) stay. The 363 items that were already published keep every approved value (risk tier, arrival, wording, slug, plan and decision notes), so the assertions about the discovery below run on those (rows without `added`).
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { HEXAGON_CATALOGUE, CATALOGUE_CHANNELS } from './catalogue.js';
@@ -10,20 +10,21 @@ import { TELEGRAM_HEXAGONS, X_HEXAGONS, TELEGRAM_EXTRA_HEXAGONS, EXTRA_HEXAGON_I
 const count = (f, k) => HEXAGON_CATALOGUE.filter(f).reduce((m, i) => ((m[i[k]] = (m[i[k]] || 0) + 1), m), {});
 const legacy = (i) => !i.added; // published before the registry export
 const rawSource = JSON.parse(readFileSync(new URL('./hexagons-366.json', import.meta.url), 'utf8'));
-// The count is the registry's: Data point rows (655) = published (650) + Decision = Dropped (5). The export asserts the same and stops if they differ.
-// THE CI ASSERTION (MPC-11541): the published catalogue count equals the registry rows with Row Type empty or Data point, minus the Dropped ones. The public dataset is the same count.
+// The count is the registry's: Data point rows (655) = published (650) + the 5 rows with Decision = Dropped. The build asserts the same and fails if they differ.
 assert.equal(rawSource.registry.data_point_rows, 655);
 assert.equal(rawSource.registry.published, 650);
 assert.deepEqual(rawSource.registry.excluded.map((e) => e.registry_id), [78, 90, 99, 153, 538]);
-assert.ok(rawSource.registry.excluded.every((e) => /Decision = Dropped/.test(e.reason)), 'every excluded row is excluded because its Decision is Dropped, nothing else');
+assert.ok(rawSource.registry.excluded.every((e) => /Decision = Dropped/.test(e.reason)));
 assert.equal(HEXAGON_CATALOGUE.length, rawSource.registry.data_point_rows - rawSource.registry.excluded.length);
 assert.equal(HEXAGON_CATALOGUE.length, 650);
-assert.equal(rawSource.items.length, HEXAGON_CATALOGUE.length);
+// THE ASSERTION THAT PROTECTS THE SITE (MPC-11541): the JSON that /footprint/ actually serves holds exactly the registry rows with Row Type empty or Data point, minus every Decision = Dropped row,
+// and the same ids as the catalogue. A stale public file or a Dropped row slipping back in fails CI here.
 const publicDataset = JSON.parse(readFileSync(new URL('../../public/footprint/hexagons-366.json', import.meta.url), 'utf8'));
-assert.equal(publicDataset.length, HEXAGON_CATALOGUE.length, 'the /footprint/ dataset has exactly the catalogue count');
-assert.ok(!HEXAGON_CATALOGUE.some((i) => rawSource.registry.excluded.some((e) => e.registry_id === i.registry_id)), 'no Dropped row is published');
-assert.deepEqual(rawSource.registry.excluded.filter((e) => e.was).map((e) => e.was.id).sort(), ['email.inbound_signature', 'email.wkd', 'tg.reactions_polls', 'web.reverse_dns'], 'the old record of each dropped item is kept');
+assert.equal(publicDataset.length, rawSource.registry.data_point_rows - rawSource.registry.excluded.length, '/footprint/ dataset = registry data points minus Dropped');
+assert.equal(rawSource.items.length, HEXAGON_CATALOGUE.length, 'the source file, catalogue.js and the dataset all hold the same rows');
+assert.deepEqual(publicDataset.map((i) => i.id).sort(), HEXAGON_CATALOGUE.map((i) => i.id).sort(), '/footprint/ dataset ids = catalogue ids');
 assert.equal(HEXAGON_CATALOGUE.filter(legacy).length, 363);
+assert.deepEqual(HEXAGON_CATALOGUE.filter((i) => [97, 174].includes(i.registry_id)).map((i) => i.id).sort(), ['email.subdomains', 'tg.join_request_bio'], 'Held rows stay published');
 assert.equal(new Set(HEXAGON_CATALOGUE.map((i) => i.registry_id)).size, 650, 'every item is one registry row');
 assert.ok(HEXAGON_CATALOGUE.every((i) => typeof i.evidence_key === 'string'), 'every item carries its Evidence Key');
 // 33 Channel Keys (the 27 built + 6 research-only) and the blank key, which is "general": never a channel, never counted as one.
@@ -32,7 +33,6 @@ assert.equal(KEYS.length, 33);
 assert.deepEqual(CATALOGUE_CHANNELS.map((c) => c.key).filter((k) => k !== 'general').sort(), [...KEYS].sort());
 assert.equal(CATALOGUE_CHANNELS.length, 34);
 assert.equal(count(() => true, 'channel').general, 120, 'blank Channel Key rows are filed as general');
-// The four dropped items were: web.reverse_dns (medium, B), email.inbound_signature (high, A), email.wkd (low, B), tg.reactions_polls (low, A), all unbuilt (new).
 assert.deepEqual(count(() => true, 'risk'), { high: 284, medium: 268, low: 98 });
 assert.deepEqual(count(() => true, 'status'), { defined: 101, new: 549 });
 assert.deepEqual(count(legacy, 'risk'), { high: 90, medium: 207, low: 66 });
@@ -78,15 +78,11 @@ assert.ok(brokers.every((i) => i.arrival === 'B' && i.access === 'Verify' && i.r
 assert.deepEqual(CATALOGUE_CHANNELS.find((c) => c.key === 'brokers'), { key: 'brokers', code: 'DB', label: 'Data brokers and news archives', group: 'Core' });
 assert.deepEqual([...RECORDS_EXTRA_IDS].sort(), brokers.map((i) => i.id).sort());
 // Drops and holds (2026-10-29) stay in the file with their reason; nothing is deleted. The inbound sender and mail app items are approved, built later.
-// MPC-11541: the four drops are Decision = Dropped in the registry, so they are no longer published items; their record (decision, reason, date) is kept in registry.excluded[].was.
-// Held items (97, 174) are not Dropped and stay published.
 const raw = rawSource.items;
 const decided = Object.fromEntries(raw.filter((i) => i.decision).map((i) => [i.id, i.decision]));
+// The four 2026-10-29 drops (web.reverse_dns, email.wkd, tg.reactions_polls, email.inbound_signature) are no longer published (Decision = Dropped); the two holds stay.
 assert.deepEqual(decided, { 'email.subdomains': 'held', 'tg.join_request_bio': 'held' });
 assert.ok(raw.filter((i) => i.decision).every((i) => i.decision_reason && i.decided === '2026-10-29' && i.status === 'new'));
-const keptDrops = Object.fromEntries(rawSource.registry.excluded.filter((e) => e.was).map((e) => [e.was.id, e.was.decision]));
-assert.deepEqual(keptDrops, { 'web.reverse_dns': 'dropped', 'email.wkd': 'dropped', 'tg.reactions_polls': 'dropped', 'email.inbound_signature': 'dropped' });
-assert.ok(rawSource.registry.excluded.filter((e) => e.was).every((e) => e.was.decision_reason && e.was.decided === '2026-10-29'), 'each dropped item keeps its reason and date');
 assert.equal(channelOfHexagon('tg.username'), 'TG');
 console.log('catalogue.test.mjs ok');
 

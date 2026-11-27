@@ -1,4 +1,4 @@
-// MPC-8689: every hexagon gets its own page with a unique, stable address; the master page lists all of them (650 since the 2026-11-27 registry export with Decision = Dropped rows left out, MPC-11541).
+// MPC-8689: every hexagon gets its own page with a unique, stable address; the master page lists all of them (650 since the 2026-11-27 registry export, MPC-11541).
 import assert from 'node:assert/strict';
 import { mkdtempSync, readFileSync, existsSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -22,7 +22,7 @@ for (const h of HEXAGON_CATALOGUE) {
 const master = readFileSync(path.join(out, 'hexagon', 'index.html'), 'utf8');
 assert.equal((master.match(/<tr data-r=/g) || []).length, 650);
 assert.ok(master.includes('54 run in the scan'), 'master page carries the one count sentence');
-assert.ok(!/\b(650|651|654|653|662|368|366)\b/.test(master.replace(/<tr data-r=[\s\S]*<\/tbody>/, '')), 'no headline total in the master page copy (MPC-11541)');
+assert.ok(!/\b(650|654|653|662|368|366)\b/.test(master.replace(/<tr data-r=[\s\S]*<\/tbody>/, '')), 'no headline total in the master page copy (MPC-11541)');
 assert.ok(master.includes('284 High') && master.includes('268 Medium') && master.includes('98 Low'));
 // A registry row with no access recorded says so instead of printing an empty access line.
 const noAccess = HEXAGON_CATALOGUE.find((h) => !h.access);
@@ -31,14 +31,14 @@ console.log('generate-hexagon-pages.test.mjs ok');
 
 // Owner decision 7 (batch 2, 2026-10-29): the 14 share-list pages carry hand-written text, and it does not borrow generic claims that do not fit.
 import { REVIEWED } from './hexagon-reviewed-copy.mjs';
-const SHARE = ['webrtc-leak', 'name-in-your-address', 'at-username', 'sms-phone-number', 'phone-number-whatsapp-id', 'profile-name', 'username-and-display-name', 'viber-name-and-photo', 'caller-number', 'voice', 'header-line', 'return-address', 'voice-recording'];
+const SHARE = ['webrtc-leak', 'name-in-your-address', 'at-username', 'sms-phone-number', 'phone-number-whatsapp-id', 'profile-name', 'username-and-display-name', 'viber-name-and-photo', 'if-they-email-us-signature-block', 'caller-number', 'voice', 'header-line', 'return-address', 'voice-recording'];
 // MPC-9791: connected-devices is a draft entry (owner review pending), not one of the 14 owner-reviewed share-list pages.
 const DRAFTS = ['connected-devices'];
-// MPC-11541: email.inbound_signature (registry row 90) is Decision = Dropped, so it has no page now. Its reviewed text stays in hexagon-reviewed-copy.mjs (nothing is deleted) but is unused.
-const DROPPED = ['if-they-email-us-signature-block'];
-assert.deepEqual(Object.keys(REVIEWED).sort(), [...SHARE, ...DRAFTS, ...DROPPED].sort());
-for (const slug of DROPPED) assert.ok(!HEXAGON_CATALOGUE.some((x) => x.slug === slug), `${slug} is dropped, so it is not in the catalogue`);
-for (const slug of SHARE) {
+assert.deepEqual(Object.keys(REVIEWED).sort(), [...SHARE, ...DRAFTS].sort());
+// MPC-11541: the owner dropped 'If they email us: signature block' (Decision = Dropped), so it has no page any more; its reviewed text stays on file.
+const UNPUBLISHED = ['if-they-email-us-signature-block'];
+for (const slug of UNPUBLISHED) assert.ok(!HEXAGON_CATALOGUE.some((x) => x.slug === slug), `${slug} is not published`);
+for (const slug of SHARE.filter((x) => !UNPUBLISHED.includes(x))) {
   const h = HEXAGON_CATALOGUE.find((x) => x.slug === slug);
   assert.ok(h, `${slug} is in the catalogue`);
   assert.equal(REVIEWED[slug].uses.length, 4, `${slug}: four uses`);

@@ -6,7 +6,7 @@ import { TELEGRAM_HEXAGONS, TELEGRAM_EXTRA_IDS, EMAIL_EXTRA_IDS, EXTRA_HEXAGON_I
 import { HEXAGON_CATALOGUE } from './catalogue.js';
 import { scanCounts } from './counts.js';
 
-// MPC-11541: the per-person denominator stays on the catalogue as published before the 2026-11-27 registry export (368 less the registry's Decision = Dropped rows that were in it: 538 on 2026-11-27 and the four of 2026-10-29, web.reverse_dns, email.inbound_signature, email.wkd and tg.reactions_polls, = 363); the 287 added rows never move it.
+// MPC-11541: the per-person denominator stays on the catalogue as published before the 2026-11-27 registry export, less the rows now Decision = Dropped (368 - 5 = 363); the 287 added rows never move it.
 assert.equal(FOOTPRINT_TOTAL, 363);
 assert.equal(HEXAGON_CATALOGUE.length, 650);
 const none = footprintSummary();

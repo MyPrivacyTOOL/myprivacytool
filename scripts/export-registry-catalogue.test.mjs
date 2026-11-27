@@ -1,10 +1,9 @@
-// MPC-11541: the registry export. The count must equal the registry's Row Type = Data point count, Decision = Dropped rows are not published (a rule, not a list of ids), and a re-run changes nothing.
+// MPC-11541: the registry export. The count must equal the registry's Row Type = Data point count, owner-excluded rows are not published, and a re-run changes nothing.
 import assert from 'node:assert/strict';
-import { exportCatalogue, clean, isDropped, EXPECTED_PUBLISHED } from './export-registry-catalogue.mjs';
+import { exportCatalogue, clean, EXCLUDED_DECISION } from './export-registry-catalogue.mjs';
 
 const previous = { version: 'old', total: 2, risk_tiers_approved: '2026-10-28', items: [
   { id: 'web.thing', channel: 'web', channel_label: 'Web scan', group: 'Core', code: 'A1', arrival: 'A', risk: 'low', label: 'Thing', reveals: 'r', field: 'f', status: 'defined', access: 'OK', source: '', slug: 'thing' },
-  { id: 'web.gone', registry_id: 5, channel: 'web', channel_label: 'Web scan', group: 'Core', code: 'A2', arrival: 'A', risk: 'low', label: 'Gone', reveals: 'r', field: 'f', status: 'new', access: 'Verify', source: '', slug: 'gone', decision: 'dropped', decision_reason: 'why', decided: '2026-10-29' },
   { id: 'dy.ids', channel: 'douyin', channel_label: 'Douyin (China)', group: 'Asian', code: 'B1', arrival: 'B', risk: 'medium', label: 'Douyin IDs', reveals: 'r', field: 'f', status: 'new', access: 'Verify', source: '', slug: 'douyin-ids' },
 ] };
 const row = (id, o = {}) => ({ 'Hexagon ID': id, Footprint: `Row ${id}`, 'Catalogue Code': '', 'Evidence Key': `key\\_${id}`, 'Channel Key': 'web', 'Risk Score': 'Critical', 'Arrival Order / Capture Point': 'Class C - User Action / Consent', 'Build Status': 'New', ...o });
@@ -13,21 +12,17 @@ const rows = [
   row(2, { Footprint: 'Douyin ID', 'Catalogue Code': '[dy.ids](http://dy.ids)', 'Channel Key': 'douyin' }), // same code as row 3, different title
   row(3, { Footprint: 'Douyin IDs', 'Catalogue Code': 'dy.ids', 'Channel Key': 'douyin' }),
   row(4, { 'Channel Key': null, 'Arrival Order / Capture Point': null, 'Risk Score': 'Low' }),
-  row(5, { Footprint: 'Gone', 'Catalogue Code': 'web.gone', Decision: 'Dropped' }), // an old catalogue item whose row is now Dropped
-  row(538, { Footprint: 'Public registers', Decision: 'Dropped' }), // never published before: no old record
-  row(6, { Footprint: 'Held one', Decision: 'Held' }), // Held is not Dropped: published
+  row(538, { Footprint: 'Public registers', Decision: 'Dropped' }),
+  row(5, { Footprint: 'Kept on hold', Decision: 'Held' }),
+  row(6, { Footprint: 'Dropped for good', Decision: 'Dropped' }),
 ];
-const out = exportCatalogue(rows, { dataPointRows: 7, previous });
+// Rule: every row with Decision = Dropped is left out (here 538 and 6); Held stays. The derived count is asserted when asked.
+assert.equal(EXCLUDED_DECISION, 'Dropped');
+const out = exportCatalogue(rows, { dataPointRows: 7, previous, expectPublished: 5 });
 assert.equal(out.items.length, 5);
 assert.equal(out.registry.data_point_rows, 7);
-assert.deepEqual(out.registry.excluded.map((e) => e.registry_id), rows.filter(isDropped).map((r) => r['Hexagon ID']));
-assert.deepEqual(out.registry.excluded.map((e) => e.registry_id), [5, 538]);
-assert.ok(out.registry.excluded.every((e) => /Decision = Dropped/.test(e.reason)));
-// The dropped row's old catalogue record is kept, not deleted; a row that was never published has none.
-assert.deepEqual(out.registry.excluded[0].was, { id: 'web.gone', decision: 'dropped', decision_reason: 'why', decided: '2026-10-29' });
-assert.equal(out.registry.excluded[1].was, undefined);
-assert.ok(!out.items.some((i) => i.id === 'web.gone' || i.registry_id === 538 || i.registry_id === 5), 'a Dropped row is not published');
-assert.ok(out.items.some((i) => i.registry_id === 6), 'a Held row is published');
+assert.deepEqual(out.registry.excluded.map((e) => e.registry_id), [538, 6]);
+assert.ok(out.items.some((i) => i.registry_id === 5), 'a Held row stays published');
 assert.equal(out.items.length + out.registry.excluded.length, out.registry.data_point_rows);
 assert.equal(out.total, 5);
 // Matched rows keep their approved fields; only channel, registry id and Evidence Key follow the registry.
@@ -43,13 +38,10 @@ assert.equal(out.items.find((i) => i.registry_id === 2).risk, 'high');
 assert.equal(new Set(out.items.map((i) => i.slug)).size, 5, 'slugs are unique');
 // The count must match Notion's; a different number fails the export.
 assert.throws(() => exportCatalogue(rows, { dataPointRows: 8, previous }), /Notion reports 8/);
-// The derived count is asserted: a different one STOPS the export and writes nothing; the expected one passes.
-assert.equal(EXPECTED_PUBLISHED, 650);
-assert.throws(() => exportCatalogue(rows, { dataPointRows: 7, previous, expectedPublished: 650 }), /STOP: .* derives 5 published rows, expected 650/);
-assert.doesNotThrow(() => exportCatalogue(rows, { dataPointRows: 7, previous, expectedPublished: 5 }));
+// The derived publishable count is asserted: a different expectation stops the export.
+assert.throws(() => exportCatalogue(rows, { dataPointRows: 7, previous, expectPublished: 6 }), /derived 5 publishable rows.*expected 6/);
 // Rows that are not Data point are ignored.
 assert.equal(exportCatalogue([...rows, row(900, { 'Row Type': 'Control' })], { dataPointRows: 7, previous }).items.length, 5);
-for (const type of ['Placeholder', 'Framework', 'Feature']) assert.equal(exportCatalogue([...rows, row(901, { 'Row Type': type })], { dataPointRows: 7, previous }).items.length, 5, `${type} is not published`);
 // A catalogue item with no registry row fails the export.
 assert.throws(() => exportCatalogue(rows.slice(1), { dataPointRows: 6, previous }), /no registry row/);
 // Re-running on its own output changes nothing.

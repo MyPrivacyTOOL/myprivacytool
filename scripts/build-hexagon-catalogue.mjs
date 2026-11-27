@@ -1,4 +1,4 @@
-// MPC-11541: the source is now the Hexagon Registry export (scripts/export-registry-catalogue.mjs): every Row Type = Data point row except the owner-excluded ones. The build FAILS
+// MPC-11541: the source is now the Hexagon Registry export (scripts/export-registry-catalogue.mjs): every Row Type = Data point row except those with Decision = Dropped. The build FAILS
 // when the count differs from the Data point rows the export recorded.
 // MPC-8689: builds everything that is derived from shared/hexagon-registry/hexagons-366.json (the approved 366-hexagon discovery, risk tiers
 // approved 2026-10-28): catalogue.js (the registry copy), public/footprint/hexagons-366.json (the /footprint/ dataset) and, only when it does not
@@ -12,7 +12,7 @@ import assert from 'node:assert/strict';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const data = JSON.parse(readFileSync(path.join(ROOT, 'shared/hexagon-registry/hexagons-366.json'), 'utf8'));
 const items = data.items;
-// MPC-11541: the count must equal the registry's Row Type = Data point count (published + owner-excluded). Fail the build otherwise.
+// MPC-11541: the count must equal the registry's Row Type = Data point count (published + the rows with Decision = Dropped). Fail the build otherwise.
 const reg = data.registry;
 assert.ok(reg && Number.isInteger(reg.data_point_rows), 'hexagons-366.json: registry.data_point_rows is missing (re-run scripts/export-registry-catalogue.mjs)');
 assert.equal(items.length, reg.published, `catalogue has ${items.length} items, registry export published ${reg.published}`);
