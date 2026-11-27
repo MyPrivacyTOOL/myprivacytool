@@ -5,7 +5,7 @@ import { HEXAGONS, HEXAGON_COUNT, EMAIL_HEXAGONS, getHexagon } from './registry.
 import { SCORE_VERSION, CATEGORY_WEIGHTS, WEIGHT_TOTAL, SCORABLE_IDS, computeExposure } from './score.js';
 import {
   SCORE_VERSION_V2, EMAIL_SCORED_IDS, EMAIL_NOT_SCORED, SCORED_HEXAGONS_V2, HEXAGON_COUNT_V2, EMAIL_CATEGORY_WEIGHT,
-  CATEGORY_WEIGHTS_V2, CATEGORY_OF_V2, itemInfoV2, isScoredV2, computeExposureV2,
+  CATEGORY_WEIGHTS_V2, CATEGORY_OF_V2, WEIGHTS_LABEL_V2, itemInfoV2, isScoredV2, computeExposureV2, totalForV2,
 } from './scoreV2.js';
 import { SEVERITY_OF_SENSITIVITY } from './score.js';
 
@@ -121,4 +121,23 @@ test('order does not matter and duplicates behave as in v1', () => {
   assert.deepEqual(dup.rejected, [{ id: 'email-name', reason: 'conflicting_status' }]);
   assert.equal(dup.counts.checked, 0);
   assert.throws(() => computeExposureV2([], { total: 0 }), RangeError);
+});
+
+test('Z follows whether the email checks can apply: 60 with an address, 54 for a page-only scan (coverage is not lowered by checks that never applied)', () => {
+  assert.equal(totalForV2(true), 60);
+  assert.equal(totalForV2(false), 54);
+  const r = rng(7);
+  for (let i = 0; i < 100; i++) {
+    const scan = randomWebScan(r);
+    const a = computeExposure(scan);
+    const b = computeExposureV2(scan, { total: totalForV2(false) });
+    assert.deepEqual(b.coverage, a.coverage, 'page-only scan: coverage identical to v1');
+    assert.equal(b.score, a.score);
+  }
+});
+
+test('the email weight is labelled interim and approved (2026-11-27), never "proposed"', () => {
+  assert.equal(EMAIL_CATEGORY_WEIGHT, 10);
+  assert.match(WEIGHTS_LABEL_V2, /interim, approved 2026-11-27/);
+  assert.doesNotMatch(WEIGHTS_LABEL_V2, /PROPOSED|awaiting/i);
 });

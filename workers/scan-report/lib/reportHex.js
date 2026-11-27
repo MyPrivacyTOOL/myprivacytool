@@ -4,7 +4,8 @@
 import HEX, { EMAIL } from './hexagons.generated.js';
 // MPC-7471-F4: the one exposure score. Imported from the shared registry module, never re-implemented here.
 import { computeExposure } from '../../../shared/hexagon-registry/score.js';
-import { computeExposureV2 } from '../../../shared/hexagon-registry/scoreV2.js';
+// MPC-11569: exposure-v2, in SHADOW only (see webExposureV2 below). Never the headline.
+import { computeExposureV2, totalForV2 } from '../../../shared/hexagon-registry/scoreV2.js';
 // MPC-7561: each approved hexagon has its own guide page; the rest fall back to the generic guide below.
 import { hasGuide, guidePath } from '../../../shared/hexagon-registry/guides.js';
 
@@ -155,17 +156,16 @@ const outHex = (h) => ({ id: h.id, label: h.label, category: h.category, status:
 // A saved scan is final. `report.score` below is a different measure (the email-footprint privacy health score) and is left as it was.
 export const EXPOSURE_METHOD_URL = 'https://myprivacytool.io/how-we-calculate-your-score';
 export const webExposure = (web) => ({ ...computeExposure(web.map((h) => ({ id: h.id, status: h.status })), { final: true }), method_url: EXPOSURE_METHOD_URL });
-// MPC-11569: exposure-v2 over the 54 web hexagons AND the built email hexagons (60), from the statuses the report already shows. Additive: `web_scan.exposure`
-// (exposure-v1, 54) is unchanged. Only a saved web scan gets one. `email-breaches` (not built) is listed in `rejected` as `not_built` and never counted.
-// The sentence is the same text as ScoreVersionNotice (src/components/ScoreVersionNotice.tsx); src/lib/reportExposureV2.test.ts keeps the two equal. Wording awaits the owner.
-export const SCORE_V2_EXPLANATION = { headline: 'We now check more. You did not become more exposed.', detail: 'Your score now counts more checks, so it can be higher or lower than before. That reflects what we look at, not a change in what you reveal. Scores from different methods cannot be compared with each other.' };
-export const webAndEmailExposure = (web, emailHexes) => ({ ...computeExposureV2([...web, ...emailHexes].map((h) => ({ id: h.id, status: h.status })), { final: true }), explanation: SCORE_V2_EXPLANATION, method_url: EXPOSURE_METHOD_URL });
+// MPC-11569: exposure-v2 computed from the SAME saved statuses (web + email), recorded next to the v1 score for comparison. SHADOW: it is only a field in the
+// user's own JSON file, never in the email body, the page or a baseline, and `exposure` above stays the headline. Z = 60 because a report is prepared for an
+// address (totalForV2). email-breaches is rejected as not_built inside computeExposureV2. No method_url: no page describes v2 yet.
+export const webExposureV2 = (web, emailHexes) => computeExposureV2([...web, ...(emailHexes ?? [])].map((h) => ({ id: h.id, status: h.status })), { final: true, total: totalForV2(true) });
 export function buildReportJson({ scanId, webScan, web, emailHexes, score, generatedAt = new Date().toISOString() }) {
   return {
     schema_version: REPORT_JSON_VERSION,
     generated_at: generatedAt,
     report_id: scanId || null,
-    web_scan: webScan ? { saved: true, id: webScan.id ?? null, created_at: webScan.created_at ?? null, summary: tally(web), exposure: webExposure(web), hexagons: web.map(outHex) } : { saved: false, id: null, created_at: null, summary: null, exposure: null, hexagons: [] },
+    web_scan: webScan ? { saved: true, id: webScan.id ?? null, created_at: webScan.created_at ?? null, summary: tally(web), exposure: webExposure(web), exposure_v2_shadow: webExposureV2(web, emailHexes), hexagons: web.map(outHex) } : { saved: false, id: null, created_at: null, summary: null, exposure: null, hexagons: [] },
     email: { summary: tally(emailHexes), hexagons: emailHexes.map(outHex) },
     exposure_v2: webScan ? webAndEmailExposure(web, emailHexes) : null,
     score: score ?? null,

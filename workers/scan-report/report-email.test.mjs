@@ -3,7 +3,7 @@
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { buildReportEmail, BRIDGE, ATTACHMENT_WARNING } from './lib/email.js';
 import { computeScore } from './lib/score.js';
-import { WEB_HEXAGONS, EMAIL_HEXAGONS, reportAttachment, MAX_VALUE } from './lib/reportHex.js';
+import { WEB_HEXAGONS, EMAIL_HEXAGONS, reportAttachment, buildReportJson, MAX_VALUE } from './lib/reportHex.js';
 import { loadWebScan } from './lib/webScanLoader.js';
 import { captureStatus, isEstimate } from '../../shared/hexagon-registry/status.js';
 
@@ -93,11 +93,17 @@ const att = reportAttachment(real.report);
 const parsed = JSON.parse(Buffer.from(att.content, 'base64').toString('utf8'));
 check(/^my-privacy-scan-[a-z0-9-]+\.json$/.test(att.filename) && parsed.schema_version === 1 && parsed.web_scan.hexagons.length === 54 && parsed.email.hexagons.length === 7 && parsed.web_scan.hexagons.find((h) => h.status === 'found').detail !== undefined, 'JSON attachment decodes and carries all hexagons with detail');
 check(!JSON.stringify(parsed).includes('@'), 'JSON attachment holds no email address');
-// MPC-11569: exposure-v2 over 54 web + 6 built email = 60, additive; v1 stays at 54; email-breaches (not built) is never counted.
-check(parsed.exposure_v2.score_version === 'exposure-v2' && parsed.exposure_v2.coverage.total === 60 && parsed.web_scan.exposure.score_version === 'exposure-v1' && parsed.web_scan.exposure.coverage.total === 54, 'JSON: exposure_v2 (60) sits beside exposure-v1 (54)');
-check(parsed.exposure_v2.rejected.some((r) => r.id === 'email-breaches' && r.reason === 'not_built'), 'JSON: email-breaches is not counted in exposure_v2 (not built)');
-check(/did not become more exposed/.test(parsed.exposure_v2.explanation.headline) && !real.html.includes('did not become more exposed'), 'JSON carries the explanation; the email body gets no score line (wording not approved, MPC-7471-F4)');
-check(Object.keys(parsed).sort().join() === 'email,exposure_v2,generated_at,report_id,schema_version,score,web_scan', 'JSON top-level keys match docs/report-json-shape.md');
+check(Object.keys(parsed).sort().join() === 'email,generated_at,report_id,schema_version,score,web_scan', 'JSON top-level keys match docs/report-json-shape.md');
+// MPC-11569: exposure-v2 rides along in SHADOW only. v1 stays the headline, v2 never reaches the email body, and a report without a saved web scan has none.
+{
+  const sh = parsed.web_scan.exposure_v2_shadow;
+  check(parsed.web_scan.exposure.score_version === 'exposure-v1' && sh.score_version === 'exposure-v2', 'shadow: `exposure` is still v1 and `exposure_v2_shadow` is v2');
+  check(sh.coverage.total === 60 && sh.provisional === false && !('method_url' in sh), 'shadow: Z is 60 for a report (an address was given), final, no method page linked');
+  check(sh.rejected.some((r) => r.id === 'email-breaches' && r.reason === 'not_built'), 'shadow: email-breaches is never counted (not built)');
+  check(!/exposure-v2|exposure_v2/i.test(real.html) && !/exposure-v2|exposure_v2/i.test(real.text), 'shadow: nothing about v2 in the email body (html or text)');
+  const noWeb = buildReportJson({ scanId: 'x', webScan: null, web: [], emailHexes: [], score: null });
+  check(noWeb.web_scan.exposure === null && !('exposure_v2_shadow' in noWeb.web_scan), 'shadow: no saved web scan => no v2 either');
+}
 
 // loader (real MPC-7465 tables: web_scan_contacts links scans.id to web_scans.id)
 const sb = (byTable) => ({ select: async (path) => { const t = path.split('?')[0]; if (byTable instanceof Error) throw byTable; return byTable[t] ?? []; } });

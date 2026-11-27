@@ -21,6 +21,12 @@ Every "Your privacy report" email carries one file, `my-privacy-scan-<report id>
       "excluded_categories": [], "rejected": [], "warnings": [],
       "method_url": "https://myprivacytool.io/how-we-calculate-your-score"
     },
+    "exposure_v2_shadow": {            // MPC-11569: SHADOW. exposure-v2 computed from the same saved statuses (web + the built email checks), for comparison with `exposure`. NOT the headline, not shown in the email or on the page. Same shape as `exposure`, no method_url; null when saved is false.
+      "score_version": "exposure-v2", "status": "scored|no_checked_items", "provisional": false,
+      "score": 49, "band": "medium",
+      "coverage": { "checked": 15, "total": 60, "percent": 25 },   // total 60 = 54 web + 6 built email checks; email-breaches is never counted (rejected: not_built)
+      "counts": { }, "categories": { /* the nine v1 categories plus email */ }, "excluded_categories": [], "rejected": [ { "id": "email-breaches", "reason": "not_built" } ], "warnings": []
+    },
     "hexagons": [
       {
         "id": "location",              // registry id, stable
