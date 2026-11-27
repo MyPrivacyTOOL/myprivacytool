@@ -70,13 +70,32 @@ export function linksToResolve(html) {
   return [...new Set(htmlLinks(html))].filter((l) => !/\/unsubscribe\?/.test(l) && !/\/scan\/live/.test(l)).map((l) => l.replace(/&amp;/g, '&')).slice(0, 25);
 }
 
-/** A link "resolves" when it answers 2xx or redirects (3xx) to somewhere that does. A 404/410/5xx or a network error does not. */
-export async function resolveLinks(urls, fetchImpl = fetch, { timeoutMs = 10000 } = {}) {
+/**
+ * MPC-10608 (decided 2026-11-17 HKT): some data broker opt-out pages answer HTTP 403 to any automated request. A 403 is tolerated ONLY for a host on this list,
+ * and a host is listed ONLY after a person or session has opened its opt-out link in a real browser and seen the opt-out page. It is reported as
+ * "automated check blocked", never as a working link. Every other 403, and 404, 410, 5xx, DNS, TLS errors and timeouts, stay failures.
+ * Re-open each listed link in a browser monthly; remove a host whose page no longer opens. `verified` is the HKT date of the last browser check.
+ */
+export const BOT_BLOCKED_VERIFIED_HOSTS = {
+  'www.truthfinder.com': { verified: '2026-11-27', saw: 'redirects to the PeopleConnect Suppression Center (the opt-out form)' },
+};
+
+const hostOf = (u) => { try { return new URL(u).hostname; } catch { return ''; } };
+
+/**
+ * A link "resolves" when it answers 2xx or redirects (3xx) to somewhere that does. A 404/410/5xx or a network error does not.
+ * Returns the failures. A tolerated 403 (see above) is not a failure and is pushed to `blocked`, so the caller can count it separately.
+ */
+export async function resolveLinks(urls, fetchImpl = fetch, { timeoutMs = 10000, blocked = [], allowedHosts = BOT_BLOCKED_VERIFIED_HOSTS } = {}) {
   const bad = [];
   for (const u of urls) {
     try {
       const res = await fetchImpl(u, { method: 'GET', redirect: 'follow', signal: AbortSignal.timeout(timeoutMs), headers: { 'User-Agent': 'mpt-nightly-chain/1 (+https://myprivacytool.io)' } });
-      if (!(res.status >= 200 && res.status < 300)) bad.push(`${u.replace(/[?#].*/, '')} -> HTTP ${res.status}`);
+      if (res.status >= 200 && res.status < 300) continue;
+      // The refusal must come from the listed host itself: a redirect that ends in a 403 somewhere else is not covered.
+      const host = hostOf(u);
+      if (res.status === 403 && Object.hasOwn(allowedHosts, host) && (!res.url || hostOf(res.url) === host)) blocked.push(host);
+      else bad.push(`${u.replace(/[?#].*/, '')} -> HTTP ${res.status}`);
     } catch (e) { bad.push(`${u.replace(/[?#].*/, '')} -> ${String(e.name || 'error')}`); }
   }
   return bad;

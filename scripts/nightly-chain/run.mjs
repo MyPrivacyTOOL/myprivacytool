@@ -163,10 +163,14 @@ export async function runChain(env, { fetchImpl = fetch, sleep = (ms) => new Pro
     },
     async links_resolve() {
       const urls = linksToResolve(ctx.html);
-      const bad = await resolveLinks(urls, fetchImpl);
+      const blocked = [];
+      const bad = await resolveLinks(urls, fetchImpl, { blocked });
       result.facts.links_checked = urls.length;
+      result.facts.links_check_blocked = blocked.length;
+      if (bad.length) result.facts.links_failed = bad;   // every failing link, not only the first three the step detail has room for
       if (bad.length) throw new Error(`${bad.length} of ${urls.length} links do not resolve: ${bad.slice(0, 3).join('; ')}`);
-      return `${urls.length} links resolve`;
+      if (!blocked.length) return `${urls.length} links resolve`;
+      return `${urls.length - blocked.length} links resolve; ${blocked.length} automated check blocked (HTTP 403, browser-verified host, not proven by this run): ${blocked.join(', ')}`;
     },
     // MPC-7556: proves the Resend webhook is delivering events every night. The report email (sent through the real provider to the test mailbox) must come back as a
     // stored 'delivered' event on its per-send row (email_sends, written by the webhook). No event in the wait = the webhook, the secret or the migration is broken.
@@ -254,6 +258,7 @@ export function metricsRow(r, now = new Date()) {
 export async function main(env = process.env, fetchImpl = fetch) {
   const r = await runChain(env, { fetchImpl });
   for (const s of r.steps) console.log(`${s.skipped ? 'SKIP' : s.ok ? 'PASS' : 'FAIL'} ${s.step}${s.detail ? ' - ' + s.detail : ''}`);
+  for (const link of r.facts.links_failed ?? []) console.log(`  failed link: ${link}`);
   if (r.notConfigured) console.log(`NOT CONFIGURED: ${r.notConfigured}`);
   if (env.SUPABASE_URL && env.SUPABASE_SERVICE_ROLE_KEY && env.DRY_RUN !== '1') {
     try { await new Supabase(env, fetchImpl).insert('mpt_raw_metrics', metricsRow(r)); console.log('result row written to mpt_raw_metrics'); }

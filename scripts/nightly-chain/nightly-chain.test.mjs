@@ -2,7 +2,7 @@
 // Run: node scripts/nightly-chain/nightly-chain.test.mjs
 import { createHash } from 'node:crypto';
 import { runChain, metricsRow, hkDay } from './run.mjs';
-import { fixtureScan, checkReport, scanRequestBody, consentRequestBody, consentVersion, resolveLinks, linksToResolve } from './checks.mjs';
+import { fixtureScan, checkReport, scanRequestBody, consentRequestBody, consentVersion, resolveLinks, linksToResolve, BOT_BLOCKED_VERIFIED_HOSTS } from './checks.mjs';
 import { isTestAddress, testAddress, excludeTestFilter, onlyTestFilter } from '../../shared/test-records.js';
 import { buildReportEmail } from '../../workers/scan-report/lib/email.js';
 
@@ -82,6 +82,7 @@ function world(opts = {}) {
       db.suppressions.add(createHash('sha256').update(e).digest('hex')); return json({ ok: true });
     }
     if (url.startsWith('https://myprivacytool.io/') || url.startsWith('https://www.myprivacytool.io/')) return json({}, opts.deadLink && url.includes(opts.deadLink) ? 404 : 200);
+    if (opts.forbidden && url.includes(opts.forbidden)) return json({}, 403);
     if (url.startsWith('https://')) return json({}, 200);   // other pages the report links to (guides, HIBP)
     return json({}, 500);
   };
@@ -194,6 +195,32 @@ for (const [name, opts, step] of broken) {
   const links = linksToResolve(good.html);
   check(links.length > 0 && links.every((l) => /^https:/.test(l) && !/unsubscribe\?/.test(l) && !l.includes('&amp;')), 'links to resolve: https only, unsubscribe link never fetched, entities decoded');
   check((await resolveLinks(['https://a.invalid/x'], async () => { throw new Error('down'); })).length === 1 && (await resolveLinks(['https://a.invalid/x'], async () => json({}, 410))).length === 1 && (await resolveLinks(['https://a.invalid/x'], async () => json({}, 200))).length === 0, 'resolveLinks: network error and 410 are failures, 200 passes');
+}
+
+
+// ------------------------------------------------------------ MPC-10608: HTTP 403 from broker opt-out pages
+{
+  const status = (code, finalUrl) => async () => ({ ...json({}, code), ...(finalUrl ? { url: finalUrl } : {}) });
+  const allowedHosts = { 'broker.invalid': { verified: '2026-01-01' } };
+  const probe = async (url, impl) => { const blocked = []; const bad = await resolveLinks([url], impl, { blocked, allowedHosts }); return { bad: bad.length, blocked: blocked.length }; };
+  const is = (r, bad, blocked) => r.bad === bad && r.blocked === blocked;
+  check(is(await probe('https://broker.invalid/optout', status(200)), 0, 0), '403 rule: 200 passes and is not counted as blocked');
+  check(is(await probe('https://broker.invalid/optout', status(403)), 0, 1), '403 rule: 403 from a listed host is "automated check blocked", not a failure');
+  check(is(await probe('https://other.invalid/optout', status(403)), 1, 0), '403 rule: 403 from a host not on the list fails');
+  check(is(await probe('https://sub.broker.invalid/optout', status(403)), 1, 0) && is(await probe('https://broker.invalid.evil.invalid/x', status(403)), 1, 0), '403 rule: only the exact host, not a subdomain or a look-alike');
+  check(is(await probe('https://broker.invalid/optout', status(403, 'https://elsewhere.invalid/x')), 1, 0), '403 rule: a redirect ending in a 403 on another host fails');
+  for (const code of [401, 404, 410, 429, 500, 503]) check(is(await probe('https://broker.invalid/optout', status(code)), 1, 0), `403 rule: ${code} from a listed host fails`);
+  for (const name of ['TimeoutError', 'TypeError']) check(is(await probe('https://broker.invalid/optout', async () => { throw Object.assign(new Error('x'), { name }); }), 1, 0), `403 rule: ${name} (timeout, DNS, TLS) on a listed host fails`);
+  check(is(await probe('https://constructor/x', status(403)), 1, 0), '403 rule: an inherited object key is not a listed host');
+  check(Object.values(BOT_BLOCKED_VERIFIED_HOSTS).every((v) => /^\d{4}-\d{2}-\d{2}$/.test(v.verified) && v.saw), '403 rule: every listed host records when it was opened in a browser and what was seen');
+}
+{
+  const listed = world({ forbidden: 'www.truthfinder.com' }); const r = await run({}, listed);
+  const step = r.steps.find((s) => s.step === 'links_resolve');
+  check(r.ok && r.facts.links_check_blocked === 1 && /1 automated check blocked .*not proven.*www\.truthfinder\.com/.test(step.detail), `nightly: a 403 from the listed host passes, counted and named as "automated check blocked" (${step.detail})`);
+  const unlisted = world({ forbidden: 'www.spokeo.com' }); const r2 = await run({}, unlisted);
+  check(r2.failedStep === 'links_resolve' && r2.facts.links_check_blocked === 0 && r2.facts.links_failed.length === 1 && /spokeo.*HTTP 403/.test(r2.facts.links_failed[0]), 'nightly: a 403 from an unlisted host fails the run, and the failing link is recorded');
+  check(metricsRow(r2, NOW).payload.links_failed.length === 1 && !/@/.test(JSON.stringify(metricsRow(r2, NOW))), 'metrics row: failing links recorded, still no email address');
 }
 
 console.log(failed ? `${failed} FAILED` : 'ALL PASS');
