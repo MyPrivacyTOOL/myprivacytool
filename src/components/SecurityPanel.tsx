@@ -64,13 +64,13 @@ const SecurityPanel = ({ onClose }: SecurityPanelProps) => {
     const total = 7;
     
     if (securityData.httpsStatus.isSecure) score++;
-    if (!securityData.dnsLeak?.isLeaking) score++;
+    if (securityData.dnsLeak?.checked && !securityData.dnsLeak.isLeaking) score++; // MPC-9791: an unchecked probe is not a pass
     if (!securityData.mixedContent.hasMixedContent) score++;
     if (securityData.securityHeaders.score >= 60) score++;
     if (securityData.browserSecurity.isUpdated) score++;
     if (securityData.tlsConfig.isSecure) score++;
     // WebRTC check - assume no leak if DNS check passed
-    if (!securityData.dnsLeak?.isLeaking) score++;
+    if (securityData.dnsLeak?.checked && !securityData.dnsLeak.isLeaking) score++;
     
     return { score, total, percentage: Math.round((score / total) * 100) };
   }, [securityData]);
@@ -79,8 +79,8 @@ const SecurityPanel = ({ onClose }: SecurityPanelProps) => {
     if (!securityData?.dnsLeak) return null;
     
     const vpnDetected = securityData.dnsLeak.vpnDetected;
-    const dnsProtected = !securityData.dnsLeak.isLeaking;
-    const webrtcProtected = !securityData.dnsLeak.isLeaking;
+    const dnsProtected = securityData.dnsLeak.checked && !securityData.dnsLeak.isLeaking;
+    const webrtcProtected = securityData.dnsLeak.checked && !securityData.dnsLeak.isLeaking;
     
     let effectiveness = 0;
     if (vpnDetected) {
@@ -317,13 +317,13 @@ const SecurityPanel = ({ onClose }: SecurityPanelProps) => {
               detail={securityData.httpsStatus.hstsEnabled ? 'With HSTS' : undefined}
             />
             <SecurityCheckItem 
-              label="No DNS Leaks" 
-              passed={!securityData.dnsLeak?.isLeaking}
+              label={securityData.dnsLeak?.checked ? 'No DNS Leaks' : 'DNS leak test not checked'} 
+              passed={!!securityData.dnsLeak?.checked && !securityData.dnsLeak.isLeaking}
               critical={securityData.dnsLeak?.isLeaking}
             />
             <SecurityCheckItem 
-              label="No WebRTC Leaks" 
-              passed={!securityData.dnsLeak?.isLeaking}
+              label={securityData.dnsLeak?.checked ? 'No WebRTC Leaks' : 'WebRTC leak test not checked'} 
+              passed={!!securityData.dnsLeak?.checked && !securityData.dnsLeak.isLeaking}
             />
             <SecurityCheckItem 
               label="Security Headers Present" 
@@ -568,7 +568,7 @@ const SecurityPanel = ({ onClose }: SecurityPanelProps) => {
         {/* PRIVACY NOTICE */}
         <p className="text-xs text-center text-muted-foreground pt-2">
           <EyeOff className="w-3 h-3 inline mr-1" />
-          All security tests run locally in your browser. No data is sent externally.
+          The security tests run in your browser. The network leak test asks an outside service for the public address your connection shows, so it only starts after you press Scan me.
         </p>
       </CardContent>
     </Card>

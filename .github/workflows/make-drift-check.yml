@@ -1,0 +1,29 @@
+# Daily check that the live Make scenario MPC-6952 (7817044) still matches the reviewed copy in docs/make/.
+# Needs the MAKE_API_TOKEN repo secret (Make > profile > API > add token with scenarios:read). Without it the run reports a notice and passes, so
+# merging this does not turn anything red before the token exists. A GitHub schedule does not use a Cloudflare cron trigger.
+# Drift fails the run (GitHub emails the repo watchers). The token is only sent as an Authorization header and is never printed.
+name: Make scenario drift check
+on:
+  schedule:
+    - cron: '23 22 * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  drift:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      MAKE_API_TOKEN: ${{ secrets.MAKE_API_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Skip until the token exists
+        id: gate
+        run: |
+          if [ -z "$MAKE_API_TOKEN" ]; then echo "::notice::MAKE_API_TOKEN repo secret is not set, drift check skipped"; echo "run=false" >> "$GITHUB_OUTPUT"; else echo "run=true" >> "$GITHUB_OUTPUT"; fi
+      - name: Compare live scenario with docs/make
+        if: steps.gate.outputs.run == 'true'
+        run: node scripts/check-make-drift.mjs

@@ -1,9 +1,12 @@
 // MPC-7493: publishes the weekly learning-loop numbers to Notion as one page per week under a parent page (the Inbound Funnels strategy page).
 // AGGREGATES ONLY. No scan, scan number, contact, IP or browser value is ever written: the page is built from the counts in
 // mpt_raw_metrics (source=supabase, report=learning_loop_weekly). Any count of 1 to 4 is shown as "<5" so a tiny group cannot point at one visitor,
-// and a rate is shown only when its group has at least 5 scans. Re-running a week updates the same page. A page this publisher did not create is left alone.
+// and a rate is shown only when its group has at least 5 scans. MPC-9892: the anonymised aggregate section is read from learning_aggregate_daily
+// (counters only, filled when a record is deleted) through mpt_learning_aggregate_week; every number in it goes through the same "<5" floor. Re-running a week updates the same page. A page this publisher did not create is left alone.
 import { MARKER, notion, addDays } from './notion.js';
 import { hkDayStartOf } from '../lib/hk.js';
+import { callRecipient } from '../../../shared/recipients/outbound.ts';
+import { recipientCtx } from '../lib/recipient-ctx.js';
 
 export const MIN_GROUP = 5;
 export const TITLE = (weekOf) => `Learning loop: week of ${weekOf}`;
@@ -37,8 +40,46 @@ export function sumGa4Events(rows) {
   return out;
 }
 
+// MPC-9892 (Open Tracker design 4.5): the anonymised aggregate. rows = [{dimension, key, n}] summed over the week by mpt_learning_aggregate_week.
+// Every printed number goes through shown(): a cell of 1 to 4 reads "<5". No total is printed beside a row whose cells are floored, so a hidden cell
+// cannot be recovered by subtraction. Nothing here can name a scan, address, user agent or person: the table holds none.
+const STEPS = ['scan_started', 'scan_finished', 'results_viewed', 'contact_step_opened', 'contact_given'];
+const STEP_LABEL = { scan_started: 'scan started', scan_finished: 'scan finished', results_viewed: 'results viewed', contact_step_opened: 'contact step opened', contact_given: 'contact given' };
+const BUCKETS = ['hk', 'uk', 'eu', 'north_america', 'other'];
+export function learningAggregateLines(rows) {
+  const cells = new Map((rows ?? []).map((r) => [`${r.dimension}|${r.key}`, n(r.n)]));
+  const get = (d, k) => cells.get(`${d}|${k}`) ?? 0;
+  if (cells.size === 0) return ['Anonymised aggregate: nothing has been counted for this week yet (counters are added when a record is deleted, 7 days after report delivery for a free user).'];
+  const out = [`Anonymised aggregate (counters only, added at the moment a record is deleted; nothing per person or per scan is kept). Saved scans counted: ${shown(get('scan', 'web_scan_saved'))}`];
+  out.push(`Funnel steps reached by those scans: ${STEPS.map((s) => `${STEP_LABEL[s]} ${shown(get('funnel_step', s))}`).join(', ')}`);
+  const hexes = new Map();
+  for (const [k, v] of cells) {
+    const m = /^hexagon_result\|([a-z0-9_-]+):(found|not_found|not_checked)$/.exec(k);
+    if (!m) continue;
+    const h = hexes.get(m[1]) ?? { id: m[1], found: 0, not_found: 0, not_checked: 0 };
+    h[m[2]] += v; hexes.set(m[1], h);
+  }
+  const ranked = [...hexes.values()].map((h) => ({ ...h, total: h.found + h.not_found + h.not_checked })).sort((a, b) => b.total - a.total || a.id.localeCompare(b.id));
+  const big = ranked.filter((h) => h.total >= MIN_GROUP).slice(0, 15);
+  out.push(big.length ? 'Hexagon results (found / not found / not checked), the 15 most often seen:' : `Hexagon results: no hexagon has been seen ${MIN_GROUP} times yet.`);
+  for (const h of big) out.push(`${h.id}: found ${shown(h.found)}, not found ${shown(h.not_found)}, not checked ${shown(h.not_checked)}`);
+  const fam = [...cells].map(([k, v]) => ({ m: /^bot_family\|(bot|ai):([a-z0-9_.-]+)$/.exec(k), v })).filter((x) => x.m)
+    .map((x) => ({ cls: x.m[1], family: x.m[2], v: x.v })).sort((a, b) => b.v - a.v || a.family.localeCompare(b.family)).slice(0, 10);
+  out.push(fam.length ? `Bot and AI families (machine mirror), the ten busiest: ${fam.map((f) => `${f.family} (${f.cls}) ${shown(f.v)}`).join(', ')}` : 'Bot and AI families: none counted this week.');
+  out.push(`Arrival region of people (coarse bucket): ${BUCKETS.map((b) => `${b.replace('_', ' ')} ${shown(get('country_bucket', b))}`).join(', ')}`);
+  const tiles = new Map();
+  for (const [k, v] of cells) {
+    const m = /^tile_event\|([a-z0-9_-]+):(shown|yes_me|not_me|disputed|kept)$/.exec(k);
+    if (!m) continue;
+    const t = tiles.get(m[1]) ?? { id: m[1], shown: 0, yes_me: 0, not_me: 0, disputed: 0, kept: 0 }; t[m[2]] += v; tiles.set(m[1], t);
+  }
+  const tl = [...tiles.values()].filter((t) => t.shown >= MIN_GROUP).sort((a, b) => b.shown - a.shown || a.id.localeCompare(b.id)).slice(0, 10);
+  if (tl.length) { out.push('Tile prompts (shown / yes me / not me / disputed / kept), the ten most shown:'); for (const t of tl) out.push(`${t.id}: shown ${shown(t.shown)}, yes me ${shown(t.yes_me)}, not me ${shown(t.not_me)}, disputed ${shown(t.disputed)}, kept ${shown(t.kept)}`); }
+  return out;
+}
+
 // The lines of the page, as plain strings (the first carries the marker). Exported so the tests can check exactly what would be published.
-export function learningLoopLines(weekOf, p, readAt, ga4) {
+export function learningLoopLines(weekOf, p, readAt, ga4, agg = null) {
   const lines = [
     `${MARKER} Week of ${weekOf} (Mon-Sun Hong Kong time). Aggregates only, read ${readAt} from mpt_raw_metrics (learning_loop_weekly). Counts of 1 to 4 are shown as "<${MIN_GROUP}"; rates need at least ${MIN_GROUP} scans. Only visitors who accepted the scan-saving consent have a saved scan.`,
     'Did they come back? Why did they not stay? What made them leave?',
@@ -66,6 +107,7 @@ export function learningLoopLines(weekOf, p, readAt, ga4) {
     ? 'Hexagons shown as a finding, share of leavers vs share of stayers (the ten with the biggest difference):'
     : `Hexagons shown to leavers vs stayers: not enough scans yet (each side needs at least ${MIN_GROUP}).`);
   for (const h of rows) lines.push(`${h.id}: leavers ${Math.round(h.leaver * 1000) / 10}%, stayers ${Math.round(h.stayer * 1000) / 10}%`);
+  if (agg) lines.push(...learningAggregateLines(agg));
   return { lines, hexagonRows: rows.length };
 }
 
@@ -79,7 +121,7 @@ export function learningLoopBlocks(lines) {
 }
 
 async function supa(env, path) {
-  const res = await fetch(`${env.SUPABASE_URL}/rest/v1/${path}`, { headers: { apikey: env.SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}` } });
+  const res = await callRecipient('supabase', { url: `${env.SUPABASE_URL}/rest/v1/${path}`, init: { headers: { apikey: env.SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}` } }, sent: [] }, recipientCtx(env));
   if (!res.ok) throw new Error(`supabase read ${path.split('?')[0]} failed: HTTP ${res.status}`);
   return res.json();
 }
@@ -108,7 +150,11 @@ export async function publishLearningLoop(env, weekOf, now = new Date()) {
   const kids = await children(env, parent);
   const existing = kids.filter((k) => k.type === 'child_page' && k.child_page?.title === title);
   if (existing.length > 1) throw new Error(`${existing.length} pages already titled "${title}"; refusing to pick one`);
-  const { lines } = learningLoopLines(weekOf, payload, readAt, ga4);
+  // MPC-9892: counters only. If the function is not there yet (migration not applied) the page still publishes, with a one-line note.
+  let agg = [];
+  try { agg = await supa(env, `rpc/mpt_learning_aggregate_week?p_from=${weekOf}&p_to=${addDays(weekOf, 6)}`); } catch { agg = null; }
+  const { lines } = learningLoopLines(weekOf, payload, readAt, ga4, agg ?? []);
+  if (agg === null) lines.push('Anonymised aggregate: not available (could not be read).');
   const blocks = learningLoopBlocks(lines);
   if (existing.length === 0) {
     const page = await notion(env, 'POST', '/pages', { parent: { type: 'page_id', page_id: parent }, properties: { title: { title: richText(title) } }, children: blocks });

@@ -23,7 +23,7 @@ const AcceptableUse = () => {
                 1. Purpose
               </h2>
               <p className="text-muted-foreground">
-                This Acceptable Use Policy ("Policy") sets out what you may and may not do when using MyPrivacyTOOL's website and services (the "Services"). MyPrivacyTOOL is an online privacy scanning and monitoring service that helps people check their personal data exposure across data breaches and the dark web. It applies to all users, including those on the Free ($0), Basic ($7.99/mo), Pro ($14.99/mo) and Executive ($49.99/mo) plans. It forms part of, and should be read with, our Terms of Service.
+                This Acceptable Use Policy ("Policy") sets out what you may and may not do when using MyPrivacyTOOL's website and services (the "Services"). MyPrivacyTOOL is an online privacy scanning service that helps people check their personal data exposure. We do not currently check whether an email address appears in known data breaches; when paid plans open, we expect to offer breach checks and monitoring. It applies to all users. Only the free scan is available today; when paid plans open, it will also apply to users on the planned Basic ($7.99/mo), Pro ($14.99/mo) and Executive ($49.99/mo) plans. It forms part of, and should be read with, our Terms of Service.
               </p>
             </section>
 
@@ -74,7 +74,7 @@ const AcceptableUse = () => {
                 5. Third-Party Data Sources and Services
               </h2>
               <p className="text-muted-foreground">
-                Our Services rely on third-party providers, including the Have I Been Pwned API for breach data. Your use of results derived from those sources must comply with this Policy and with any applicable third-party terms. You must not use such results to harm the individuals affected by a breach.
+                Our Services rely on third-party providers, which our Privacy Policy lists. The optional password check uses the Have I Been Pwned password service; when paid plans open, we expect to use a provider for breach data. Your use of results derived from those sources must comply with this Policy and with any applicable third-party terms. You must not use such results to harm the individuals affected by a breach.
               </p>
             </section>
 
@@ -83,7 +83,7 @@ const AcceptableUse = () => {
                 6. Accounts and Payments
               </h2>
               <p className="text-muted-foreground">
-                You are responsible for keeping your account credentials secure and for all activity under your account. Paid plans are processed by Stripe. You must not use stolen, unauthorised or fraudulent payment methods, and must not initiate fraudulent chargebacks.
+                Free accounts are optional, and there are no payments today. You are responsible for keeping your sign-in link secure and for all activity under your account. When paid plans open, we expect payments to be processed by Stripe. You must not use stolen, unauthorised or fraudulent payment methods, and must not initiate fraudulent chargebacks.
               </p>
             </section>
 

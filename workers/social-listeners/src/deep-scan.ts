@@ -1,9 +1,10 @@
 // MPC-7892 Telegram DEEP v1 (allow-listed test accounts only, default off). An explicit "DEEP" message in the private chat starts a consent step;
 // "DEEP YES" runs a username check for THE SENDER'S OWN @username against a fixed list of public profile endpoints. Opening a link, HELP or any other
 // message never starts it. Wording is DRAFT pending Chris's approval. A username match is NOT proof of identity; a block, timeout or error is NOT an all-clear.
+import { callRecipient } from "../../../shared/recipients/outbound";
 import type { Logger } from "./logger";
 import { call, probeIds, telegramSender } from "./probe-reader";
-import type { Env } from "./shared";
+import { type Env, recipientCtx } from "./shared";
 
 export const DETECTOR_VERSION = "mpt-seed-sites-1";
 export const CONSENT_TEXT_VERSION = "deep-consent-1";
@@ -63,12 +64,16 @@ const jobsPerDay = (env: Env): number => { const n = Number.parseInt(env.DEEP_JO
 
 async function rest(env: Env, method: string, path: string, body?: unknown, prefer?: string): Promise<{ ok: boolean; status: number; rows: Record<string, unknown>[] }> {
   try {
-    const res = await fetch(`${env.SUPABASE_URL!.replace(/\/+$/, "")}/rest/v1/${path}`, {
-      method,
-      headers: { apikey: env.SUPABASE_KEY!, authorization: `Bearer ${env.SUPABASE_KEY!}`, "Content-Type": "application/json", ...(prefer ? { Prefer: prefer } : {}) },
-      body: body === undefined ? undefined : JSON.stringify(body),
-      signal: AbortSignal.timeout(TIMEOUT_MS),
-    });
+    const res = await callRecipient("supabase", {
+      url: `${env.SUPABASE_URL!.replace(/\/+$/, "")}/rest/v1/${path}`,
+      init: {
+        method,
+        headers: { apikey: env.SUPABASE_KEY!, authorization: `Bearer ${env.SUPABASE_KEY!}`, "Content-Type": "application/json", ...(prefer ? { Prefer: prefer } : {}) },
+        body: body === undefined ? undefined : JSON.stringify(body),
+        signal: AbortSignal.timeout(TIMEOUT_MS),
+      },
+      sent: ["username", "scan_result"], // deep_jobs (sender key, @username) and deep_osint_results
+    }, recipientCtx(env));
     let rows: Record<string, unknown>[] = [];
     try { const j = await res.json(); rows = Array.isArray(j) ? j : []; } catch { /* empty body */ }
     return { ok: res.ok, status: res.status, rows };
@@ -94,14 +99,18 @@ async function readCapped(res: Response): Promise<unknown> {
 export interface SiteResult { source: string; site_name: string; status: ResultStatus; http_status: number; observed_at: string; evidence: Record<string, unknown>; limitation: string }
 const LIMITATION = "A username match shows only that an account with this name exists on that site; it is not proof it is the same person. Not found, blocked or unavailable is not proof of no exposure.";
 
-export async function checkSite(site: Site, username: string, deadline: number): Promise<SiteResult> {
+export async function checkSite(site: Site, username: string, deadline: number, env?: Env): Promise<SiteResult> {
   const observed_at = new Date().toISOString();
   const base = { source: site.id, site_name: site.name, observed_at, limitation: LIMITATION };
   const url = `https://${site.host}${site.path(encodeURIComponent(username))}`;
   const left = deadline - Date.now();
   if (left <= 0) return { ...base, status: "unavailable", http_status: 0, evidence: { reason: "deadline_reached" } };
   try {
-    const res = await fetch(url, { method: "GET", redirect: "manual", headers: { Accept: "application/json", "User-Agent": "MyPrivacyTOOL-deep-check/1" }, signal: AbortSignal.timeout(Math.min(TIMEOUT_MS, left)) });
+    const res = await callRecipient("deep-scan-sites", {
+      url,
+      init: { method: "GET", redirect: "manual", headers: { Accept: "application/json", "User-Agent": "MyPrivacyTOOL-deep-check/1" }, signal: AbortSignal.timeout(Math.min(TIMEOUT_MS, left)) },
+      sent: ["username"],
+    }, recipientCtx(env));
     if (res.status >= 300 && res.status < 400) return { ...base, status: "unavailable", http_status: res.status, evidence: { reason: "redirect_refused" } };
     const body = await readCapped(res);
     return { ...base, status: site.verdict(res.status, body), http_status: res.status, evidence: { host: site.host, check: "public_profile_endpoint" } };
@@ -112,12 +121,12 @@ export async function checkSite(site: Site, username: string, deadline: number):
 }
 
 /** Bounded concurrency; one site's failure never fails the others. */
-export async function runChecks(username: string, sites: Site[] = SITES): Promise<SiteResult[]> {
+export async function runChecks(username: string, sites: Site[] = SITES, env?: Env): Promise<SiteResult[]> {
   const deadline = Date.now() + DEADLINE_MS;
   const out: SiteResult[] = new Array(sites.length);
   let next = 0;
   await Promise.all(Array.from({ length: Math.min(CONCURRENCY, sites.length) }, async () => {
-    while (next < sites.length) { const i = next++; out[i] = await checkSite(sites[i], username, deadline); }
+    while (next < sites.length) { const i = next++; out[i] = await checkSite(sites[i], username, deadline, env); }
   }));
   return out;
 }
@@ -216,7 +225,7 @@ export async function handleDeepCommand(env: Env, update: unknown, log: Logger):
     if (!claim.ok || claim.rows.length === 0) return; // duplicate YES or already cancelled
     const jobId = String(job.id), username = String(job.query_username);
     await send(env, ctx, `Running DEEP for @${username} (job ${short(jobId)}). This takes up to about 30 seconds.`);
-    const results = await runChecks(username);
+    const results = await runChecks(username, SITES, env);
     const rows = results.map((r) => ({ job_id: jobId, ...r, detector_version: DETECTOR_VERSION, schema_version: 1 }));
     const saved = await rest(env, "POST", "deep_osint_results?on_conflict=job_id,source", rows, "resolution=ignore-duplicates,return=minimal");
     const complete = results.every((r) => r.status === "found" || r.status === "not_found");

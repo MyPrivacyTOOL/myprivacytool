@@ -11,8 +11,10 @@ import fr from "../../../locales/fr/main.json";
 import pt from "../../../locales/pt/main.json";
 import ar from "../../../locales/ar/main.json";
 import type { EventLog } from "./event-log";
+import { callRecipient } from "../../../shared/recipients/outbound";
 import type { Logger } from "./logger";
-import type { Env } from "./shared";
+import { type Env, recipientCtx } from "./shared";
+import { telegramCaptureEnabled } from "./telegram-capture";
 
 // MPC-7641: tagged so GA4 and leads can attribute clicks, scans and sign-ups to this channel (utm_medium=channel_osint, utm_source = platform).
 const SCAN_URL = "https://myprivacytool.io/scan?utm_source=telegram&utm_medium=channel_osint&utm_campaign=bot_reply";
@@ -61,26 +63,36 @@ export function replyTarget(update: unknown): number | string | null {
   return typeof id === "number" || (typeof id === "string" && id !== "") ? id : null;
 }
 
+/** CK-8502: owner-approved disclosure (2026-10-28), appended to a reply while TELEGRAM_CAPTURE_HEXAGONS is on AND the sender has confirmed with Y (owner decision 2026-10-31: capture, and so the disclosure, only applies after the Y; before it the teaser question carries the saving notice). English only until the 10 locale files carry a reviewed translation. */
+export const CAPTURE_DISCLOSURE = "To reply, I keep the details Telegram sends me with your messages (your name, your Telegram username, language and what you write). Send STOP any time and I'll delete them.";
+
 /** Reads core-brain's answer and, if it carries message keys, sends the reply. Never throws: a failed send is logged only. */
 export async function sendTelegramReply(env: Env, update: unknown, brain: Response, log: Logger, events?: EventLog | null): Promise<void> {
   try {
     const chatId = replyTarget(update);
     if (chatId === null) return;
-    const body = (await brain.json()) as { ignored?: boolean; message_keys?: unknown; locale?: unknown };
+    const body = (await brain.json()) as { ignored?: boolean; message_keys?: unknown; locale?: unknown; state?: unknown; next_state?: unknown };
     if (body.ignored) return;
-    const reply = composeReply(body.message_keys, body.locale);
+    const composed = composeReply(body.message_keys, body.locale);
+    // Capture only records after the Y (captureTelegram fails closed), so the "I keep your details" sentence belongs to the reply that confirms the Y and to later replies, not to the welcome or the teaser.
+    const confirmed = body.next_state === "confirmed" || body.state === "confirmed";
+    const reply = composed && telegramCaptureEnabled(env) && confirmed ? `${composed}\n\n${CAPTURE_DISCLOSURE}` : composed;
     if (!reply) return log.warn("reply_empty");
     if (!env.TELEGRAM_BOT_TOKEN) return log.warn("bot_token_unset");
     const ctl = new AbortController();
     const timer = setTimeout(() => ctl.abort(), TELEGRAM_TIMEOUT_MS);
     const request = { chat_id: chatId, text: escapeUrlUnderscores(reply), parse_mode: "Markdown" };
     try {
-      const res = await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(request),
-        signal: ctl.signal,
-      });
+      const res = await callRecipient("telegram", {
+        url: `https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`,
+        init: {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(request),
+          signal: ctl.signal,
+        },
+        sent: ["message_text", "username"], // the reply text and the chat id it goes to
+      }, recipientCtx(env));
       if (!res.ok) log.error("telegram_send_rejected", { status: res.status });
       if (events) events.out("sendMessage", request, { status: res.status, response: await res.json().catch(() => null) });
     } catch (err) {

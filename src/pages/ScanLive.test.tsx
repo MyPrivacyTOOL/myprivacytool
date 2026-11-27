@@ -8,7 +8,7 @@ import Scan from "./Scan";
 beforeEach(() => { window.scrollTo = vi.fn() as unknown as typeof window.scrollTo; sessionStorage.clear(); localStorage.clear(); });
 afterEach(() => { vi.unstubAllGlobals(); });
 
-const MARKETING = /email me my results and occasional privacy tips/i;
+const MARKETING = /email me my results and follow-ups about them/i;
 async function submit() {
   const user = userEvent.setup();
   await user.type(screen.getAllByLabelText("Email address")[0], "live+unit@example.com");

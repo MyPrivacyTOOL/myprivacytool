@@ -1,13 +1,17 @@
 // Telegram Bot API webhook listener. Validates, routes to core-brain, then sends the reply core-brain chose (MPC-7251).
 import { baselineScanEnabled, baselineSender, isConsentConfirmation, isScanStatusRequest, replyScanStatus, runBaselineScan } from "./baseline-scan";
-import { handleDeleteMyData, isDeleteMyDataRequest } from "./delete-my-data";
-import { handleDashboardCommand, isDashboardCommand } from "./dashboard-link";
+import { handleRecordsCheck, isRecordsCommand } from "./records-check";
+import { eventExtrasActive, handleEventExtra, observeEventExtra } from "./event-extras";
+import { handleDeleteMyData, isDeleteCommandText, isDeleteMyDataRequest } from "./delete-my-data";
+import { footprintCallbackAsMessage, handleDashboardCommand, handleFootprintCallback, handleFootprintCommand, isDashboardCommand, isFootprintCommand } from "./dashboard-link";
 import { handleDeepCommand, isDeepCommand } from "./deep-scan";
 import { isPhotoExifRequest, replyPhotoExif } from "./photo-exif";
 import { handleFixWizard, isFixWizardUpdate } from "./fix-wizard";
 import { createEventLog } from "./event-log";
+import { captureTelegram, eraseTelegramCapture, isCaptureDelete, replyCaptureErased, telegramCaptureEnabled } from "./telegram-capture";
+import { scanAllowed } from "./baseline-scan";
 import { createLogger } from "./logger";
-import { isProbeIdRequest, isProbeSender, probeMode, replyProbeId, runTelegramProbe } from "./probe-reader";
+import { eraseProbeCaptures, isProbeIdRequest, isProbeSender, probeMode, replyProbeId, runTelegramProbe, telegramSender } from "./probe-reader";
 import { sendTelegramReply } from "./reply";
 import { type Env, RATE_LIMITED, callCoreBrain, parseJson, readRawBody, timingSafeEqual } from "./shared";
 
@@ -45,6 +49,46 @@ export async function handleTelegramWebhook(request: Request, env: Env, ctx?: Ex
     if (isProbeSender(env, payload)) await run(runTelegramProbe(env, payload, log, events));
   }
 
+  // CK-8502 (owner decision D1, default off): STOP erases what was captured for ANY private sender; capture itself records one row per message (never a STOP).
+  if (isCaptureDelete(env, payload)) {
+    const sender = (payload as { message?: { from?: { id?: unknown } } }).message?.from?.id;
+    const run = (async () => {
+      const ok = await eraseTelegramCapture(env, payload, log);
+      if (!scanAllowed(env, String(sender))) await replyCaptureErased(env, payload, ok, log); // allowed senders get the fuller reply below
+    })();
+    if (ctx?.waitUntil) ctx.waitUntil(run); else await run;
+    if (!scanAllowed(env, String(sender))) return done(new Response("OK"));
+  } else if (telegramCaptureEnabled(env)) {
+    const cap = captureTelegram(env, payload, log);
+    if (ctx?.waitUntil) ctx.waitUntil(cap); else await cap;
+  }
+
+  // STOP with capture switched off, from a sender the scan features are not open to: the probe log still has to be cleared. The two STOP
+  // paths that clear it themselves are excluded; the message then goes on to core-brain as before.
+  const stopSender = telegramSender(payload);
+  if (stopSender && isDeleteCommandText((payload as { message?: { text?: unknown } }).message?.text) && !isCaptureDelete(env, payload) && !isDeleteMyDataRequest(env, payload)) {
+    const wipe = eraseProbeCaptures(env, stopSender.id).then((n) => { if (n === null) log.warn("probe_erase_failed"); });
+    if (ctx?.waitUntil) ctx.waitUntil(wipe);
+    else await wipe;
+  }
+
+  // MPC-8689 records check (default off, allow-listed test accounts): "/listing <url> <term>" and "/archive <url> <term>". Fetches that one address; core-brain never sees it.
+  if (isRecordsCommand(env, payload)) {
+    const rc = handleRecordsCheck(env, payload, log);
+    if (ctx?.waitUntil) ctx.waitUntil(rc);
+    else await rc;
+    return done(new Response("OK"));
+  }
+
+  // MPC-8689 event extras (default off, allow-listed test accounts): an edit, or a block/unblock of the bot. Stores a flag and answers once; core-brain never sees it.
+  const evx = observeEventExtra(payload);
+  if (evx && eventExtrasActive(env, evx)) {
+    const ev = handleEventExtra(env, payload, log);
+    if (ctx?.waitUntil) ctx.waitUntil(ev);
+    else await ev;
+    return done(new Response("OK"));
+  }
+
   // MPC-7894 STOP / delete my data (exact messages, senders the scan is open to): withdraws consent and deletes stored scan data; core-brain never sees it.
   if (isDeleteMyDataRequest(env, payload)) {
     const del = handleDeleteMyData(env, payload, log);
@@ -58,6 +102,22 @@ export async function handleTelegramWebhook(request: Request, env: Env, ctx?: Ex
     const dash = handleDashboardCommand(env, payload, log);
     if (ctx?.waitUntil) ctx.waitUntil(dash);
     else await dash;
+    return done(new Response("OK"));
+  }
+
+  // MPC-8689 footprint handoff link (default off, allow-listed test accounts): exact "footprint" command only; core-brain never sees it.
+  if (isFootprintCommand(env, payload)) {
+    const fp = handleFootprintCommand(env, payload, log);
+    if (ctx?.waitUntil) ctx.waitUntil(fp);
+    else await fp;
+    return done(new Response("OK"));
+  }
+
+  // MPC-8689: the "Count it in my web scan" button under the report. Same switch and allow-list as the typed command.
+  if (footprintCallbackAsMessage(env, payload)) {
+    const cb = handleFootprintCallback(env, payload, log);
+    if (ctx?.waitUntil) ctx.waitUntil(cb);
+    else await cb;
     return done(new Response("OK"));
   }
 

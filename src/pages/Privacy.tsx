@@ -1,4 +1,7 @@
 import { useEffect } from "react";
+import { PrivacyRecipients, VisitLogSentence } from "@/components/LegalRecipients";
+import { renderConsent } from "../../shared/recipients/consent-text";
+import { CONSENT_CONFIG } from "../../shared/recipients/consent-config";
 import Seo from "@/components/Seo";
 import { HK_POLICY_ANCHOR, HK_POLICY_EN, HK_POLICY_ZH, type HkPolicyCopy } from "@/data/hkSpamCopy";
 import pageMeta from "@/data/pageMeta.json";
@@ -39,6 +42,8 @@ const HkPolicyBlocks = ({ copy, id }: { copy: HkPolicyCopy; id: string }) => (
   </div>
 );
 
+const CONSENT_DAYS = CONSENT_CONFIG.n_hours / 24;
+
 const Privacy = () => {
   // The consent line on /HongKongSpam links to #hk-stop-spam (or #hk-stop-spam-zh); the section renders after load, so scroll to it here.
   useEffect(() => {
@@ -56,7 +61,7 @@ const Privacy = () => {
               Privacy Policy
             </h1>
             <p className="mb-8 text-lg text-muted-foreground">
-              Last updated: 12 October 2026
+              Last updated: 18 November 2026
             </p>
 
             <section className="mb-8">
@@ -93,12 +98,21 @@ const Privacy = () => {
                 2.0 What Stays in Your Browser
               </h3>
               <p className="text-muted-foreground">
-                The free scan on our homepage detects device, browser and network
-                characteristics directly in your browser, and shows them to you
-                there. The finished result stays in your browser. It is not sent
-                to us unless you ask for your report and choose to save it (see
-                section 2.4). If you leave without giving us an email address,
-                nothing from the scan is saved. The other information described
+                The free scan on our homepage reads device, browser and network
+                characteristics in your browser and shows them to you there. Two
+                parts of it use a server. Your IP address and approximate
+                location come from a lookup on our own servers, which stores
+                nothing. When you press Scan me, your browser sends us a record
+                of your agreement (a random scan ID, the version of the wording
+                and a hash of the text you saw), and the network leak check asks an
+                outside service for the public address your connection shows (the
+                services are named in section 5). The finished result stays in
+                your browser. It is not sent to us unless you ask for your report
+                and choose to save it (see section 2.4). If you give us details to
+                look up, such as an email address, they go to our servers to run
+                the lookups (see section 2.1). If you leave without giving us an
+                email address, we keep no copy of your scan result, only the
+                record that you pressed Scan me. The other information described
                 below is stored only when you take an action that submits it (for
                 example, entering your email address, messaging our bot, or
                 requesting a scan of a social handle).
@@ -109,16 +123,27 @@ const Privacy = () => {
               </h3>
               <ul className="list-inside list-disc space-y-2 text-muted-foreground">
                 <li>
-                  <strong>Account Registration:</strong> Email address, name,
-                  password, phone number (optional), organization name
+                  <strong>Free Account:</strong> A free account is optional. If you
+                  tick "Keep my scan and create my free account" (consent version
+                  2026-11-08-v1) or sign in at /account, we hold your email
+                  address, the scans you link to the account and the record of the
+                  consent you gave. There is no password: you sign in with an
+                  emailed link, and the sign-in session is kept in your browser's
+                  local storage. You can delete the account and every linked scan
+                  at any time with "Delete my account and all scans" on /account.
+                  When paid plans open, we expect to ask for more details, such as
+                  a name, and we will update this policy before we do
                 </li>
                 <li>
                   <strong>Scan Requests:</strong> Email addresses and data
                   exposure information you request us to search for
                 </li>
                 <li>
-                  <strong>Payment Information:</strong> Billing address, payment
-                  method (processed securely by Stripe)
+                  <strong>Payment Information:</strong> We take no payments and
+                  hold no payment details today. When paid plans open, we expect
+                  payments to be handled by a payment processor (named as planned
+                  in section 5), and we will update this
+                  policy before we collect any billing address or payment details
                 </li>
                 <li>
                   <strong>Communications:</strong> Feedback, support requests,
@@ -127,7 +152,7 @@ const Privacy = () => {
                 <li>
                   <strong>Newsletter & Waitlist Sign-ups:</strong> Email address
                   and the page or campaign you signed up from, stored in our CRM
-                  (HubSpot)
+                  (the CRM provider is named in section 5)
                 </li>
                 <li>
                   <strong>Scan Summary Submitted with Your Email:</strong> If you
@@ -137,7 +162,7 @@ const Privacy = () => {
                 </li>
                 <li>
                   <strong>Messaging Channel Data:</strong> If you contact us through
-                  a messaging channel (currently Telegram and the web start page),
+                  a messaging channel (currently Telegram, Messenger, WhatsApp and the web start page),
                   we store your channel ID, display name, your replies, and your
                   conversation stage so we can continue the conversation. When you
                   message our Telegram bot we receive what you send (including
@@ -147,8 +172,9 @@ const Privacy = () => {
                   linked personal channel. We do not receive your phone number or
                   contacts unless you share them. We use this to run your privacy
                   scan and to measure what a messaging channel makes visible about
-                  a person. We keep it for up to 90 days, then it is deleted
-                  automatically. Our team can see it on a restricted basis; it is
+                  a person. On Telegram we start keeping these details only
+                  after you reply Y to confirm you are 19 or over; before that we
+                  keep only the stage of the conversation. We keep it until you ask us to delete it. Our team can see it on a restricted basis; it is
                   not shared publicly. You can ask us to delete everything linked
                   to your Telegram id at any time by writing to{" "}
                   <a
@@ -157,7 +183,52 @@ const Privacy = () => {
                   >
                     privacy@myprivacytool.io
                   </a>
-                  .
+                  . You can also do it yourself in the chat: send STOP, or tap
+                  &ldquo;Delete my scan data&rdquo; in the /fix list, and we delete
+                  your saved scan results, your fix-list progress and re-check
+                  records, any deeper scan results and your consent record, and we
+                  stop checking your profile. In your results each hexagon is a
+                  footprint: one piece of information about you that is visible,
+                  counted out of 30. The footprints you leave across the web make
+                  up your digital shadow, and each scan is a footstep, a dated
+                  snapshot of where you stand at that moment. Our scan only sees
+                  what Telegram shows to our bot, so it is part of your shadow and
+                  not all of it. Our aim is that you wipe your
+                  footprints and keep your footsteps clean: we help you find what
+                  your Telegram profile shows to bots and guide you to remove it,
+                  then we delete our copy. We delete only what we hold; the
+                  Telegram settings stay yours to change and we never change them
+                  for you, and anything Telegram itself stores is outside our
+                  control.
+                </li>
+                <li>
+                  <strong>Messenger and WhatsApp Chats:</strong> When you message
+                  our Facebook Page on Messenger, or our WhatsApp number, we
+                  receive what you send or tap (text and button taps), your
+                  Messenger page-scoped id or your WhatsApp phone number, and the
+                  time. Our first reply is a consent card. Until you tap &ldquo;I
+                  agree&rdquo; we send you nothing more than the menu and save
+                  nothing about you. If you tap &ldquo;Ask a question&rdquo; and
+                  agree, we save the time you agreed, the version of this policy
+                  you saw and that you asked to speak to us, and we tell our team
+                  that someone has asked a question (the channel and a short code,
+                  never your name, id or message). A person on our team then reads
+                  your message in the Messenger or WhatsApp inbox, where Meta keeps
+                  it under its own terms. In this chat we do not use an AI model to
+                  read or answer your messages, and we do not add you to our CRM. We
+                  keep what we save for at most 24 hours. You can delete it sooner
+                  by tapping &ldquo;Delete my data&rdquo;, by sending STOP or DELETE,
+                  or by writing to{" "}
+                  <a
+                    href="mailto:privacy@myprivacytool.io"
+                    className="text-brand underline hover:text-foreground"
+                  >
+                    privacy@myprivacytool.io
+                  </a>
+                  . Tapping &ldquo;No thanks&rdquo; deletes what we saved and we do
+                  not message you again until you start a new chat. Meta runs
+                  Messenger and WhatsApp itself and is named in section 5; we
+                  cannot delete what Meta holds in your own account.
                 </li>
                 <li>
                   <strong>Optional Contact Details:</strong> Where you choose to
@@ -167,9 +238,14 @@ const Privacy = () => {
                   when, and which version of our wording you saw
                 </li>
                 <li>
-                  <strong>Age Confirmation:</strong> We ask you to confirm you are
-                  16 or older with a checkbox. We do not collect or store your date
-                  of birth
+                  <strong>Age Confirmation:</strong> On our website we ask you to
+                  confirm you are 16 or older with a checkbox. Our Telegram bot is
+                  for people aged 19 or over: it asks you to reply Y only if you
+                  are, and it records nothing from your messages before you do. We
+                  cannot check your age, so this relies on your answer. Our Messenger
+                  and WhatsApp chats are for people aged 16 or over: please do not
+                  use them if you are younger, and we do not ask for your date of
+                  birth there. We do not collect or store your date of birth
                 </li>
                 <li>
                   <strong>Handles You Ask Us to Scan:</strong> Social media handles
@@ -188,18 +264,21 @@ const Privacy = () => {
               <ul className="list-inside list-disc space-y-2 text-muted-foreground">
                 <li>
                   <strong>Device Information:</strong> Device type, operating
-                  system, browser type, IP address. To show you your IP address
-                  and approximate location, the scan asks two third-party
-                  services (ipify and ipapi.co) from your browser when the scan
-                  loads, so they receive your IP address
+                  system, browser type, IP address. The scan shows you your own
+                  IP address and approximate location using our own service,
+                  which reads them from your connection and sends them back to
+                  you without storing them. Who receives your IP address, and
+                  when, is listed in section 5
                 </li>
                 <li>
                   <strong>Usage Analytics:</strong> Pages visited, time spent on
-                  pages, clicks, referrer source (via Google Analytics 4)
+                  pages, clicks, referrer source (through the analytics services named in section 5, only after you allow analytics)
                 </li>
                 <li>
-                  <strong>Cookies & Similar Technologies:</strong> Session IDs,
-                  preference settings, security tokens
+                  <strong>Cookies & Similar Technologies:</strong> Preference settings,
+                  your cookie choice and, if you sign in or connect an outside
+                  account, a session kept in your browser storage or in a cookie
+                  (each one is named in the Cookie Policy)
                 </li>
                 <li>
                   <strong>Engagement Records:</strong> For users of our scan
@@ -213,40 +292,46 @@ const Privacy = () => {
               </ul>
 
               <h3 className="mt-6 text-xl font-semibold text-foreground">
-                2.3 Server Logs of Every Page Request
+                2.3 Visit Log and Bot Record
               </h3>
               <p className="text-muted-foreground">
-                When your browser or any other program asks our website for a
-                page, our servers keep a log entry of that request, as most
-                websites do. We keep it to protect the site, to tell people apart
-                from automated programs, and to understand which programs read
-                our site. We do not use this log to block or challenge anyone. The
-                entry holds: the time, the page address (without anything after a
-                question mark), the request type and our response code, the
-                browser or program name it reported (the user agent), your IP
-                address, the country and network your IP address belongs to, the
-                page you came from (site and page only), and a short list of
-                technical headers that browsers send (such as accepted languages
-                and browser hints). It never holds cookies or login details. Images,
-                fonts and other page files are not logged.
+                <VisitLogSentence />{" "}
+                The log is filed by the country your connection arrives from, so
+                a visitor using a VPN is filed under the VPN&rsquo;s country. For
+                each country we set whether the IP address is kept in full,
+                shortened (the last part removed) or not at all. Today it is kept
+                in full in Hong Kong and in countries we have not set a rule for,
+                shortened in the European Union and the United Kingdom, and in
+                every case removed after 7 days. Country, source, campaign tags
+                and device type stay for 2 years without an IP address. The log
+                holds no cookie, no scan number, no email address and no
+                browser string.
               </p>
               <p className="mt-4 text-muted-foreground">
-                We sort each request into one of four groups using a written list
-                of rules, which we version and improve over time: person, search
-                or other bot, AI crawler or AI agent, or unknown. The rules look at
-                the program name, the kind of network the request comes from, and
-                whether the request has the headers every ordinary browser sends.
-                Any request we cannot place is treated as a person. The sorting
-                is not perfect: a program can pretend to be a browser, and a
-                person who hides their browser details can look like a bot.
+                Separately, we keep a record of automated visitors, because a
+                machine is not a person. When we sort a visit as a bot or an AI
+                crawler or agent, we record the time, the page address (without
+                anything after a question mark), the program name it reported,
+                its IP address, the country and network it belongs to, the page
+                it came from (site and page only) and a short list of technical
+                headers. Its IP address is removed after 7 days, and the headers
+                and detailed network information after 30 days; the program name,
+                the page, the country and the result of the sorting stay, so we
+                can tell which programs read our site. The
+                record never holds cookies or login details, and images, fonts and
+                other page files are not logged. We do not use it to block or
+                challenge anyone.
               </p>
               <p className="mt-4 text-muted-foreground">
-                For bots and AI crawlers we record and keep the full entry,
-                because a machine is not a person. For people, and for requests we
-                could not place, we keep the entry but remove the IP address after
-                30 days; the rest of the entry then stays without it. If you think
-                a visit of yours was wrongly sorted as a bot, contact us and we
-                will delete it.
+                We sort each visit into person, search or other bot, AI crawler or
+                AI agent, or unknown, using a written list of rules that look at
+                the program name, the kind of network, and whether the request
+                has the headers every ordinary browser sends. Anything we cannot
+                place is treated as a person and goes to the visit log, not the
+                bot record. The sorting is not perfect: a program can pretend to
+                be a browser, and a person who hides their browser details can
+                look like a bot. If you think a visit of yours was wrongly sorted
+                as a bot, contact us and we will delete it.
               </p>
 
               <h3 className="mt-6 text-xl font-semibold text-foreground">
@@ -254,14 +339,14 @@ const Privacy = () => {
               </h3>
               <p className="text-muted-foreground">
                 The free scan runs in your browser and shows you the results
-                there. We do not save it unless you ask for your report. When you
-                enter your email address and tick the box to save your scan
+                there. We do not save the result unless you ask for your report.
+                When you enter your email address and tick the box to save your scan
                 result, we save the full result, meaning the technical details
                 your browser reported such as IP address, device, browser,
                 language, screen and fingerprint-style values, together with your
                 email address, for 12 months, so your report can show it. If you
-                leave without giving an email address, nothing from the scan is
-                saved. We only count, without personal data, how many visitors
+                leave without giving an email address, we do not save the result
+                (see section 2.0 for what pressing Scan me sends). We only count, without personal data, how many visitors
                 finish a scan and how many ask for a report, through our analytics
                 if you accepted analytics cookies.
               </p>
@@ -369,9 +454,23 @@ const Privacy = () => {
               </h2>
               <p className="text-muted-foreground">
                 We do not collect your date of birth or your street address for our
-                free scan or waitlist. If a paid feature later requires a billing
+                free scan or waitlist. If a paid plan later requires a billing
                 address, we will tell you at the point of collection and keep it
                 only as long as tax and accounting law requires.
+              </p>
+            </section>
+
+            <section className="mb-8">
+              <h2 className="text-2xl font-bold text-foreground">
+                2B. Partners We Are Considering
+              </h2>
+              <p className="text-muted-foreground">
+                We are considering a licensed broker-data vendor to help check
+                whether your details appear in data-broker listings. It is
+                planned and not yet active: no data is sent to any such vendor
+                today. Before we switch one on, we will name it in this policy
+                and in our DPA, and say what it receives. The vendor has not yet
+                been chosen.
               </p>
             </section>
 
@@ -385,15 +484,16 @@ const Privacy = () => {
               <ul className="list-inside list-disc space-y-2 text-muted-foreground">
                 <li>
                   <strong>Service Delivery:</strong> Performing privacy scans,
-                  generating exposure reports, managing your account
+                  generating exposure reports (and, when paid plans open, managing your account)
                 </li>
                 <li>
                   <strong>Customer Support:</strong> Responding to inquiries,
-                  troubleshooting issues, sending account updates
+                  troubleshooting issues (and, when paid plans open, sending account updates)
                 </li>
                 <li>
-                  <strong>Billing & Payments:</strong> Processing subscription
-                  payments and generating invoices
+                  <strong>Billing & Payments:</strong> When paid plans open,
+                  processing subscription payments and generating invoices. We
+                  do none of this today
                 </li>
                 <li>
                   <strong>Marketing:</strong> Sending promotional emails, product
@@ -452,16 +552,21 @@ const Privacy = () => {
                 5. Data Sharing & Disclosure
               </h2>
               <p className="text-muted-foreground">
-                We do NOT sell your personal data. We may share information with:
+                We do NOT sell your personal data. Who receives your data is
+                listed below, written from the list the site checks every
+                outgoing call against; after it come the other cases in which we
+                share information.
               </p>
+              <PrivacyRecipients />
+              <h3 className="mt-6 text-xl font-semibold text-foreground">
+                Other sharing
+              </h3>
               <ul className="list-inside list-disc space-y-2 text-muted-foreground">
                 <li>
-                  <strong>Service Providers:</strong> Payment processors (Stripe),
-                  hosting and edge infrastructure (Cloudflare), databases (Supabase,
-                  Google Cloud), CRM and email (HubSpot), messaging platforms
-                  (Telegram), transactional email (Resend), internal task and
-                  notification tools (Notion, Slack), and analytics (Google Analytics 4, and Cloudflare
-                  Web Analytics, which counts page loads without cookies)
+                  <strong>Email Breach Checks:</strong> We do not currently check
+                  whether your email address appears in data breaches. If we
+                  start, we will add the company to the list above and say what we
+                  send to it.
                 </li>
                 <li>
                   <strong>AI Model Providers:</strong> When you send us a message
@@ -485,21 +590,6 @@ const Privacy = () => {
                   Alice's spoken guidance do not send anything to an AI provider.
                 </li>
                 <li>
-                  <strong>Email Checks for Your Report:</strong> To prepare your
-                  report we send only the part of your email address after the @
-                  to Cloudflare and to the public domain-registration service
-                  (rdap.org and the registry it points to). We send a scrambled
-                  code made from your address (a SHA-256 hash), not the address
-                  itself, to Gravatar and to Libravatar, to see whether a public
-                  profile picture exists. We do not currently check data
-                  breaches. If we start, we will name the company here and say
-                  what we send to it. We also search public code changes
-                  (commits) on GitHub: your whole email address, not a scrambled
-                  code, goes to GitHub, in a search for public code changes that
-                  name it as the author, so we can tell you if your address is
-                  published in public code
-                </li>
-                <li>
                   <strong>Legal Authorities:</strong> When required by law or to
                   protect rights and safety
                 </li>
@@ -514,6 +604,44 @@ const Privacy = () => {
               </p>
             </section>
 
+            <section className="mb-8" id="scan-consent">
+              <h2 className="text-2xl font-bold text-foreground">
+                5A. What You Agree To When You Press Scan me
+              </h2>
+              <p className="text-muted-foreground">
+                MyPrivacyTOOL does what trackers do, with your permission, in the
+                open, then shows you what it reveals and how to stop it. This is
+                the exact text above the Scan me button (wording version{" "}
+                {CONSENT_CONFIG.consent_version}). Pressing the button is the
+                agreement; there is no toggle and no second click:
+              </p>
+              <blockquote className="mt-4 border-l-4 border-surface-border pl-4 text-muted-foreground" data-testid="consent-text-a">
+                {renderConsent("en").plain}
+              </blockquote>
+              <p className="mt-4 text-muted-foreground">
+                We record that you agreed, with the version and a fingerprint of
+                the exact words you saw, against your scan number. The record
+                holds no IP address and no email address.
+              </p>
+              <ul className="mt-4 list-inside list-disc space-y-2 text-muted-foreground">
+                <li>
+                  Before you press Scan me, no outside service receives anything
+                  about you from the scan, except the services our own pages need
+                  to be delivered, which are listed above as run before you
+                  press.
+                </li>
+                <li>
+                  The bot check on the scan loads when you press Scan me, and the
+                  check of your public network address through your browser
+                  (WebRTC) runs inside the scan, not when the page loads.
+                </li>
+                <li>
+                  Our pages serve their fonts from our own site, not from an
+                  outside font service.
+                </li>
+              </ul>
+            </section>
+
             <section className="mb-8">
               <h2 className="text-2xl font-bold text-foreground">
                 6. Data Retention
@@ -524,13 +652,20 @@ const Privacy = () => {
               </p>
               <ul className="list-inside list-disc space-y-2 text-muted-foreground">
                 <li>
-                  <strong>Account Data:</strong> Retained for the duration of
-                  your subscription plus 30 days
+                  <strong>Account Data:</strong> Your email address, linked scans and
+                  consent record are kept until you delete your account with
+                  "Delete my account and all scans", which deletes them. A linked
+                  scan's saved result is also deleted automatically 12 months
+                  after the scan. When paid
+                  plans open, billing data will be kept for the duration of your
+                  subscription plus 30 days
                 </li>
                 <li>
                   <strong>Scan Results:</strong> Per-session scan results for
                   submitted handles are deleted automatically after 24 hours.
-                  Results saved to an account are retained for 2 years for
+                  A scan you link to your free account is kept until you delete the account or the scan, and its saved result
+                  is deleted automatically 12 months after the scan. When paid plans open, results
+                  saved to an account may be retained for up to 2 years for
                   historical comparison and reporting
                 </li>
                 <li>
@@ -541,11 +676,19 @@ const Privacy = () => {
                   address you used
                 </li>
                 <li>
+                  <strong>Report Delivery Record:</strong> The delivery record
+                  for a scan (the email address you gave and the status of your
+                  report) is kept 7 days after your report is delivered, then
+                  deleted, unless you keep your scan
+                </li>
+                <li>
                   <strong>Server Request Logs:</strong> The log of page requests
-                  (see section 2.3) keeps full entries for bots and AI crawlers.
-                  For people and requests we could not place, the IP address is
-                  removed after 30 days. To ask for earlier deletion of a visit,
-                  contact us with the approximate time and your IP address
+                  is split in two (see section 2.3). The visit log keeps the
+                  IP address for up to 7 days, and country, source, campaign tags
+                  and device type for 2 years without it. The bot and AI record
+                  keeps the IP address for 7 days and the headers for 30 days.
+                  To ask for earlier deletion of a visit, contact us with the
+                  approximate time and your IP address
                 </li>
                 <li>
                   <strong>Messaging Conversation State:</strong> Retained for 7
@@ -571,7 +714,8 @@ const Privacy = () => {
                   or anonymised
                 </li>
                 <li>
-                  <strong>Billing Records:</strong> Retained for 7 years
+                  <strong>Billing Records:</strong> We hold none today. When
+                  paid plans open, billing records will be kept for 7 years
                   (legal requirement)
                 </li>
                 <li>
@@ -583,6 +727,70 @@ const Privacy = () => {
                 You may request deletion of your data at any time, subject to
                 legal retention requirements.
               </p>
+
+              <h3 className="mt-6 text-xl font-semibold text-foreground">
+                6B. Connected accounts (GitHub, Reddit, Google)
+              </h3>
+              <ul className="list-inside list-disc space-y-2 text-muted-foreground" data-testid="connected-accounts">
+                <li>
+                  <strong>GitHub:</strong> when you connect, we ask GitHub for the <code>read:user</code> permission only and read your public profile
+                  activity. We keep your GitHub account number and an encrypted access token (and refresh token) until you disconnect (we delete them automatically if the token is not used for 90 days), and we stop using the token 90 days after you
+                  connected, until you connect again; a copy of the
+                  snapshot we derive for 24 hours; and a signed session cookie in your browser for 7 days. The snapshot holds derived values only
+                  (languages, topics, counts and a role label), not your email address, name, username, location, company or picture.
+                </li>
+                <li>
+                  <strong>Reddit:</strong> works the same way: encrypted token until you disconnect (not used after 90 days without connecting again, and deleted automatically if not used for 90 days), a 24-hour copy of the derived snapshot and a 7-day
+                  session cookie.
+                </li>
+                <li>
+                  <strong>Google:</strong> after you agree, we use Google&rsquo;s token to read your verified email address and then revoke it. We keep only a
+                  signed session cookie for 1 hour. Nothing is stored on our servers.
+                </li>
+                <li>
+                  <strong>Your controls:</strong> disconnecting GitHub or Reddit deletes the stored token, revokes our access at the provider, clears the
+                  24-hour copy and ends the session. If your 7-day session has ended, you can still remove the stored connection: sign in with the provider
+                  again on the Connect page (or its &ldquo;remove&rdquo; link) and we delete the token and the copy and revoke our access, without
+                  reading your profile, saving anything new or signing you in. If the provider tells us you revoked access, we delete our copy of the
+                  token. Even if you do not disconnect, we automatically delete a stored GitHub or Reddit token that has not been used for 90 days.
+                  The cookies are named in the Cookie Policy.
+                </li>
+              </ul>
+
+              <h3 className="mt-6 text-xl font-semibold text-foreground">
+                6A. Retention by Relationship
+              </h3>
+              <p className="text-muted-foreground">
+                Whatever personal data we hold about you without a relationship,
+                your scan or your IP address from a visit, is gone within{" "}
+                {CONSENT_DAYS} days. What we keep depends on what you choose:
+              </p>
+              <ul className="mt-4 list-inside list-disc space-y-2 text-muted-foreground" data-testid="retention-by-relationship">
+                <li>
+                  <strong>You ran a free scan and did not sign up:</strong> your
+                  personal record (the scan, the email address you gave, the
+                  delivery record and the list of who saw what during your scan)
+                  is deleted {CONSENT_DAYS} days after your report is delivered.
+                  You can delete it sooner, free, with your scan number. We
+                  email you 24 hours and 4 hours before, each time with a
+                  one-click link to keep your scan or sign up and the exact
+                  deletion time, and once more when it is done. After that we
+                  cannot tell whose it was. We keep only counts that contain no
+                  personal data, such as how many scans finished.
+                </li>
+                <li>
+                  <strong>You kept your scan or signed up:</strong> we keep your record until you delete it or ask us to. A saved scan
+                  result is different: it is deleted automatically 12 months after
+                  the scan. It includes the technical details your browser
+                  reported, such as your IP address.
+                </li>
+                <li>
+                  <strong>You are a paying customer:</strong> paid plans are not
+                  open today. When they open, records for a paying customer are
+                  kept for as long as the plan runs, with the periods in this
+                  section.
+                </li>
+              </ul>
             </section>
 
             <section className="mb-8">
@@ -697,19 +905,23 @@ const Privacy = () => {
                 </li>
                 <li>
                   <strong>At-Rest Encryption:</strong> Sensitive data encrypted
-                  in our databases
+                  in our databases (the database provider encrypts stored data
+                  at platform level)
                 </li>
                 <li>
                   <strong>Access Controls:</strong> Role-based access to
                   sensitive data
                 </li>
                 <li>
-                  <strong>Regular Audits:</strong> Security assessments and
-                  vulnerability testing
+                  <strong>Security Review:</strong> We reviewed our servers and
+                  database settings in October 2026 and fixed what we found. We
+                  have no fixed audit schedule
                 </li>
                 <li>
-                  <strong>Incident Response:</strong> Procedures to detect and
-                  respond to breaches
+                  <strong>Incident Response:</strong> We keep a short written
+                  checklist for investigating a problem and rolling back a bad
+                  release. We do not yet have a full incident response plan or
+                  run practice drills
                 </li>
               </ul>
               <p className="mt-4 text-muted-foreground">
@@ -754,8 +966,8 @@ const Privacy = () => {
                   functionality
                 </li>
                 <li>
-                  <strong>Analytics Cookies:</strong> Track usage patterns (Google
-                  Analytics 4). Analytics events are only sent after you allow
+                  <strong>Analytics Cookies:</strong> Track usage patterns (through the
+                  analytics services named in section 5). Analytics events are only sent after you allow
                   analytics in our consent manager
                 </li>
                 <li>
@@ -850,11 +1062,11 @@ const Privacy = () => {
                 </p>
                 <h3 className="mt-4 text-xl font-semibold text-foreground">If you ask us to email a friend</h3>
                 <p className="text-muted-foreground">
-                  You give us the address. We send that person one email saying someone who uses MyPrivacyTOOL asked us to, without saying who. We keep only a SHA-256 hash of the address, never the address itself, so we can tell if you invite the same person twice and match them if they later sign up through your link. We check it against our opt-out and suppression lists first, send no reminders, and the email has an unsubscribe link that stops us ever emailing that address. You may invite up to 10 people in total. Only invite people who would expect to hear from you.
+                  You give us the address. We send that person one email saying someone who uses MyPrivacyTOOL asked us to, without saying who. On our servers we keep only a SHA-256 hash of the address, not the address itself, so we can tell if you invite the same person twice and match them if they later sign up through your link. The hash is a lookup code, not anonymous: anyone who already has a guess of an address can check it against the hash. To send the email we pass the address to our email provider, which keeps delivery records under its own retention (section 5). The unsubscribe link in the email contains the address, so it can appear in request logs when that person uses it. We check it against our opt-out and suppression lists first, send no reminders, and the email has an unsubscribe link that stops us ever emailing that address. You may invite up to 10 people in total. Only invite people who would expect to hear from you.
                 </p>
                 <h3 className="mt-4 text-xl font-semibold text-foreground">If someone invites you</h3>
                 <p className="text-muted-foreground">
-                  Using a friend&apos;s link is your choice. If you run a scan through it, your friend learns only that you completed one, and earns a free month of Pro. You can ask us to delete your data at any time, which also removes the link between you and your friend.
+                  Using a friend&apos;s link is your choice. If you run a scan through it, the person who invited you is emailed that a friend they invited got their first report, and earns a free month of Pro. Their invite page shows only counts: how many friends signed up and how many got their first report. They are not told who you are or anything about your results. You can ask us to delete your data at any time, which also removes the link between you and your friend.
                 </p>
                 <p className="text-muted-foreground">We keep referral records for as long as the accounts they belong to, and delete them with the account. Write to privacy@myprivacytool.io to see or delete yours.</p>
               </section>

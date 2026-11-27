@@ -13,6 +13,8 @@
 
 // No Node built-ins here: Cloudflare Pages Functions only bundle with the Web Crypto API unless the project enables
 // the nodejs_compat flag, and an unresolved import fails the whole Pages build (so no site deploy goes out).
+import { callRecipient } from "../../shared/recipients/outbound.ts";
+import { workerRecipientContext } from "../../shared/recipients/worker-ctx.ts";
 
 const toBase64 = (bytes: Uint8Array): string => {
   let bin = "";
@@ -214,15 +216,24 @@ export const onRequestPost = async ({ request, env }: Ctx): Promise<Response> =>
   // Insert into Supabase (cairn_facts table)
   let insertResult: Response;
   try {
-    insertResult = await fetch(`${env.SUPABASE_URL}/rest/v1/cairn_facts`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${env.SUPABASE_SERVICE_KEY}`,
-        "Content-Type": "application/json",
-        Prefer: "return=minimal",
+    // MPC-9885: the row is subject_id, source, fact_type, a salted hash of the fact (never the plaintext), confidence, tags and a timestamp.
+    insertResult = await callRecipient(
+      "supabase",
+      {
+        url: `${env.SUPABASE_URL}/rest/v1/cairn_facts`,
+        init: {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${env.SUPABASE_SERVICE_KEY}`,
+            "Content-Type": "application/json",
+            Prefer: "return=minimal",
+          },
+          body: JSON.stringify(factRecord),
+        },
+        sent: [],
       },
-      body: JSON.stringify(factRecord),
-    });
+      workerRecipientContext(env as unknown as Record<string, unknown>),
+    );
   } catch (err) {
     console.error("Supabase insert failed:", err);
     return json({ error: "database_unreachable" }, 502);

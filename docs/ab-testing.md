@@ -15,12 +15,12 @@ It ships **off**: everyone sees `control` until `VITE_AB_START_CTA_ENABLED=true`
 Four independent tests on `/pricing`, all **off** until their flag is `true` on Cloudflare Pages (then redeploy). Copy needs Chris's approval first. Bucketing is per experiment, so analyse each on its own.
 | Experiment (flag) | Variants |
 |---|---|
-| `pricing_headline` (`VITE_AB_PRICING_HEADLINE_ENABLED`) | `control` "Pricing" / `free_first` "Know your exposure for free. Removal is planned." |
-| `pricing_cta` (`VITE_AB_PRICING_CTA_ENABLED`) | `control` solid "Join the waitlist" / `outline` outline button / `notify_text` "Notify me when plans open" (paid tiers only) |
+| `pricing_headline` (`VITE_AB_PRICING_HEADLINE_ENABLED`) | `control` "Pricing" / `free_first` "Know your exposure for free. Wipe your footprints with a plan." |
+| `pricing_cta` (`VITE_AB_PRICING_CTA_ENABLED`) | `control` solid "Choose plan" / `outline` outline button / `notify_text` "Get this plan" (paid tiers only) |
 | `pricing_tiers` (`VITE_AB_PRICING_TIERS_ENABLED`) | `control` equal cards / `highlight_pro` Pro card emphasised |
 | `pricing_social_proof` (`VITE_AB_PRICING_SOCIAL_PROOF_ENABLED`) | `control` none / `above_plans` / `below_plans` trust line |
 
-- Primary conversion = `pricing_waitlist_signup` / `generate_lead` (the on-page waitlist form, MPC-7626), split by the `ab_pricing_*` dimension for the test (those events carry `ab_<experiment_id>`, not `variant_id`), divided by `experiment_exposure` for the same `experiment_id` and `variant_id`. Both events and `pricing_plan_click` carry `ab_<experiment_id>` params for cross-test cuts. `experiment_cta_click` (plan button click) is the secondary signal. HubSpot stays the source of truth for signups.
+- Primary conversion = `pricing_waitlist_signup` / `generate_lead` (the notification sign-up in the "Paid plans are in design" pop-up, MPC-7626), split by the `ab_pricing_*` dimension for the test (those events carry `ab_<experiment_id>`, not `variant_id`), divided by `experiment_exposure` for the same `experiment_id` and `variant_id`. Both events and `pricing_plan_click` carry `ab_<experiment_id>` params for cross-test cuts. `experiment_cta_click` (plan button click) is the secondary signal. HubSpot stays the source of truth for signups.
 - Time on page and bounce rate: GA4 engagement time and engaged-session rate, broken down by the same `variant_id`.
 - Preview: `/pricing?ab_pricing_cta=outline` (forced views are never counted).
 - Social proof: no real testimonial or customer count exists, so the trust line only repeats what the Free plan states. Do not add numbers or quotes without a verified source.
@@ -87,3 +87,18 @@ Consent means GA4 sees only part of the traffic; the ratio between variants is s
 
 ## Adding an experiment
 Add an entry to `EXPERIMENTS` (first variant = control, flag `VITE_AB_<ID>_ENABLED`), call `useExperiment("<id>")`, fire `trackExperimentExposure` when the element is first visible and `trackExperimentCta` on click, and include `experiment_id`/`variant_id` on the success event. Cloudflare edge splitting is a later option if flicker or SEO ever matters; not needed for a button label.
+
+## Phone landing page: `mobile_hive`
+Where: the honeycomb on the results of the landing page scan, and the site header, on phones. Off until `VITE_AB_MOBILE_HIVE_ENABLED=true` is set on Cloudflare Pages and the site redeploys. No new copy: the header button reuses "Check My Exposure".
+| Variant | What a phone visitor sees | Share |
+|---|---|---|
+| `control` | Small tiles (88px, three per row) with no value line; scan button only inside the menu | 20% |
+| `readable_tiles` | Two bigger tiles per row (`hiveLayout(..., { readable: true })`) with the value and status line; "Check My Exposure" button on its own full-width row under the header logo row | 80% |
+
+- **Why:** below 420px the layout uses 88px tiles, and tiles under 100px are `compact`, which drops the value line (`src/lib/honeycomb.ts`, `InteractiveHexagonTile.tsx`). The hypothesis is that showing visitors their own values drives engagement and report requests.
+- **Two changes in one variant, on purpose:** it is the cheapest test of the idea. If `readable_tiles` wins, split the tiles and the button to see which one did it.
+- **Events** (consent-gated like all events, counts only, no scan data), all with `experiment_id=mobile_hive` and `variant_id`: `experiment_exposure` and `hex_value_rendered` (`hexes_with_value`: how many tiles show a value line), each sent ONCE per results grid, after every pillar is measured, and only at phone width; `experiment_cta_click` and `header_cta_click` for the header button. Nothing is sent while the flag is off (unlike the other experiments, so GA4 has a clean start date) and nothing for forced QA views. The control reports `hexes_with_value` of 0, which is the baseline. Primary outcome: `report_requested` per exposure, by `variant_id`. Guardrail: engaged-session rate. Tile taps: `hexagon_confirm`.
+- **Known gap:** the header button is shown on every page, but exposure fires only when a hive renders. Clicks from visitors who never reached a hive have no matching exposure, so read the header button as a secondary signal.
+- **Split is 80/20, not 50/50 (decided 2026-11-07).** GA4 showed about 34 mobile sessions a month, so no split can reach significance (a 25% lift needs roughly 5,000 sessions per arm). The 20% control is a safety net to catch a broken layout, not a measurement: judge success by before-and-after trends (mobile session length, pages per session, hex taps) as direction only. Baseline: `docs/ab-testing.md` history and MPC-9559.
+- **Decide the success line before starting:** for example a 25% relative lift in `report_requested` per exposure at 95% confidence, with engaged-session rate not falling. At low traffic (pricing was about 6 sessions a day) this may take weeks; check the exposure counts before calling it.
+- Preview: `/?ab_mobile_hive=readable_tiles` at a phone width (forced views are never counted).

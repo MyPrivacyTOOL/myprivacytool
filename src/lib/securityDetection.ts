@@ -1,9 +1,17 @@
 // Security and Privacy Vulnerability Detection
 // Detects critical security issues that could expose user data
 
+import { hasScanConsent } from '@/lib/scanConsent';
 import { parseIceCandidateAddress } from "./fingerprintDetection";
+import { recipientPeerConnection, webRtcAvailable } from '@/lib/recipientClient';
 
 export interface DNSLeakResult {
+  /**
+   * MPC-9791: false when the probe could not run or was blocked (WebRTC unavailable, blocked by the browser or an extension, no ICE candidates,
+   * or no scan consent so no STUN server was used). An unchecked result must never be shown as "no leak". Note this is a WebRTC address probe,
+   * not a test of which DNS service answers the visitor's lookups.
+   */
+  checked: boolean;
   isLeaking: boolean;
   dnsServers: string[];
   expectedLocation: string;
@@ -81,6 +89,7 @@ const VULNERABLE_VERSIONS: Record<string, number> = {
  */
 export async function detectDNSLeak(): Promise<DNSLeakResult> {
   const result: DNSLeakResult = {
+    checked: false,
     isLeaking: false,
     dnsServers: [],
     expectedLocation: 'Unknown',
@@ -92,6 +101,7 @@ export async function detectDNSLeak(): Promise<DNSLeakResult> {
   try {
     // Check for WebRTC leak (common VPN bypass)
     const webrtcLeak = await detectWebRTCLeak();
+    result.checked = webrtcLeak.probed;
     
     if (webrtcLeak.localIPs.length > 0) {
       result.dnsServers = webrtcLeak.localIPs;
@@ -129,17 +139,19 @@ export async function detectDNSLeak(): Promise<DNSLeakResult> {
 /**
  * Detect WebRTC leaks that can bypass VPNs
  */
-async function detectWebRTCLeak(): Promise<{ localIPs: string[], publicIP: string | null }> {
-  const result = { localIPs: [] as string[], publicIP: null as string | null };
+async function detectWebRTCLeak(): Promise<{ localIPs: string[], publicIP: string | null, probed: boolean }> {
+  // probed: a STUN-enabled probe (only after the Scan me click) saw at least one ICE candidate. Anything else (blocked, unavailable, timed out empty) is NOT CHECKED.
+  const result = { localIPs: [] as string[], publicIP: null as string | null, probed: false };
 
   try {
     // Check if WebRTC is available
-    if (typeof RTCPeerConnection === 'undefined') {
+    if (!webRtcAvailable()) {
       return result;
     }
 
-    const pc = new RTCPeerConnection({
-      iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+    // MPC-9888: Google STUN only after the Scan me click (design 2.4). Before it, iceServers is empty: host candidates only, nobody is contacted.
+    const pc = await recipientPeerConnection('google-stun', {
+      iceServers: hasScanConsent() ? [{ urls: 'stun:stun.l.google.com:19302' }] : []
     });
 
     const candidates: string[] = [];
@@ -152,6 +164,7 @@ async function detectWebRTCLeak(): Promise<{ localIPs: string[], publicIP: strin
 
       pc.onicecandidate = (event) => {
         if (event.candidate) {
+          if (hasScanConsent()) result.probed = true;
           const candidate = event.candidate.candidate;
           // CK-8305: use the candidate's address field; mDNS names and foundation ids are not addresses
           const parsed = parseIceCandidateAddress(candidate);

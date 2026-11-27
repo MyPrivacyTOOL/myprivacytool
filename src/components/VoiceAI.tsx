@@ -382,6 +382,12 @@ const getHexagonInsight = (hexagonData: HexagonData | null): string => {
       const location = locationMatch ? locationMatch[1] : 'your real location';
       return `I detected a DNS leak. Your DNS requests are going to your ISP's servers instead of your VPN's DNS. Your ISP can see the websites you visit, and websites can work out your real location at ${location}. Turning on DNS leak protection in your VPN settings fixes this.`;
     }
+    if (value.toLowerCase().includes('not checked')) {
+      return "I could not run the DNS leak check on your browser, so I am not saying anything either way. It needs a network test your browser may have blocked, or it waits until you press Scan me.";
+    }
+    if (value.toLowerCase().includes('no leak seen')) {
+      return "No real internet address leaked in this browser test. That is a WebRTC test: it does not show which DNS service answers your lookups.";
+    }
     if (value.toLowerCase().includes('vpn protected') || value.toLowerCase().includes('protected')) {
       return "Excellent—your VPN is properly protecting your DNS requests. No leak detected. Your DNS queries are being routed through secure servers, keeping your browsing history hidden from your ISP.";
     }
@@ -1063,15 +1069,15 @@ export default function VoiceAI({ hexagonData, tile, confirmedCount, totalCount 
     } else if (confirmedCount >= 23 && confirmedCount < 40) {
       newMessage = `Deep fingerprint analysis complete! I've mapped 12 fingerprinting methods. Your complete technical profile reveals how uniquely trackable you are.`;
     } else if (confirmedCount >= 40 && confirmedCount < 46) {
-      // Behavior tracking wave
+      // Behavior tracking wave (40 and 46 are wave boundaries in the reveal order, not a hexagon total)
       newMessage = `🖱️ Behavioral tracking active! I'm now analyzing your mouse movements, typing patterns, clicks, and scrolls. This is the most insidious form of tracking—it cannot be blocked.`;
       trackVoiceAIMessage('behavior_wave');
-    } else if (confirmedCount >= 44 && confirmedCount < totalCount && totalCount >= 46) {
+    } else if (confirmedCount >= 44 && confirmedCount < totalCount && totalCount >= HEXAGON_COUNT) {
       newMessage = `Behavioral analysis nearly complete. Your interaction patterns create a signature that can help recognise you, even in private browsing.`;
-    } else if (confirmedCount >= totalCount - 1 && confirmedCount > 0 && totalCount < 46) {
+    } else if (confirmedCount >= totalCount - 1 && confirmedCount > 0 && totalCount < HEXAGON_COUNT) {
       newMessage = `Almost there! I now have a complete picture of your digital shadow.`;
-    } else if (confirmedCount === totalCount && totalCount >= 46) {
-      // Final comprehensive summary for full 46 hexagons
+    } else if (confirmedCount === totalCount && totalCount >= HEXAGON_COUNT) {
+      // Final comprehensive summary once every hexagon in the registry (HEXAGON_COUNT) is confirmed
       newMessage = `COMPLETE! I've analyzed all ${HEXAGON_COUNT} aspects of your digital shadow across ${HEXAGON_GROUP_COUNT} categories. Your behavioral patterns, fingerprints, stored data, connected accounts, and security status have all been mapped. This comprehensive profile is what the surveillance economy knows about you. Every click, scroll, and keystroke—they see it all.`;
       trackVoiceAIMessage('full_scan_complete');
     } else if (confirmedCount === totalCount && totalCount > 0) {

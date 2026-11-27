@@ -1,4 +1,4 @@
-import worker, { runAll, COLLECTORS } from './worker.js';
+import worker, { runAll, COLLECTORS, COLLECTOR_GROUPS, STAGES, SUBREQUEST_BUDGET, runStage } from './worker.js';
 import { hkDate, hkWeekday, previousHkWeek } from './lib/hk.js';
 import supabaseCounts, { TABLES } from './collectors/supabase-counts.js';
 import cloudflare, { previousDay, WORKERS } from './collectors/cloudflare-analytics.js';
@@ -144,6 +144,69 @@ check(row.status === 'error' && /YOUTUBE_API_KEY not set/.test(row.error), 'miss
   check(r.find((x) => x.source === 'b').stored === false && r.filter((x) => x.stored).map((x) => x.source).join() === 'a,c' && inserts.map((i) => i.row.source).join() === 'a,c', 'one bad row fails the batch, then falls back row by row so the others are still stored');
   insertRequests = 0; r = await runAll(env, []);
   check(r.length === 0 && insertRequests === 0, 'no collectors => no insert request');
+}
+
+// MPC-7557 fix: the daily run is split into stages; each stage is its own invocation, so each has its own outbound-request budget.
+{
+  const grouped = Object.values(COLLECTOR_GROUPS).flat();
+  check(grouped.length === COLLECTORS.length && COLLECTORS.every((c) => grouped.includes(c)), 'every collector is in exactly one stage group');
+  check(STAGES.filter((x) => x.startsWith('collect_')).every((x) => COLLECTOR_GROUPS[x]), 'every collect_ stage has a group');
+  const realFetch = globalThis.fetch; let calls = 0;
+  globalThis.fetch = async (...a) => { calls++; return realFetch(...a); };
+  for (const stage of STAGES) {
+    calls = 0; inserts = [];
+    try { await runStage(stage, { ...env, NOTION_TOKEN: 'n' }, new Date('2026-10-09T16:15:00Z')); } catch { /* a stage may fail on the fake backend; only the request count matters here */ }
+    check(calls <= SUBREQUEST_BUDGET, `stage ${stage} uses ${calls} outbound requests (budget ${SUBREQUEST_BUDGET})`);
+  }
+  // Through the SELF binding: the daily cron calls every stage once, each as its own request, in order.
+  const seen = [];
+  const selfEnv = { ...env, SELF: { fetch: async (u, o) => { seen.push({ path: new URL(u).pathname, auth: o.headers.authorization }); return new Response(JSON.stringify({ result: 'ok' }), { status: 200 }); } } };
+  const w2 = []; await worker.scheduled({ cron: '15 16 * * *' }, selfEnv, { waitUntil: (p) => w2.push(p) }); await Promise.all(w2);
+  check(seen.map((x) => x.path).join() === STAGES.map((x) => '/stage/' + x).join() && seen.every((x) => x.auth === 'Bearer tok'), 'daily cron calls each stage once through SELF, in order, with the token');
+  // A failing stage does not stop the later ones.
+  const seen2 = []; const failEnv = { ...env, SELF: { fetch: async (u) => { seen2.push(new URL(u).pathname); return new Response('boom', { status: seen2.length === 1 ? 500 : 200 }); } } };
+  const w3 = []; await worker.scheduled({ cron: '15 16 * * *' }, failEnv, { waitUntil: (p) => w3.push(p) }); await Promise.all(w3);
+  check(seen2.length === STAGES.length, 'a failing stage does not stop the later stages');
+  globalThis.fetch = realFetch;
+  check((await call('/stage/collect_core', 'POST')).status === 401, 'POST /stage without token => 401');
+  check((await call('/stage/nope', 'POST', { authorization: 'Bearer tok' })).status === 404, 'unknown stage => 404');
+  inserts = []; check((await call('/stage/collect_core', 'POST', { authorization: 'Bearer tok' })).status === 200 && inserts.length === COLLECTOR_GROUPS.collect_core.filter((c) => !c.skip?.(new Date())).length, 'authorised POST /stage/collect_core stores that group only (weekday-skipped collectors excluded)');
+}
+
+// MPC-7557: any collector row that errors and has no alert of its own is reported in ONE combined Slack message (source/report and a short error class only).
+{
+  const realFetch = globalThis.fetch; const posts = []; let inserted = 0;
+  globalThis.fetch = async (url, opts = {}) => {
+    url = String(url);
+    if (url.startsWith('https://slack.com/api/')) { posts.push(JSON.parse(opts.body).text); return { ok: true, status: 200, json: async () => ({ ok: true }) }; }
+    if (url.includes('/rest/v1/mpt_raw_metrics')) { inserted += JSON.parse(opts.body).length; return { ok: true, status: 201, json: async () => ({}) }; }
+    return { ok: false, status: 404, json: async () => ({}) };
+  };
+  const okC = { source: 'a', report: 'fine', collect: async () => ({ payload: {} }) };
+  const badC = { source: 'b', report: 'silent_failure', collect: async () => ({ error: 'mpt_x failed: HTTP 404 for someone@example.com sekret' }) };
+  const badEmailed = { source: 'c', report: 'has_own_alert', collect: async () => ({ error: 'boom' }), alertText: () => 'own alert text' };
+  const slackEnv = { ...env, SLACK_BOT_TOKEN: 'xoxb-token', MPTSLACK_CHANNEL_ID: 'C1' };
+  await runAll(slackEnv, [okC, badC, badEmailed], new Date('2026-11-04T16:15:00Z'));
+  check(posts.length === 2 && posts.includes('own alert text'), 'a collector with its own alert keeps it, and is not repeated in the combined message');
+  const combined = posts.find((t) => t !== 'own alert text') ?? '';
+  check(/1 metrics collector row failed/.test(combined) && combined.includes('b/silent_failure') && !combined.includes('a/fine') && !combined.includes('c/has_own_alert'), 'the combined message names only the silent failing row');
+  check(!combined.includes('someone@example.com') && !combined.includes('xoxb-token') && !combined.includes('sekret'), 'no email address or token in the combined message');
+  check(inserted === 3, 'error rows are still stored');
+  posts.length = 0; await runAll(slackEnv, [okC], new Date('2026-11-04T16:15:00Z'));
+  check(posts.length === 0, 'no failing rows means no message');
+  posts.length = 0; await runAll(env, [okC, badC], new Date('2026-11-04T16:15:00Z'));
+  check(posts.length === 0, 'without Slack settings nothing is posted and nothing throws');
+  globalThis.fetch = realFetch;
+}
+
+// MPC-9930: POST /check/google-ads — bearer-guarded, read-only, reports missing secret NAMES instead of calling Google.
+{
+  const req = (auth) => new Request('https://w/check/google-ads', { method: 'POST', headers: auth ? { authorization: auth } : {} });
+  const noAuth = await worker.fetch(req(null), env);
+  check(noAuth.status === 401, '/check/google-ads without the bearer token is 401');
+  const res = await worker.fetch(req('Bearer tok'), env);
+  const body = await res.json();
+  check(res.status === 200 && body.check === 'google-ads' && body.result.configured === false && body.result.missing.length === 3 && body.result.missing.includes('GOOGLE_ADS_REFRESH_TOKEN'), '/check/google-ads with no Google Ads secrets reports the three missing names, calls nothing');
 }
 
 process.exit(ok ? 0 : 1);

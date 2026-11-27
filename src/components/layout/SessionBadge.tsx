@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { afterUserAction } from "@/lib/recipientClient";
 import { useLocation, useNavigate } from "react-router-dom";
 import { LogOut, ShieldCheck, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -45,7 +46,8 @@ const SessionBadge = () => {
     }
     if (!hasSessionHint()) return;
     let alive = true;
-    fetchSession().then((r) => {
+    // MPC-10790: the session check is a user_action recipient, so it waits for the first real action on the page (at once if there already was one).
+    afterUserAction().then(() => fetchSession()).then((r) => {
       if (!alive) return;
       if (r.status === "connected") setState({ kind: "connected", email: r.email, expiresAt: r.expiresAt });
       else {

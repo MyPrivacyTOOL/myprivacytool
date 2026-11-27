@@ -4,6 +4,7 @@ import Seo from "@/components/Seo";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { recipientFetch } from "@/lib/recipientClient";
 
 // MPC-7893: the private dashboard for a Telegram scan. Reached only through the one-time link (/d/<uuid>), which sets an HttpOnly session cookie and
 // redirects here with no token in the address. Everything shown comes from /api/dashboard; nothing is invented here, and opening this page never runs a
@@ -129,7 +130,7 @@ const TelegramDashboard = () => {
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
     const ctl = new AbortController();
-    fetch("/api/dashboard", { credentials: "same-origin", cache: "no-store", signal: ctl.signal })
+    recipientFetch("cloudflare-edge", "/api/dashboard", { credentials: "same-origin", cache: "no-store", signal: ctl.signal }, ["page_load"])
       .then(async (r) => (r.ok ? setData(await r.json()) : setError(MESSAGES[r.status] ?? "Something went wrong. Please try again later.")))
       .catch((e) => { if (e?.name !== "AbortError") setError("Something went wrong. Please try again later."); });
     return () => ctl.abort();

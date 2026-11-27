@@ -8,7 +8,11 @@ import { resetHubSpotCache } from "./src/hubspot-sync";
 import { hasOAuth1, oauth1Header } from "./src/x-media";
 import { FOLLOW_LINE } from "./src/mirror-bot";
 import { classifyTheme } from "./src/funnel";
-import { CONSENT_MESSAGE, INTENT_REPLIES, WELCOME_BODY, WELCOME_MESSAGE, branded, greeting, buildMirrorMessage, describeShape, extractMirrorDms, parseBareReply, parseMirrorCommand } from "./src/mirror-bot";
+import { CONSENT_MESSAGE, GUESS_NOTICE, INTENT_REPLIES, WELCOME_BODY, WELCOME_MESSAGE, branded, greeting, buildMirrorMessage, describeShape, extractMirrorDms, parseBareReply, parseMirrorCommand } from "./src/mirror-bot";
+import { openGuess } from "../../shared/email-guess";
+import { setBundledRegistryForTests } from "../../shared/recipients/outbound";
+import { parseRegistry } from "../../shared/recipients/registry";
+import recipientsData from "../../shared/recipients/recipients.data.js";
 
 const sig = (body: string) => "sha256=" + createHmac("sha256", "xs").update(body).digest("base64");
 const dm = (sender: string, text: string, forUser = "999") =>
@@ -134,7 +138,7 @@ describe("new dm.received event shape (MPC-7628)", () => {
   const evt = (sender: string, text: string, self = "999") =>
     ({ data: { event_type: "dm.received", filter: { user_id: self }, payload: { sender_id: sender, text } } });
   it("understands a dm.received payload and skips our own echo", () => {
-    expect(extractMirrorDms(evt("42", "MIRROR YES"))).toEqual([{ senderId: "42", text: "MIRROR YES", command: "consent" }]);
+    expect(extractMirrorDms(evt("42", "MIRROR YES"))).toMatchObject([{ senderId: "42", text: "MIRROR YES", command: "consent" }]);
     expect(extractMirrorDms(evt("999", "MIRROR"))).toEqual([]);
   });
   it("does not treat a post that merely says mirror as a DM", () => {
@@ -173,12 +177,12 @@ describe("rate limit, retry and tagging (MPC-7628)", () => {
   it("retries the DM once with a refreshed token after a 401", async () => {
     let first = true;
     const f = vi.spyOn(globalThis, "fetch").mockImplementation(async (u: unknown) => {
-      if (String(u).startsWith("https://sb.test")) return Response.json([]);
+      if (String(u).startsWith("https://x.supabase.co")) return Response.json([]);
       if (String(u).includes("oauth2/token")) return Response.json({ access_token: "fresh", refresh_token: "r2", expires_in: 7200 });
       if (first && String(u).includes("/dm_conversations/")) { first = false; return new Response("expired", { status: 401 }); }
       return new Response("{}");
     });
-    const e = { ...env(), SUPABASE_URL: "https://sb.test", SUPABASE_KEY: "k", X_CLIENT_ID: "c", X_CLIENT_SECRET: "s", X_REFRESH_TOKEN: "boot" };
+    const e = { ...env(), SUPABASE_URL: "https://x.supabase.co", SUPABASE_KEY: "k", X_CLIENT_ID: "c", X_CLIENT_SECRET: "s", X_REFRESH_TOKEN: "boot" };
     await post(dm("77", "MIRROR"), e);
     await new Promise((x) => setTimeout(x, 20));
     const dms = calls(f).filter((c) => String(c[0]).includes("/dm_conversations/"));
@@ -211,7 +215,7 @@ describe("bare Y / N answers (MPC-7628)", () => {
     for (const t of ["yes please", "maybe", "", "yy", "you", "yo", "yesterday", undefined]) expect(parseBareReply(t)).toBeNull();
   });
   it("marks bare replies so they can be checked first", () => {
-    expect(extractMirrorDms(JSON.parse(dm("42", "y")))).toEqual([{ senderId: "42", text: "y", command: "consent", bare: true }]);
+    expect(extractMirrorDms(JSON.parse(dm("42", "y")))).toMatchObject([{ senderId: "42", text: "y", command: "consent", bare: true }]);
   });
   it("a bare Y right after the consent request runs the scan and sends the mirror", async () => {
     const b = brain(); const f = x(asked());
@@ -398,7 +402,7 @@ describe("branding, welcome and simple Y (MPC-7628)", () => {
 
 describe("Channel OSINT funnel counting (MPC-7628)", () => {
   const settle = () => new Promise((r) => setTimeout(r, 20));
-  const e = () => ({ ...env(), SUPABASE_URL: "https://sb.test", SUPABASE_KEY: "k" });
+  const e = () => ({ ...env(), SUPABASE_URL: "https://x.supabase.co", SUPABASE_KEY: "k" });
   /** Fake X + Supabase: the RPC bodies are what we assert on. */
   function fake(history: { sender_id: string; text: string; created_at: string }[] = []) {
     const rpc: Record<string, unknown>[] = [];
@@ -507,13 +511,14 @@ describe("OAuth 1.0a signing for the clip upload (MPC-7628)", () => {
 
 describe("X activity feed for the CRM (MPC-7628)", () => {
   const settle = () => new Promise((r) => setTimeout(r, 20));
-  const e = () => ({ ...env(), SUPABASE_URL: "https://sb.test", SUPABASE_KEY: "k" });
+  const e = () => ({ ...env(), SUPABASE_URL: "https://x.supabase.co", SUPABASE_KEY: "k" });
   function fake(followedBy = true) {
     const touch: Record<string, unknown>[] = [];
     const erase: Record<string, unknown>[] = [];
     const sent: string[] = [];
     vi.spyOn(globalThis, "fetch").mockImplementation(async (u: unknown, init?: RequestInit) => {
       const url = String(u);
+      if (url.includes("/rpc/mpt_social_record")) return new Response("{}", { status: 404 }); // CK-8502 migration not applied: PostgREST answers 404 for an unknown function, the Worker falls back
       if (url.includes("/rpc/mpt_social_touch")) { touch.push(JSON.parse(init!.body as string)); return new Response("{}"); }
       if (url.includes("/rpc/mpt_erase_social_contact")) { erase.push(JSON.parse(init!.body as string)); return new Response("1"); }
       if (url.includes("/rpc/")) return new Response("{}");
@@ -597,7 +602,7 @@ describe("X activity feed for the CRM (MPC-7628)", () => {
 
 describe("HubSpot sync of the X feed (MPC-7628)", () => {
   const settle = () => new Promise((r) => setTimeout(r, 30));
-  const e = (extra: object = {}) => ({ ...env(), SUPABASE_URL: "https://sb.test", SUPABASE_KEY: "k", HUBSPOT_SOCIAL_TOKEN: "hs-token", ...extra });
+  const e = (extra: object = {}) => ({ ...env(), SUPABASE_URL: "https://x.supabase.co", SUPABASE_KEY: "k", HUBSPOT_SOCIAL_TOKEN: "hs-token", ...extra });
   /** Fake X, Supabase and HubSpot. `existing` = the HubSpot contact id returned by search. */
   function fake(opts: { existing?: string; propertyStatus?: number } = {}) {
     const hs: { method: string; path: string; body: unknown; auth: string }[] = [];
@@ -663,5 +668,144 @@ describe("HubSpot sync of the X feed (MPC-7628)", () => {
     await post(dm("42", "delete my data"), e());
     await settle();
     expect(x.hs.some((c) => c.method === "DELETE" && c.path === "/crm/v3/objects/contacts/901")).toBe(true);
+  });
+});
+
+// MPC-11111: the magic guess in the Mirror's bridge link. Ships off; carries a sealed address only when the person's own bio holds exactly one.
+describe("magic guess in the Mirror bridge link (MPC-11111)", () => {
+  const KEY = "mirror-test-key-0123456789abcdef";   // not a real secret
+  const ON = { EMAIL_GUESS_ENABLED: "true", EMAIL_GUESS_KEY: KEY };
+  const PLAIN = "https://myprivacytool.io/x";
+  const ADDRESS = "zelda.quillfeather@example.test";
+  async function mirrorFor(bio: string | undefined, extra: object = {}) {
+    vi.restoreAllMocks();   // a fresh spy per call: this helper runs several times in one test
+    resetTokenCache();
+    const f = vi.spyOn(globalThis, "fetch").mockImplementation(async (u) =>
+      String(u).includes("/users/42") ? Response.json({ data: { description: bio, protected: false } }) : new Response("{}"),
+    );
+    await post(dm("42", "MIRROR YES"), { ...env(), ...extra });
+    // sealing uses real WebCrypto (off the main thread), so wait for the DM instead of one event-loop tick
+    await vi.waitFor(() => { if (calls(f).length < 2) throw new Error("the DM has not been sent yet"); });
+    return JSON.parse((calls(f)[1][1] as RequestInit).body as string).text as string;
+  }
+  const linkOf = (text: string) => (text.match(/Next step: run a free full scan at (\S+)/) ?? [])[1] as string;
+
+  it("is off by default: the plain /x link, even when the bio holds an address", async () => {
+    const text = await mirrorFor(`Designer. ${ADDRESS}`);
+    expect(linkOf(text)).toBe(PLAIN);
+    expect(text).not.toContain("#g=");
+    expect(text).not.toContain(GUESS_NOTICE);
+  });
+  it("needs the exact switch AND the key", async () => {
+    expect(linkOf(await mirrorFor(`Designer. ${ADDRESS}`, { EMAIL_GUESS_ENABLED: "true" }))).toBe(PLAIN);
+    expect(linkOf(await mirrorFor(`Designer. ${ADDRESS}`, { EMAIL_GUESS_KEY: KEY }))).toBe(PLAIN);
+    expect(linkOf(await mirrorFor(`Designer. ${ADDRESS}`, { EMAIL_GUESS_ENABLED: "false", EMAIL_GUESS_KEY: KEY }))).toBe(PLAIN);
+    expect(linkOf(await mirrorFor(`Designer. ${ADDRESS}`, { EMAIL_GUESS_ENABLED: "true", EMAIL_GUESS_KEY: "short" }))).toBe(PLAIN);
+  });
+  it("on, with one address in the bio: a /scan link with the same utm tags and a sealed token in the fragment, plus a notice", async () => {
+    const text = await mirrorFor(`Designer. ${ADDRESS}`, ON);
+    const link = linkOf(text);
+    expect(link.startsWith("https://myprivacytool.io/scan?utm_source=x&utm_medium=channel_osint&utm_campaign=bot_reply#g=v1.")).toBe(true);
+    expect(link).not.toContain("zelda");              // the address is not readable in the link
+    expect(link).not.toContain("example.test");
+    expect(text).toContain(GUESS_NOTICE);
+    const opened = await openGuess(KEY, link.split("#g=")[1]);
+    expect(opened).toEqual({ email: ADDRESS, channel: "x", confidence: 0.9, basis: "bio_email" });
+  });
+  it("on, but no address, or two different ones, in the bio: the plain link and no notice", async () => {
+    for (const bio of ["Designer in Leeds", undefined, `${ADDRESS} or other@example.test`]) {
+      const text = await mirrorFor(bio, ON);
+      expect(linkOf(text), String(bio)).toBe(PLAIN);
+      expect(text).not.toContain(GUESS_NOTICE);
+    }
+  });
+  it("is the same message as before when nothing is sealed", () => {
+    expect(buildMirrorMessage({ description: "hello", protected: false })).toContain(`Next step: run a free full scan at ${PLAIN}\n\n`);
+  });
+});
+
+// MPC-11111: the X bot answers its DMs here and never passes them to core-brain (where dm_received is sent for the other channels), so this Worker sends it for X.
+describe("GA4 dm_received for X DMs (MPC-11111)", () => {
+  const GA4_ON = { GA4_SERVER_EVENTS_ENABLED: "true", GA4_API_SECRET: "test-secret-not-real" };
+  let restoreRegistry: (() => void) | undefined;
+  /** The registry entry is set explicitly, so these tests stay true whatever state the shipped file is in. */
+  const registry = (enabled: boolean) => {
+    restoreRegistry?.();
+    const reg = parseRegistry(JSON.parse(JSON.stringify(recipientsData)));
+    reg.recipients.find((r) => r.key === "ga4-measurement-protocol")!.enabled = enabled;
+    restoreRegistry = setBundledRegistryForTests(reg);
+  };
+  afterEach(() => { restoreRegistry?.(); restoreRegistry = undefined; });
+  const stub = (ga4: () => Response = () => new Response(null, { status: 204 })) =>
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (u) => (String(u).includes("google-analytics.com") ? ga4() : new Response("{}")));
+  const ga4Calls = (f: { mock: { calls: unknown[][] } }) => f.mock.calls.filter((c) => String(c[0]).includes("google-analytics.com")) as [string, RequestInit][];
+  const consentSent = (f: { mock: { calls: unknown[][] } }) => f.mock.calls.some((c) => String(c[0]).includes("/dm_conversations/with/42/messages"));
+  /** Background work, real WebCrypto: wait for the answer to go out, then give any event time to land. */
+  const answered = async (f: { mock: { calls: unknown[][] } }) => {
+    await vi.waitFor(() => { if (!consentSent(f)) throw new Error("the DM has not been sent yet"); });
+    await new Promise((x) => setTimeout(x, 25));
+  };
+  const several = (...items: [string, string][]) =>
+    JSON.stringify({ for_user_id: "999", direct_message_events: items.map(([sender, text]) => ({ type: "message_create", message_create: { sender_id: sender, message_data: { text } } })) });
+
+  it("sends nothing while the registry entry is disabled (the shipped state), even with the switch and the secret set; the DM is still answered", async () => {
+    registry(false);
+    const f = stub();
+    expect((await post(dm("42", "MIRROR"), { ...env(), ...GA4_ON })).status).toBe(200);
+    await answered(f);
+    expect(ga4Calls(f)).toHaveLength(0);
+  });
+  it("sends nothing unless every gate is open", async () => {
+    for (const [on, extra] of [[true, {}], [true, { GA4_SERVER_EVENTS_ENABLED: "true" }], [true, { GA4_API_SECRET: "s" }], [true, { GA4_SERVER_EVENTS_ENABLED: "TRUE", GA4_API_SECRET: "s" }]] as const) {
+      registry(on);
+      vi.restoreAllMocks();   // a fresh spy per round
+      const f = stub();
+      await post(dm("42", "MIRROR"), { ...env(), ...extra });
+      await answered(f);
+      expect(ga4Calls(f), JSON.stringify(extra)).toHaveLength(0);
+    }
+  });
+  it("with every gate open sends one dm_received for the DM, the channel and nothing else", async () => {
+    registry(true);
+    const f = stub();
+    await post(dm("42", "MIRROR"), { ...env(), ...GA4_ON });
+    await vi.waitFor(() => { if (ga4Calls(f).length < 1) throw new Error("no GA4 call yet"); });
+    await answered(f);
+    const sent = ga4Calls(f);
+    expect(sent).toHaveLength(1);
+    const u = new URL(sent[0][0]);
+    expect(u.origin + u.pathname).toBe("https://www.google-analytics.com/mp/collect");
+    const body = JSON.parse(String(sent[0][1].body));
+    expect(Object.keys(body).sort()).toEqual(["client_id", "events"]);   // no other field can carry a sender id or text
+    expect(body.events).toEqual([{ name: "dm_received", params: { channel: "x" } }]);
+    expect(body.client_id).toMatch(/^[0-9a-f]{32}$/);
+  });
+  it("counts each DM the bot answers: a MIRROR command, an ordinary message and DELETE are three events", async () => {
+    registry(true);
+    const f = stub();
+    await post(several(["42", "MIRROR"], ["43", "hello"], ["44", "DELETE"]), { ...env(), ...GA4_ON });
+    await vi.waitFor(() => { if (ga4Calls(f).length < 3) throw new Error("fewer than three GA4 calls so far"); });
+    await answered(f);
+    expect(ga4Calls(f)).toHaveLength(3);
+  });
+  it("GA4 being down never changes what the person gets", async () => {
+    registry(true);
+    const f = stub(() => { throw new Error("GA4 down"); });
+    expect((await post(dm("42", "MIRROR"), { ...env(), ...GA4_ON })).status).toBe(200);
+    await answered(f);
+    const consent = f.mock.calls.find((c) => String(c[0]).includes("/dm_conversations/with/42/messages")) as [string, RequestInit];
+    expect(JSON.parse(String(consent[1].body)).text).toContain("reply Y");
+  });
+  it("counts nothing for what it forwards to core-brain (counted there, never twice), nor for events that are not DMs", async () => {
+    registry(true);
+    const b = brain();
+    const f = stub();
+    const noSelfId = JSON.stringify({ direct_message_events: [{ type: "message_create", message_create: { sender_id: "42", message_data: { text: "hello" } } }] });
+    expect((await post(noSelfId, { ...env(b), ...GA4_ON })).status).toBe(200);
+    expect(b.fetch).toHaveBeenCalledTimes(1);
+    const mention = JSON.stringify({ for_user_id: "999", tweet_create_events: [{ text: "hi" }] });
+    expect((await post(mention, { ...env(b), ...GA4_ON })).status).toBe(200);
+    await new Promise((x) => setTimeout(x, 50));
+    expect(ga4Calls(f)).toHaveLength(0);
   });
 });

@@ -3,6 +3,8 @@
 // hexagon was shown as a finding to leavers vs stayers, average seconds on the results, and returns within 7 and 30 days.
 // Nothing in the payload identifies a scan or a person. Only visitors who accepted the scan-saving consent have a saved scan at all.
 import { previousHkWeek, hkWeekday } from '../lib/hk.js';
+import { callRecipient } from '../../../shared/recipients/outbound.ts';
+import { recipientCtx } from '../lib/recipient-ctx.js';
 
 export const GRACE_HOURS = 24; // a scan younger than this at the end of the week may still leave a contact, so it is not yet counted as a leaver
 
@@ -12,11 +14,11 @@ export default {
   skip: (now) => hkWeekday(now) !== 1,
   async collect(env, now = new Date()) {
     const w = previousHkWeek(now);
-    const res = await fetch(`${env.SUPABASE_URL}/rest/v1/rpc/mpt_learning_loop`, {
+    const res = await callRecipient('supabase', { url: `${env.SUPABASE_URL}/rest/v1/rpc/mpt_learning_loop`, init: {
       method: 'POST',
       headers: { apikey: env.SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ p_from: w.start.toISOString(), p_to: w.end.toISOString(), p_grace_hours: GRACE_HOURS }),
-    });
+    }, sent: [] }, recipientCtx(env));
     if (!res.ok) throw new Error(`mpt_learning_loop failed: HTTP ${res.status}`);
     const payload = await res.json();
     if (!payload || typeof payload.finished !== 'number') throw new Error('mpt_learning_loop returned an unexpected shape');

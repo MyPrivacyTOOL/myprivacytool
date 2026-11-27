@@ -125,7 +125,7 @@ describe("follow-up worker (MPC-8529)", () => {
 
 describe("RestFollowupStore", () => {
   const mk = (handler: (url: string, init: RequestInit) => { status: number; body?: unknown }) =>
-    new RestFollowupStore({ baseUrl: "http://127.0.0.1:3000", serviceKey: "k", restPrefix: "", fetchImpl: (async (url: string, init: RequestInit) => {
+    new RestFollowupStore({ baseUrl: "https://x.supabase.co", serviceKey: "k", restPrefix: "", fetchImpl: (async (url: string, init: RequestInit) => {
       const r = handler(url, init);
       return new Response(r.body === undefined ? "" : JSON.stringify(r.body), { status: r.status });
     }) as typeof fetch });
@@ -133,7 +133,7 @@ describe("RestFollowupStore", () => {
     let seen = "";
     const s = mk((url, init) => { seen = `${init.method} ${url} ${init.body}`; return { status: 200, body: [{ case_id: "c1", next_action_kind: "update", attempt_count: 1, max_attempts: 3 }] }; });
     expect(await s.claimDue("w1", 5, 60)).toEqual([{ caseId: "c1", nextActionKind: "update", attemptCount: 1, maxAttempts: 3 }]);
-    expect(seen).toContain("POST http://127.0.0.1:3000/rpc/support_followup_claim_due");
+    expect(seen).toContain("POST https://x.supabase.co/rpc/support_followup_claim_due");
     expect(seen).toContain('"p_owner":"w1"');
   });
   it("throws on a non-2xx or malformed body (fail closed)", async () => {

@@ -8,7 +8,7 @@ const SESS_DB = '318dfa5f-eb62-46fa-9bd0-c9fa58577c65';
 const FACT_DB = '5aa01b41-879e-43f7-ac77-57bbb9bfcb77';
 const INTENT_DB = '3cdbc13a-85fe-4fea-b108-bbcf955227e4';
 const ENV = {
-  SUPABASE_URL: 'https://example.supabase.test', SUPABASE_SERVICE_ROLE_KEY: 'sb_secret_test_key',
+  SUPABASE_URL: 'https://example.supabase.co', SUPABASE_SERVICE_ROLE_KEY: 'sb_secret_test_key',
   CAIRN_BRIDGE_TOKEN: 'bridge-token', CAIRN_HASH_PEPPER: 'test-pepper',
   NOTION_SYNC_LOCK_MS: 0, // tests turn the 3 s soft lock off, except the one that checks it
   NOTION_TOKEN: 'ntn_test_token', NOTION_CAIRN_SESSIONS_DB: SESS_DB, NOTION_CAIRN_FACTS_DB: FACT_DB, NOTION_CAIRN_INTENTS_DB: INTENT_DB,

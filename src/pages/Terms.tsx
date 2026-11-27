@@ -34,7 +34,9 @@ const Terms = () => {
               </h2>
               <p className="text-muted-foreground">
                 You must be at least 16 years old and have the legal capacity to
-                enter into a binding agreement to use the Services. If you are
+                enter into a binding agreement to use the Services. Our Telegram
+                bot is for people aged 19 or over: by replying Y you confirm that
+                you are. If you are
                 using the Services on behalf of an organization, you represent and
                 warrant that you have authority to bind that organization to these
                 Terms.
@@ -50,31 +52,33 @@ const Terms = () => {
                 3.1 Account Registration
               </h3>
               <p className="text-muted-foreground">
-                To use certain features of the Services, you must create an account
-                and provide accurate, complete, and current information. You are
-                responsible for maintaining the confidentiality of your password
-                and account credentials.
+                A free account is optional: the free scan and waitlist need none.
+                If you create one, you sign in with an emailed link and must give
+                an email address you control. When paid plans open, you will need
+                an account for them and must provide accurate, complete and
+                current information.
               </p>
 
               <h3 className="mt-6 text-xl font-semibold text-foreground">
                 3.2 Account Responsibility
               </h3>
               <p className="text-muted-foreground">
-                You are fully responsible for all activity that occurs under your
-                account. You agree to notify us immediately of any unauthorized use
-                of your account or any other breach of security. We are not
-                responsible for any loss or damage resulting from your failure to
-                maintain account security.
+                You are responsible for all activity
+                under your account and must tell us immediately of any
+                unauthorised use or breach of security. We will not be
+                responsible for loss or damage resulting from your failure to
+                keep your account secure.
               </p>
 
               <h3 className="mt-6 text-xl font-semibold text-foreground">
                 3.3 Account Termination
               </h3>
               <p className="text-muted-foreground">
-                We reserve the right to suspend or terminate your account if you
-                violate these Terms or engage in any fraudulent, abusive, or
-                illegal activity. You may delete your account at any time by
-                contacting support@myprivacytool.io.
+                We may suspend or terminate an account that
+                violates these Terms or is used for fraudulent, abusive or
+                illegal activity. You can delete your account and all linked
+                scans at any time with "Delete my account and all scans" on
+                /account, or by contacting support@myprivacytool.io.
               </p>
             </section>
 
@@ -90,10 +94,10 @@ const Terms = () => {
                 <li>Free privacy scans to identify your data exposure</li>
                 <li>Exposure scoring and privacy risk assessment</li>
                 <li>
-                  Paid removal and data suppression services (where available)
+                  Paid removal and data suppression services (planned, not available today)
                 </li>
                 <li>Privacy education and guidance resources</li>
-                <li>Account monitoring and alerts (premium tier)</li>
+                <li>Account monitoring and alerts (planned for a paid tier, not available today)</li>
                 <li>
                   Newsletter, waitlist and messaging channels (such as Telegram)
                   for scan follow-up
@@ -164,55 +168,36 @@ const Terms = () => {
               </p>
 
               <h3 className="mt-6 text-xl font-semibold text-foreground">
-                6.2 Paid Subscriptions
+                6.2 Paid Plans (Not Yet Open)
               </h3>
               <p className="text-muted-foreground">
-                Paid subscriptions are billed monthly or annually as specified at
-                purchase. Your subscription renews automatically unless you cancel
-                before the renewal date. Cancellation must be submitted through your
-                account settings or by contacting support.
+                Paid plans are not open today. There is no billing and no
+                subscription to cancel. A free account, if you have one, can be
+                deleted at any time. When paid plans open, we
+                plan to offer Free (1 scan), Basic ($7.99 a month, 5 scans), Pro
+                ($14.99 a month, 25 scans) and Executive ($49.99 a month,
+                unlimited scans), with the full report from Basic. Prices and
+                allowances are plans, not offers, until paid plans open.
               </p>
 
               <h3 className="mt-6 text-xl font-semibold text-foreground">
-                6.3 Billing & Payment
-              </h3>
-              <ul className="list-inside list-disc space-y-2 text-muted-foreground">
-                <li>
-                  We charge the payment method on file for your subscription
-                </li>
-                <li>
-                  All prices are in USD unless otherwise stated and exclude taxes
-                </li>
-                <li>
-                  Applicable sales tax, VAT, or GST will be added to your invoice
-                </li>
-                <li>
-                  We accept major credit cards and other payment methods via Stripe
-                </li>
-                <li>
-                  If payment fails, we will attempt to charge your account up to
-                  three times
-                </li>
-              </ul>
-
-              <h3 className="mt-6 text-xl font-semibold text-foreground">
-                6.4 Refund Policy
+                6.3 Billing, Cancellation and Refunds
               </h3>
               <p className="text-muted-foreground">
-                Subscriptions are non-refundable except where required by law. We
-                may issue refunds for billing errors or service failures at our
-                discretion. Monthly subscriptions may be cancelled within 14 days
-                of purchase for a full refund.
+                When paid plans open, we will set out here how subscriptions are
+                billed and renewed, how to cancel, how payments are processed
+                (we expect a payment provider such as Stripe), how taxes are
+                shown and what refunds apply, and we will publish it before any
+                payment is taken. None of it applies today.
               </p>
 
               <h3 className="mt-6 text-xl font-semibold text-foreground">
-                6.5 Price Changes
+                6.4 Price Changes
               </h3>
               <p className="text-muted-foreground">
-                We may change our pricing with 30 days' notice. Existing
-                subscribers will be notified of changes via email. Your continued
-                use of the Services after the change constitutes acceptance of the
-                new pricing.
+                When paid plans are open, we will give 30 days&apos; notice of
+                price changes to existing subscribers by email. Today there are
+                no subscribers and no prices are charged.
               </p>
             </section>
 

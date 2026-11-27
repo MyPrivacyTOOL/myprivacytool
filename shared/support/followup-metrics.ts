@@ -1,5 +1,7 @@
 // MPC-8529: read the personal-data-free follow-up metrics (view support_followup_metrics) and turn them into plain alerts.
 // Definitions: docs/support-followup-watchdog-mpc-8529-prep.md section 7. Counts only; no case reference, address or text.
+import { recipientFetcher } from "../recipients/outbound";
+import { workerRecipientContext } from "../recipients/worker-ctx";
 
 export interface FollowupMetrics {
   unresolvedCases: number;
@@ -23,7 +25,7 @@ const num = (v: unknown, name: string): number => {
 export async function readFollowupMetrics(c: FollowupMetricsConfig): Promise<FollowupMetrics> {
   if (!/^https:\/\//.test(c.baseUrl) && !/^http:\/\/(localhost|127\.0\.0\.1)/.test(c.baseUrl)) throw new Error("baseUrl must be https (or localhost for tests)");
   if (!c.serviceKey) throw new Error("serviceKey required");
-  const res = await (c.fetchImpl ?? fetch)(`${c.baseUrl.replace(/\/$/, "")}${c.restPrefix ?? "/rest/v1"}/support_followup_metrics?select=*`, {
+  const res = await recipientFetcher("supabase", [], workerRecipientContext(null, { fetchImpl: c.fetchImpl }))(`${c.baseUrl.replace(/\/$/, "")}${c.restPrefix ?? "/rest/v1"}/support_followup_metrics?select=*`, {
     headers: { apikey: c.serviceKey, Authorization: `Bearer ${c.serviceKey}` },
     signal: AbortSignal.timeout(c.timeoutMs ?? 5000),
   });

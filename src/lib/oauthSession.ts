@@ -6,6 +6,7 @@
  * Privacy: ordinary visitors never sign in, so the site must not call the Worker on every page view. A small
  * localStorage hint, set only when the browser lands back from a sign-in (`?channel=google`), gates the call.
  */
+import { recipientFetch } from "@/lib/recipientClient";
 export const OAUTH_URL: string =
   (import.meta.env.VITE_OAUTH_URL as string | undefined) ?? "https://myprivacytool-oauth-poc.myprivacytool.workers.dev";
 
@@ -83,9 +84,9 @@ export function stripSignInParams(search: string): string {
   return rest ? `?${rest}` : "";
 }
 
-export async function fetchSession(fetchFn: FetchFn = fetch): Promise<SessionResult> {
+export async function fetchSession(fetchFn?: FetchFn): Promise<SessionResult> {
   try {
-    const res = await fetchFn(`${OAUTH_URL}/v1/session`, { credentials: "include" });
+    const res = await recipientFetch("oauth-session", `${OAUTH_URL}/v1/session`, { credentials: "include" }, ["email"], fetchFn ? { fetchImpl: fetchFn } : {});
     // 401 = no session, expired, or the browser withheld the cross-site cookie: all mean "not connected".
     if (res.status === 401) return { status: "disconnected" };
     if (!res.ok) return { status: "error" };
@@ -98,9 +99,9 @@ export async function fetchSession(fetchFn: FetchFn = fetch): Promise<SessionRes
   }
 }
 
-export async function signOut(fetchFn: FetchFn = fetch): Promise<boolean> {
+export async function signOut(fetchFn?: FetchFn): Promise<boolean> {
   try {
-    const res = await fetchFn(`${OAUTH_URL}/v1/session`, { method: "DELETE", credentials: "include" });
+    const res = await recipientFetch("oauth-session", `${OAUTH_URL}/v1/session`, { method: "DELETE", credentials: "include" }, [], fetchFn ? { fetchImpl: fetchFn } : {});
     return res.ok;
   } catch {
     return false;

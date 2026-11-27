@@ -13,5 +13,5 @@
   "slide": "left",
   "openMs": 1300,
   "zoomDelayMs": 2900,
-  "dataset": ""
+  "dataset": "hexagons-366.json"
 }

@@ -3,7 +3,9 @@
 // Workers can both import it. Promoted from docs/hexagon-registry-draft.json (MPC-7461); facts re-checked
 // against src/lib/deviceDetection.ts.
 //
-// trust_score is deliberately null on every entry: Chris has not defined it. Do not fill it in.
+// trust_score (MPC-8357, defined 2026-11-27, Chris approved): how easily the person can check the value themselves. 100 = yes, 50 = partly, 0 = no,
+// taken from user_can_check and set by a human reviewer, never by a formula. null = not rated (the email hexagons have no user_can_check yet).
+// Definition: Notion rules page, section 3c. Not truth.confidence, confidence_score or Observability breadth.
 // truth.level: measured | estimated | cannot_be_checked. Status values: FOUND | CHECKED_AND_CLEAR | NOT_CHECKED.
 // status.default NOT_CHECKED = the code cannot tell clear from not checked (or cannot check at all): such a
 // hexagon is FOUND only on positive evidence and is never CHECKED_AND_CLEAR.
@@ -55,7 +57,7 @@ export const HEXAGONS = [
       "not_checked": "/whoami failed or returned no city: code then shows the placeholder \"Location detected\".",
       "detection_change_to_make_checkable": "Have the /whoami call return an explicit ok flag and city so a failed lookup is NOT CHECKED instead of the placeholder 'Location detected'."
     },
-    "trust_score": null,
+    "trust_score": 100,
     "source": "src/lib/deviceDetection.ts:374"
   },
   {
@@ -102,7 +104,7 @@ export const HEXAGONS = [
       "not_checked": "only if the user agent is empty (OS shows \"Unknown\").",
       "detection_change_to_make_checkable": null
     },
-    "trust_score": null,
+    "trust_score": 100,
     "source": "src/lib/deviceDetection.ts:386"
   },
   {
@@ -149,7 +151,7 @@ export const HEXAGONS = [
       "not_checked": "only if the user agent is not recognised.",
       "detection_change_to_make_checkable": null
     },
-    "trust_score": null,
+    "trust_score": 100,
     "source": "src/lib/deviceDetection.ts:396"
   },
   {
@@ -196,7 +198,7 @@ export const HEXAGONS = [
       "not_checked": "/whoami failed.",
       "detection_change_to_make_checkable": "Have the /whoami call return an explicit ok flag so a failed lookup is NOT CHECKED instead of 'Unknown ISP'."
     },
-    "trust_score": null,
+    "trust_score": 50,
     "source": "src/lib/deviceDetection.ts:406"
   },
   {
@@ -243,7 +245,7 @@ export const HEXAGONS = [
       "not_checked": "never.",
       "detection_change_to_make_checkable": null
     },
-    "trust_score": null,
+    "trust_score": 100,
     "source": "src/lib/deviceDetection.ts:416"
   },
   {
@@ -290,7 +292,7 @@ export const HEXAGONS = [
       "not_checked": "never.",
       "detection_change_to_make_checkable": null
     },
-    "trust_score": null,
+    "trust_score": 50,
     "source": "src/lib/deviceDetection.ts:434"
   },
   {
@@ -337,7 +339,7 @@ export const HEXAGONS = [
       "not_checked": "never (property always readable, may be null on some browsers: null counts as \"disabled\" today).",
       "detection_change_to_make_checkable": "Treat navigator.doNotTrack being null (unsupported) as NOT CHECKED instead of 'disabled'."
     },
-    "trust_score": null,
+    "trust_score": 50,
     "source": "src/lib/deviceDetection.ts:444"
   },
   {
@@ -384,7 +386,7 @@ export const HEXAGONS = [
       "not_checked": "API missing (Safari, Firefox).",
       "detection_change_to_make_checkable": "Return NOT CHECKED when navigator.connection is missing instead of the default 'WiFi'."
     },
-    "trust_score": null,
+    "trust_score": 50,
     "source": "src/lib/deviceDetection.ts:456"
   },
   {
@@ -431,7 +433,7 @@ export const HEXAGONS = [
       "not_checked": "empty referrer cannot be told apart from a stripped one; show \"Direct Visit\" as FOUND only with that wording.",
       "detection_change_to_make_checkable": "No browser change can tell 'direct' from 'hidden'; word the value as 'Direct or hidden'."
     },
-    "trust_score": null,
+    "trust_score": 100,
     "source": "src/lib/deviceDetection.ts:466"
   },
   {
@@ -478,7 +480,7 @@ export const HEXAGONS = [
       "not_checked": "hexagon is not generated at all when the API is missing: registry must still list it as NOT CHECKED.",
       "detection_change_to_make_checkable": "Emit an explicit NOT CHECKED entry when the battery API is missing instead of leaving the hexagon out."
     },
-    "trust_score": null,
+    "trust_score": 100,
     "source": "src/lib/deviceDetection.ts:658"
   },
   {
@@ -525,7 +527,7 @@ export const HEXAGONS = [
       "not_checked": "never.",
       "detection_change_to_make_checkable": null
     },
-    "trust_score": null,
+    "trust_score": 100,
     "source": "src/lib/deviceDetection.ts:490"
   },
   {
@@ -572,7 +574,7 @@ export const HEXAGONS = [
       "not_checked": "one language only: nothing to show (this is effectively CLEAR, but the code simply omits the hexagon).",
       "detection_change_to_make_checkable": "Emit the hexagon with status CLEAR ('one language set') when the detector ran and found no extras."
     },
-    "trust_score": null,
+    "trust_score": 100,
     "source": "src/lib/deviceDetection.ts:500"
   },
   {
@@ -619,7 +621,7 @@ export const HEXAGONS = [
       "not_checked": "never.",
       "detection_change_to_make_checkable": "Emit the hexagon with status CLEAR when the detector ran and found no mismatch (it always runs inside captureDeviceData)."
     },
-    "trust_score": null,
+    "trust_score": 50,
     "source": "src/lib/deviceDetection.ts:510"
   },
   {
@@ -666,7 +668,7 @@ export const HEXAGONS = [
       "not_checked": "recommended: always label as \"estimate\" or drop from the email.",
       "detection_change_to_make_checkable": null
     },
-    "trust_score": null,
+    "trust_score": 100,
     "source": "src/lib/deviceDetection.ts:520"
   },
   {
@@ -713,7 +715,7 @@ export const HEXAGONS = [
       "not_checked": "n/a.",
       "detection_change_to_make_checkable": null
     },
-    "trust_score": null,
+    "trust_score": 100,
     "source": "src/lib/deviceDetection.ts:678"
   },
   {
@@ -760,7 +762,7 @@ export const HEXAGONS = [
       "not_checked": "never.",
       "detection_change_to_make_checkable": null
     },
-    "trust_score": null,
+    "trust_score": 100,
     "source": "src/lib/deviceDetection.ts:534"
   },
   {
@@ -807,7 +809,7 @@ export const HEXAGONS = [
       "not_checked": "never.",
       "detection_change_to_make_checkable": null
     },
-    "trust_score": null,
+    "trust_score": 50,
     "source": "src/lib/deviceDetection.ts:544"
   },
   {
@@ -854,7 +856,7 @@ export const HEXAGONS = [
       "not_checked": "value \"N/A\" and confidence 0: no sensor or no permission.",
       "detection_change_to_make_checkable": null
     },
-    "trust_score": null,
+    "trust_score": 50,
     "source": "src/lib/deviceDetection.ts:554"
   },
   {
@@ -901,7 +903,7 @@ export const HEXAGONS = [
       "not_checked": "\"N/A\".",
       "detection_change_to_make_checkable": null
     },
-    "trust_score": null,
+    "trust_score": 50,
     "source": "src/lib/deviceDetection.ts:564"
   },
   {
@@ -948,7 +950,7 @@ export const HEXAGONS = [
       "not_checked": "\"Inactive\" means not detected, not proven absent.",
       "detection_change_to_make_checkable": "Report the permission state separately from sensor presence so 'no permission' is NOT CHECKED."
     },
-    "trust_score": null,
+    "trust_score": 50,
     "source": "src/lib/deviceDetection.ts:574"
   },
   {
@@ -995,7 +997,7 @@ export const HEXAGONS = [
       "not_checked": "detector threw or canvas blocked: hexagon omitted.",
       "detection_change_to_make_checkable": "Return a reason (blocked, unsupported, failed) instead of omitting the hexagon so a protected browser is not mistaken for a skipped check."
     },
-    "trust_score": null,
+    "trust_score": 0,
     "source": "src/lib/deviceDetection.ts:698"
   },
   {
@@ -1042,7 +1044,7 @@ export const HEXAGONS = [
       "not_checked": "WebGL unavailable/blocked: omitted.",
       "detection_change_to_make_checkable": "Return a reason when WebGL is blocked or unavailable instead of omitting the hexagon."
     },
-    "trust_score": null,
+    "trust_score": 50,
     "source": "src/lib/deviceDetection.ts:717"
   },
   {
@@ -1089,7 +1091,7 @@ export const HEXAGONS = [
       "not_checked": "unsupported/blocked: omitted.",
       "detection_change_to_make_checkable": "Return a reason when audio is blocked or unsupported instead of omitting the hexagon."
     },
-    "trust_score": null,
+    "trust_score": 0,
     "source": "src/lib/deviceDetection.ts:731"
   },
   {
@@ -1136,7 +1138,7 @@ export const HEXAGONS = [
       "not_checked": "count 0 (detector failed or fonts blocked): omitted.",
       "detection_change_to_make_checkable": "Make the detector return a failed flag so a count of 0 is not confused with a failed probe."
     },
-    "trust_score": null,
+    "trust_score": 0,
     "source": "src/lib/deviceDetection.ts:745"
   },
   {
@@ -1155,7 +1157,7 @@ export const HEXAGONS = [
     "value_type": "text",
     "presence": "always",
     "user_can_check": "yes",
-    "example_value": "Ad Blocker: Yes",
+    "example_value": "Ad blocker likely",
     "truth": {
       "confidence": {
         "number": 85,
@@ -1164,7 +1166,7 @@ export const HEXAGONS = [
       },
       "risk": {
         "how": "fixed text in the code",
-        "text": "Plugins and extensions. Browser extensions and plugins add to your unique fingerprint."
+        "text": "A guess from a decoy ad element and your browser's plug-in list. Websites cannot list your extensions this way, and neither can we."
       },
       "sensitivity": "low",
       "level": "estimated",
@@ -1183,7 +1185,7 @@ export const HEXAGONS = [
       "not_checked": "cannot be told from \"None detected\" because the failure fallback is the same object.",
       "detection_change_to_make_checkable": "Make the failure fallback return a failed flag instead of {pluginCount:0, adBlocker:false}."
     },
-    "trust_score": null,
+    "trust_score": 100,
     "source": "src/lib/deviceDetection.ts:764"
   },
   {
@@ -1230,7 +1232,7 @@ export const HEXAGONS = [
       "not_checked": "detector failed: omitted.",
       "detection_change_to_make_checkable": "Return a failed flag when detection partly fails instead of defaulting to 'None Detected'."
     },
-    "trust_score": null,
+    "trust_score": 100,
     "source": "src/lib/deviceDetection.ts:805"
   },
   {
@@ -1277,7 +1279,7 @@ export const HEXAGONS = [
       "not_checked": "WebRTC blocked or timed out.",
       "detection_change_to_make_checkable": "Return distinct states (unsupported, blocked, timed out, none found) instead of treating empty candidate lists as 'no leak'."
     },
-    "trust_score": null,
+    "trust_score": 0,
     "source": "src/lib/deviceDetection.ts:849"
   },
   {
@@ -1324,7 +1326,7 @@ export const HEXAGONS = [
       "not_checked": "memory missing on Firefox/Safari (value shows cores only).",
       "detection_change_to_make_checkable": null
     },
-    "trust_score": null,
+    "trust_score": 50,
     "source": "src/lib/deviceDetection.ts:862"
   },
   {
@@ -1371,7 +1373,7 @@ export const HEXAGONS = [
       "not_checked": "never.",
       "detection_change_to_make_checkable": null
     },
-    "trust_score": null,
+    "trust_score": 50,
     "source": "src/lib/deviceDetection.ts:874"
   },
   {
@@ -1418,7 +1420,7 @@ export const HEXAGONS = [
       "not_checked": "never.",
       "detection_change_to_make_checkable": null
     },
-    "trust_score": null,
+    "trust_score": 100,
     "source": "src/lib/deviceDetection.ts:886"
   },
   {
@@ -1465,7 +1467,7 @@ export const HEXAGONS = [
       "not_checked": "detector failed.",
       "detection_change_to_make_checkable": "Distinguish 'blocked' from 'unsupported' so only a real block counts as a protection."
     },
-    "trust_score": null,
+    "trust_score": 100,
     "source": "src/lib/deviceDetection.ts:910"
   },
   {
@@ -1512,7 +1514,7 @@ export const HEXAGONS = [
       "not_checked": "\"Permission Required\" or \"No Devices\".",
       "detection_change_to_make_checkable": "Report the permission state so 'blocked' is NOT CHECKED rather than 'No Devices'."
     },
-    "trust_score": null,
+    "trust_score": 50,
     "source": "src/lib/deviceDetection.ts:935"
   },
   {
@@ -1560,7 +1562,7 @@ export const HEXAGONS = [
       "not_checked": "never.",
       "detection_change_to_make_checkable": null
     },
-    "trust_score": null,
+    "trust_score": 50,
     "source": "src/lib/deviceDetection.ts:973"
   },
   {
@@ -1608,7 +1610,7 @@ export const HEXAGONS = [
       "not_checked": "\"Blocked\" means the read threw.",
       "detection_change_to_make_checkable": null
     },
-    "trust_score": null,
+    "trust_score": 50,
     "source": "src/lib/deviceDetection.ts:999"
   },
   {
@@ -1656,7 +1658,7 @@ export const HEXAGONS = [
       "not_checked": "\"Blocked\".",
       "detection_change_to_make_checkable": null
     },
-    "trust_score": null,
+    "trust_score": 50,
     "source": "src/lib/deviceDetection.ts:1021"
   },
   {
@@ -1703,7 +1705,7 @@ export const HEXAGONS = [
       "not_checked": "\"Blocked\", or the hexagon omitted on failure.",
       "detection_change_to_make_checkable": "Record a failure state instead of omitting the hexagon when the database list cannot be read."
     },
-    "trust_score": null,
+    "trust_score": 0,
     "source": "src/lib/deviceDetection.ts:1040"
   },
   {
@@ -1750,7 +1752,7 @@ export const HEXAGONS = [
       "not_checked": "detector failed: omitted.",
       "detection_change_to_make_checkable": "Record a failure state instead of omitting the hexagon when the cache probe fails."
     },
-    "trust_score": null,
+    "trust_score": 0,
     "source": "src/lib/deviceDetection.ts:1067"
   },
   {
@@ -1769,7 +1771,7 @@ export const HEXAGONS = [
     "value_type": "status",
     "presence": "always",
     "user_can_check": "partly",
-    "example_value": "Not Detected",
+    "example_value": "Not checked",
     "truth": {
       "confidence": {
         "number": 100,
@@ -1797,7 +1799,7 @@ export const HEXAGONS = [
       "not_checked": "always, in practice.",
       "detection_change_to_make_checkable": "A different method: this cannot be done by reading cookies on our own site. It needs a check you start yourself (for example a sign-in or permission flow), not a silent browser probe."
     },
-    "trust_score": null,
+    "trust_score": 50,
     "source": "src/lib/deviceDetection.ts:1110"
   },
   {
@@ -1816,7 +1818,7 @@ export const HEXAGONS = [
     "value_type": "status",
     "presence": "always",
     "user_can_check": "partly",
-    "example_value": "Not Detected",
+    "example_value": "Not checked",
     "truth": {
       "confidence": {
         "number": 100,
@@ -1844,7 +1846,7 @@ export const HEXAGONS = [
       "not_checked": "always, in practice.",
       "detection_change_to_make_checkable": "A different method; it needs a check you start yourself, not reading cookies on our own site."
     },
-    "trust_score": null,
+    "trust_score": 50,
     "source": "src/lib/deviceDetection.ts:1130"
   },
   {
@@ -1863,7 +1865,7 @@ export const HEXAGONS = [
     "value_type": "status",
     "presence": "always",
     "user_can_check": "partly",
-    "example_value": "Not Detected",
+    "example_value": "Not checked",
     "truth": {
       "confidence": {
         "number": 100,
@@ -1891,7 +1893,7 @@ export const HEXAGONS = [
       "not_checked": "always, in practice.",
       "detection_change_to_make_checkable": "A different method; it needs a check you start yourself, not reading cookies on our own site."
     },
-    "trust_score": null,
+    "trust_score": 50,
     "source": "src/lib/deviceDetection.ts:1150"
   },
   {
@@ -1910,7 +1912,7 @@ export const HEXAGONS = [
     "value_type": "count of platforms",
     "presence": "always",
     "user_can_check": "partly",
-    "example_value": "No Platforms",
+    "example_value": "Not checked",
     "truth": {
       "confidence": {
         "number": 95,
@@ -1938,7 +1940,7 @@ export const HEXAGONS = [
       "not_checked": "always, in practice.",
       "detection_change_to_make_checkable": "A different method; it needs a check you start yourself, not reading cookies on our own site."
     },
-    "trust_score": null,
+    "trust_score": 50,
     "source": "src/lib/deviceDetection.ts:1169"
   },
   {
@@ -1957,7 +1959,7 @@ export const HEXAGONS = [
     "value_type": "status",
     "presence": "always",
     "user_can_check": "no",
-    "example_value": "Not Linked",
+    "example_value": "Not checked",
     "truth": {
       "confidence": {
         "number": 90,
@@ -1985,7 +1987,7 @@ export const HEXAGONS = [
       "not_checked": "always, in practice.",
       "detection_change_to_make_checkable": "A different method; it needs a check you start yourself, not reading cookies on our own site."
     },
-    "trust_score": null,
+    "trust_score": 0,
     "source": "src/lib/deviceDetection.ts:1189"
   },
   {
@@ -2004,7 +2006,7 @@ export const HEXAGONS = [
     "value_type": "status",
     "presence": "always",
     "user_can_check": "no",
-    "example_value": "No Leak Detected",
+    "example_value": "No leak seen",
     "truth": {
       "confidence": {
         "number": 100,
@@ -2032,7 +2034,7 @@ export const HEXAGONS = [
       "not_checked": "initial placeholder \"Checking...\" (the value is overwritten asynchronously, after the hexagon list is first returned); \"Check Failed\" on error; also when WebRTC is blocked.",
       "detection_change_to_make_checkable": "A real DNS test (a resolver-check endpoint) with a stable result captured once, and distinct failed/blocked states."
     },
-    "trust_score": null,
+    "trust_score": 0,
     "source": "src/lib/deviceDetection.ts:1225"
   },
   {
@@ -2080,7 +2082,7 @@ export const HEXAGONS = [
       "not_checked": "never.",
       "detection_change_to_make_checkable": null
     },
-    "trust_score": null,
+    "trust_score": 100,
     "source": "src/lib/deviceDetection.ts:1241"
   },
   {
@@ -2128,7 +2130,7 @@ export const HEXAGONS = [
       "not_checked": "never.",
       "detection_change_to_make_checkable": null
     },
-    "trust_score": null,
+    "trust_score": 0,
     "source": "src/lib/deviceDetection.ts:1259"
   },
   {
@@ -2175,7 +2177,7 @@ export const HEXAGONS = [
       "not_checked": "would be the honest status: headers are not actually read.",
       "detection_change_to_make_checkable": "Read the real response headers (fetch our own page and inspect them) so the value is measured."
     },
-    "trust_score": null,
+    "trust_score": 0,
     "source": "src/lib/deviceDetection.ts:1279"
   },
   {
@@ -2222,7 +2224,7 @@ export const HEXAGONS = [
       "not_checked": "unknown browser (version 0): shows \"Outdated\".",
       "detection_change_to_make_checkable": "Return NOT CHECKED for an unrecognised browser, and move thresholds to maintained data."
     },
-    "trust_score": null,
+    "trust_score": 100,
     "source": "src/lib/deviceDetection.ts:1299"
   },
   {
@@ -2269,7 +2271,7 @@ export const HEXAGONS = [
       "not_checked": "the exact version is never measured.",
       "detection_change_to_make_checkable": "Measure it on the server (the edge knows the negotiated TLS version) and return it from /whoami."
     },
-    "trust_score": null,
+    "trust_score": 0,
     "source": "src/lib/deviceDetection.ts:1319"
   },
   {
@@ -2316,7 +2318,7 @@ export const HEXAGONS = [
       "not_checked": "\"Collecting...\" / \"Collecting data...\" (no movement, or touch device).",
       "detection_change_to_make_checkable": null
     },
-    "trust_score": null,
+    "trust_score": 50,
     "source": "src/lib/deviceDetection.ts:1390"
   },
   {
@@ -2363,7 +2365,7 @@ export const HEXAGONS = [
       "not_checked": "\"No input yet\": the user has not typed. Most users never type during the scan.",
       "detection_change_to_make_checkable": null
     },
-    "trust_score": null,
+    "trust_score": 50,
     "source": "src/lib/deviceDetection.ts:1408"
   },
   {
@@ -2410,7 +2412,7 @@ export const HEXAGONS = [
       "not_checked": "\"No clicks yet\".",
       "detection_change_to_make_checkable": null
     },
-    "trust_score": null,
+    "trust_score": 100,
     "source": "src/lib/deviceDetection.ts:1428"
   },
   {
@@ -2457,7 +2459,7 @@ export const HEXAGONS = [
       "not_checked": "\"No scrolling yet\".",
       "detection_change_to_make_checkable": null
     },
-    "trust_score": null,
+    "trust_score": 100,
     "source": "src/lib/deviceDetection.ts:1446"
   },
   {
@@ -2504,7 +2506,7 @@ export const HEXAGONS = [
       "not_checked": "never.",
       "detection_change_to_make_checkable": null
     },
-    "trust_score": null,
+    "trust_score": 100,
     "source": "src/lib/deviceDetection.ts:1464"
   },
   {
@@ -2551,7 +2553,7 @@ export const HEXAGONS = [
       "not_checked": "\"Building...\".",
       "detection_change_to_make_checkable": null
     },
-    "trust_score": null,
+    "trust_score": 0,
     "source": "src/lib/deviceDetection.ts:1480"
   }
 ];

@@ -1,0 +1,30 @@
+name: Telegram round-trip check
+
+# MPC-9850: automated, no-human synthetic round-trip of "/start scan" through the DEPLOYED @MyPrivacyTOOL_Bot webhook (social-listeners Worker): signed webhook POST from
+# an id on PROBE_TELEGRAM_IDS, core-brain answers, the Worker sends the reply through the real Telegram Bot API, and the event log must show message in -> reply out within 60 s.
+# Design and limits: scripts/ci/telegram-roundtrip.mjs. Runs on demand, on demand only (it sends a real Bot API reply, so it must never fire from a push).
+# A missing credential is NOT CONFIGURED (exit 2), never a pass. Secrets are never printed.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: telegram-roundtrip
+  cancel-in-progress: false
+
+jobs:
+  roundtrip:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Round-trip /start scan (sender is inside the Worker)
+        env:
+          TELEGRAM_WEBHOOK_SECRET: ${{ secrets.TELEGRAM_WEBHOOK_SECRET }}
+        run: node scripts/ci/telegram-roundtrip.mjs

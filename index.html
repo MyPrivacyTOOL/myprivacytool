@@ -8,7 +8,7 @@
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="format-detection" content="telephone=no" />
     <!-- Primary Meta Tags -->
-    <title>MyPrivacyTOOL | See it. Control it. Protect it.</title>
+    <title>MyPrivacyTOOL.IO - See Your Digital Shadow Without Asking</title>
         <meta name="description" data-react-helmet="true" content="See where your data is. Understand the risk. Take control. MyPrivacyTOOL makes digital privacy exposure visible and actionable for anyone." />
     <meta name="keywords" content="privacy tool, data broker, digital footprint, OSINT, personal data, privacy scan, data removal, data exposure" />
     <meta name="robots" data-react-helmet="true" content="index, follow" />
@@ -53,42 +53,62 @@
     <!-- MPC-7200: ipify/ipapi preconnects removed (the scan now asks our own Worker, /whoami); they were unused and
          opened connections to third parties before any consent choice. Preconnect only what the home page really uses. -->
     <link rel="preconnect" href="https://api.myprivacytool.io" crossorigin />
-    <link rel="dns-prefetch" href="https://www.googletagmanager.com" />
+    <!-- MPC-10790: the dns-prefetch for googletagmanager.com is gone: a DNS lookup for a third party before the Scan me click is itself a send. -->
 
     <!-- Google tag (gtag.js) — Property: 515216281 | Measurement ID: G-1BWMDBJSPL
-         Loaded only after consent: no request to googletagmanager.com / google-analytics.com
-         before the visitor chooses "Accept analytics" in our own cookie banner (src/components/CookieBanner.tsx, choice kept in
-         localStorage under mpt_cookie_consent, MPC-8450). Withdrawing consent sets the ga-disable flag so no further hits are sent. -->
+         Loaded only after the Scan me click (MPC-10790, decision A): no request to googletagmanager.com / google-analytics.com, and no event queued,
+         until the visitor has BOTH chosen "Accept analytics" (Scan me sets it; our own cookie banner, src/components/CookieBanner.tsx, choice kept in
+         localStorage under mpt_cookie_consent, MPC-8450) AND given the scan consent. Accept alone sends nothing. Withdrawing consent sets the ga-disable flag. -->
+    <script src="/recipient-client.min.js" defer></script>
     <script>
       window.dataLayer = window.dataLayer || [];
-      function gtag(){dataLayer.push(arguments);}
+      // MPC-10790: while the gate below is closed gtag() drops the call: nothing is queued in dataLayer, so nothing can flush when the tag loads later.
+      // Events from before the consent point are never replayed; the app also checks consent itself before calling gtag (src/lib/analytics.ts).
+      var mptGateOpen = false;
+      function gtag(){ if (mptGateOpen) dataLayer.push(arguments); }
       (function () {
         var GA_ID = 'G-1BWMDBJSPL';
         var loaded = false;
         // Production only: localhost and *.pages.dev previews must never send hits to the production property (MPC-7376).
         var h = location.hostname;
         var isProd = h === 'myprivacytool.io' || h === 'www.myprivacytool.io';
-        window['ga-disable-' + GA_ID] = true;
+        // MPC-10790: on a non-production host the tag can never load (allowed() is false there), so nothing queued can flush; events keep queuing there so the e2e suite can read them.
+        mptGateOpen = !isProd;
+        // MPC-9888: no default consent. GA4 loads only after the visitor chose Accept analytics in the banner, or pressed Scan me (which counts as the choice).
+        // (MPC-9740 had written analytics:true on first visit; that put a third party on the page before any click, against Open Tracker rule 2.)
+        // MPC-10790 (decision A, 2026-11-24): BOTH must hold. The analytics choice alone (cookie banner "Accept analytics") sends nothing; the tag waits for the
+        // scan consent this journey got at the Scan me click (src/lib/scanConsent.ts keeps it in sessionStorage under mpt_scan_consent; Scan me also sets the
+        // analytics choice, design 8.1). The wording version is checked by the app, which only stores the id for the current wording.
+        function scanConsented() {
+          try {
+            var s = JSON.parse(window.sessionStorage.getItem('mpt_scan_consent') || 'null');
+            return !!(s && typeof s.consentId === 'string' && s.consentId.length > 0);
+          } catch (e) { return false; }
+        }
         function allowed() {
           if (!isProd) return false;
           try {
             var c = JSON.parse(window.localStorage.getItem('mpt_cookie_consent') || 'null');
-            return !!(c && c.v === 1 && c.analytics === true);
+            return !!(c && c.v === 1 && c.analytics === true) && scanConsented();
           } catch (e) { return false; }
         }
         function sync() {
           var ok = allowed();
+          mptGateOpen = !isProd || ok;
           window['ga-disable-' + GA_ID] = !ok;
           if (!ok || loaded) return;
+          // MPC-9886: the script load goes through the recipient registry (key "ga4", basis analytics_consent). The client (/recipient-client.min.js, deferred)
+          // announces itself with mpt:recipients-ready; until then nothing is requested and sync() simply runs again when it does. The consent test above is unchanged.
+          var r = window.mptRecipients;
+          if (!r) return;
           loaded = true;
-          var s = document.createElement('script');
-          s.async = true;
-          s.src = 'https://www.googletagmanager.com/gtag/js?id=' + GA_ID;
-          document.head.appendChild(s);
+          r.script('ga4', 'https://www.googletagmanager.com/gtag/js?id=' + GA_ID).catch(function () {});
           gtag('js', new Date());
           gtag('config', GA_ID);
         }
         window.addEventListener('mpt:consent', sync);
+        window.addEventListener('mpt:scan-consent', sync);
+        window.addEventListener('mpt:recipients-ready', sync);
         sync();
       })();
     </script>
@@ -134,48 +154,5 @@
     }
     </script>
 
-    <!-- Breadcrumb Schema -->
-    <script type="application/ld+json">
-    {
-      "@context": "https://schema.org",
-      "@type": "BreadcrumbList",
-      "itemListElement": [{
-        "@type": "ListItem",
-        "position": 1,
-        "name": "Home",
-        "item": "https://www.myprivacytool.io"
-      }]
-    }
-    </script>
-
-    <!-- FAQ Schema -->
-    <script type="application/ld+json">
-    {
-      "@context": "https://schema.org",
-      "@type": "FAQPage",
-      "mainEntity": [{
-        "@type": "Question",
-        "name": "How does MyPrivacyTOOL detect my information?",
-        "acceptedAnswer": {
-          "@type": "Answer",
-          "text": "We use your browser's public information (IP address, user agent, screen resolution) combined with free IP geolocation APIs to detect your location, device type, ISP, and other data points. No personal information is stored."
-        }
-      }, {
-        "@type": "Question",
-        "name": "Is MyPrivacyTOOL free?",
-        "acceptedAnswer": {
-          "@type": "Answer",
-          "text": "Yes, the digital shadow scan is 100% free. We show you what data brokers can find about you without requiring any sign-up or payment."
-        }
-      }, {
-        "@type": "Question",
-        "name": "What data can attackers find about me?",
-        "acceptedAnswer": {
-          "@type": "Answer",
-          "text": "Attackers can find your location, device type, operating system, browser, ISP provider, screen resolution, timezone, language preferences, and privacy settings - all without you providing any information."
-        }
-      }]
-    }
-    </script>
   </body>
 </html>

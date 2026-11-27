@@ -17,8 +17,14 @@ describe("WhatsApp entry point", () => {
     expect(status).toBe("302");
     expect(target === "/start" || /^https:\/\/wa\.me\/\d{7,15}(\?text=[^\s]*)?$/.test(target)).toBe(true);
   });
-  it("the /start WhatsApp button uses /wa and no page keeps the number placeholder", () => {
-    expect(read("src/pages/Start.tsx")).toContain('url: "/wa"');
-    expect(read("src/pages/Start.tsx")).not.toContain("YOUR_WHATSAPP_NUMBER");
+  // MPC-9826: while WhatsApp is "planned" (src/config/featureStatus.ts CHANNEL_STATUS) the /start card is not a link, because /wa only bounces
+  // back to /start. When it goes live, the card must point at /wa again.
+  it("the /start WhatsApp card is not a link while planned, uses /wa once live, and no page keeps the number placeholder", () => {
+    const start = read("src/pages/Start.tsx");
+    const status = read("src/config/featureStatus.ts");
+    const planned = /whatsapp:\s*"planned"/.test(status);
+    if (planned) expect(start).toMatch(/id: "whatsapp"[^}]*url: ""/);
+    else expect(start).toMatch(/id: "whatsapp"[^}]*url: "\/wa"/);
+    expect(start).not.toContain("YOUR_WHATSAPP_NUMBER");
   });
 });

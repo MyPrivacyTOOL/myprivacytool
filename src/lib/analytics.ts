@@ -7,6 +7,9 @@ declare global {
 }
 
 import { captureAttribution, getAttribution } from './attribution';
+import { hasConsent } from './cookieConsent';
+import { hasScanConsent } from './scanConsent';
+import { funnelParams } from './funnelParams';
 
 // Session tracking
 let sessionStartTime: number = 0;
@@ -24,6 +27,12 @@ export const trackActivity = () => {
   lastActivityTime = Date.now();
 };
 
+// MPC-10790 (Open Tracker rule 2, decision A): nothing goes to GA4 before the Scan me click. The analytics choice alone (cookie banner "Accept
+// analytics") is not enough; the journey must also hold the scan consent. The gtag stub in index.html drops calls while its gate is closed too, so an
+// event from before the consent point is neither queued nor flushed later (that stub is the gate for ordinary events). The one event that carries
+// place and network values, device_profile, also checks here, so a build whose page lacks the stub still sends nothing before the click.
+export const analyticsAllowed = (): boolean => hasConsent() && hasScanConsent();
+
 // Base event tracking
 export const trackEvent = (
   eventName: string,
@@ -33,6 +42,47 @@ export const trackEvent = (
     window.gtag('event', eventName, params);
   }
 };
+
+// ---------------------------------------------------------------------------
+// CK-11491: the free-scan funnel. scan_start -> scan_complete -> report_view -> pricing_view -> checkout_start, each with channel and utm_source.
+// Same consent gate as everything else (analyticsAllowed above, and the gtag stub in index.html): there is no second gate, and an event from before
+// the consent point is dropped, never replayed. So a once-only event is marked as sent only when it was really handed to gtag.
+// No PII: closed-list or slug values only (see funnelParams.ts). The older events (scan_started, privacy_scan_completed) are unchanged.
+// ---------------------------------------------------------------------------
+export type ScanSurface = 'home' | 'scan_page';
+const funnelSent = new Set<string>();
+
+const funnelEvent = (name: string, params: Record<string, string> = {}, onceKey?: string) => {
+  if (!analyticsAllowed() || !window.gtag) return;
+  if (onceKey) {
+    if (funnelSent.has(onceKey)) return;
+    funnelSent.add(onceKey);
+  }
+  captureAttribution(window.location.search);
+  trackEvent(name, { ...funnelParams(), ...params });
+};
+
+export const resetFunnelForTests = () => funnelSent.clear();
+
+/** The visitor pressed Scan me / Check My Exposure (or, with consent already held, gave a first answer). Once per page session. */
+export const trackScanStart = (surface: ScanSurface) => funnelEvent('scan_start', { scan_surface: surface }, 'scan_start');
+/** home: every hexagon is answered (the MPC-7170 meaning of "completed"). scan_page: the live checks all finished. Once per surface. */
+export const trackScanComplete = (surface: ScanSurface) => funnelEvent('scan_complete', { scan_surface: surface }, `scan_complete:${surface}`);
+/** The report page opened from the email button, after the report was sent. Once per page session. */
+export const trackReportView = () => funnelEvent('report_view', { report_surface: 'email_link' }, 'report_view');
+/** A paid plan was chosen. checkout_mode "waitlist" = there is no live checkout, so no payment can follow; "stripe" once checkout opens. */
+export const trackCheckoutStart = (plan: string, checkoutMode: 'waitlist' | 'stripe') =>
+  funnelEvent('checkout_start', { plan, checkout_mode: checkoutMode });
+
+// MPC-9785: password-check usage counts (event names approved by Chris 2026-11-07). Fixed names, NO parameters: nothing derived from
+// the password (text, hash, prefix) and no outcome or breach count is ever sent. Each also checks the visitor's analytics choice itself,
+// because window.gtag exists before consent (it only queues) and a queued event could otherwise be sent once consent is given later.
+const passwordCheckEvent = (name: 'password_check_used' | 'password_check_error' | 'password_check_scan_click') => {
+  if (hasConsent()) trackEvent(name);
+};
+export const trackPasswordCheckUsed = () => passwordCheckEvent('password_check_used');
+export const trackPasswordCheckError = () => passwordCheckEvent('password_check_error');
+export const trackPasswordCheckScanClick = () => passwordCheckEvent('password_check_scan_click');
 
 // MPC-8451: a click on a share button. Carries only the channel and where on the site it was, never the visitor's address or results.
 export const trackShare = (channel: string, where: string) => {
@@ -88,6 +138,7 @@ export const trackScanStarted = () => {
   if (scanStartedTracked) return;
   scanStartedTracked = true;
   attributedEvent('scan_started', {});
+  trackScanStart('home');   // CK-11491: covers a journey that already held consent (no Scan me click on this page); a no-op if already sent
 };
 
 // Canonical O3 KPI event (MPC-7170). A scan is "completed" when every hexagon
@@ -101,6 +152,7 @@ export const trackScanCompleted = (hexagonCount: number) => {
     hexagon_count: hexagonCount,
     funnel_step: 'all_hexagons_confirmed',
   });
+  trackScanComplete('home');   // CK-11491
 };
 
 // Device profile tracking
@@ -112,6 +164,7 @@ export const trackDeviceProfile = (deviceData: {
   session: { timezone: string };
   privacy: { doNotTrack: boolean };
 }) => {
+  if (!analyticsAllowed()) return;
   trackEvent('device_profile', {
     device_type: deviceData.device.type,
     os: deviceData.device.os,
@@ -468,6 +521,12 @@ export const trackNewsletterSignup = (params?: Record<string, string>) => {
   attributedEvent('generate_lead', { method: 'newsletter', ...params });
 };
 
+// MPC-10616: /blog newsletter form. Fire only after the Worker confirmed the HubSpot write. Fixed params, NO email. Checks the visitor's analytics
+// choice itself (window.gtag exists before consent and only queues), like the password-check events above.
+export const trackBlogLeadCapture = (path: string) => {
+  if (hasConsent()) attributedEvent('blog_lead_capture', { form: 'blog_newsletter', page_path: path });
+};
+
 // ---------------------------------------------------------------------------
 // Business audit request (MPC-6977 follow-up B). Fire only after a confirmed
 // successful HubSpot submit.
@@ -506,6 +565,13 @@ export const trackStartSignup = (params?: Record<string, string>) => {
   attributedEvent('start_scan_signup', { form: 'start_scan', ...params });
   attributedEvent('generate_lead', { method: 'start_scan', ...params });
 };
+
+// ---------------------------------------------------------------------------
+// The magic guess on /scan (MPC-11111). Off until VITE_EMAIL_GUESS_ENABLED is "true". Never carries the address: only that a guess was shown, and the answer.
+// ---------------------------------------------------------------------------
+// Each checks the visitor's analytics choice itself (like the password-check events above): window.gtag exists before consent and only queues, and a queued event could be sent later.
+export const trackEmailGuessShown = () => { if (hasConsent()) attributedEvent('email_guess_shown', { basis: 'bio_email', source: 'scan_page' }); };
+export const trackMagicGuessSubmitted = (answer: 'yes' | 'no') => { if (hasConsent()) attributedEvent('magic_guess_submitted', { answer, basis: 'bio_email', source: 'scan_page' }); };
 
 // ---------------------------------------------------------------------------
 // Alice HD voice waitlist (MPC-6977 site-wide form wiring). Fire only after a
@@ -591,7 +657,7 @@ export const trackBlogCtaClick = (postSlug: string, ctaLocation: string, destina
 // Pricing page (MPC-7376). No checkout exists yet, so plan buttons are the conversion signal.
 // ---------------------------------------------------------------------------
 export const trackPricingView = () => {
-  trackEvent('pricing_view');
+  funnelEvent('pricing_view');
 };
 
 // `variants` maps experiment id to variant id for the live (non-forced) pricing experiments (MPC-7638),

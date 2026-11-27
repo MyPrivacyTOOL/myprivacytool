@@ -89,6 +89,7 @@ check(/x: 160 DMs/.test(wk), 'weekly: all four days (the clicks-only error day t
 weekPulls = [mk(5), { ...mk(5), status: 'ok' }]; // same day twice: newest wins
 check(/\(1\/7 days collected\)/.test(await buildChannelOsintText(env, new Date('2026-10-12T01:00:00Z'))), 'weekly: one row per day (newest pull)');
 weekPulls = []; check(/no channel activity/.test(await buildChannelOsintText(env, new Date('2026-10-12T01:00:00Z'))) && /7 day\(s\) have no/.test(await buildChannelOsintText(env, new Date('2026-10-12T01:00:00Z'))), 'weekly: no rows => says so, names the gap');
+posts.length = 0; // the 'database down' run above now (correctly) posts the combined collector-error message (MPC-7557); count only the weekly post
 await postChannelOsint(env, new Date('2026-10-12T01:00:00Z'));
 check(posts.length === 1 && posts[0].channel === 'C1' && /^Channel OSINT week of/.test(posts[0].text), 'weekly: posts one message to the usual channel');
 

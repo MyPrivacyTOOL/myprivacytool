@@ -1,4 +1,5 @@
 import Seo from "@/components/Seo";
+import { CookiesRecipients } from "@/components/LegalRecipients";
 import pageMeta from "@/data/pageMeta.json";
 
 const Cookies = () => {
@@ -12,7 +13,7 @@ const Cookies = () => {
               Cookie Policy
             </h1>
             <p className="mb-8 text-lg text-muted-foreground">
-              Last updated: 30 September 2026
+              Last updated: 18 November 2026
             </p>
 
             <section className="mb-8">
@@ -45,27 +46,45 @@ const Cookies = () => {
                 secure areas. These cookies do not track your personal information
                 and cannot be disabled.
               </p>
+              <p className="mt-4 text-muted-foreground">
+                Our own pages and services set no cookies of their own when you
+                browse, run the scan or read a report. We use your
+                browser&rsquo;s storage, and we set cookies only if you connect
+                an outside account. The analytics cookies in section 2.2 appear
+                only if you allow analytics. Requests that change something are
+                protected by checking where they come from, not by a cookie.
+              </p>
               <ul className="list-inside list-disc space-y-2 text-muted-foreground mt-4">
                 <li>
-                  <strong>Session ID:</strong> Maintains your login session
+                  <strong>Consent Choice (browser storage, mpt_cookie_consent):</strong>{" "}
+                  Records your cookie choice (accept analytics, or essential
+                  only) and the date in your own browser storage so we do not
+                  ask again on every visit. It is not sent to us
                 </li>
                 <li>
-                  <strong>CSRF Token:</strong> Protects against cross-site request
-                  forgery attacks
+                  <strong>Scan journey (this tab only, mpt_scan_consent):</strong>{" "}
+                  Holds the number of your scan and the record that you pressed
+                  Scan me. It is sent to our service with the scan and is gone
+                  when you close the tab
                 </li>
                 <li>
-                  <strong>Consent Choice:</strong> Records your cookie choice
-                  (accept analytics, or essential only) and the date in your own
-                  browser storage so we do not ask again on every visit. It is
-                  not sent to us
+                  <strong>Sign-in session (browser storage, mpt_account_session):</strong>{" "}
+                  Only if you sign in to a free account. It keeps you signed in
+                  on this browser and is sent to our service to show it is you.
+                  Signing out removes it
                 </li>
                 <li>
                   <strong>User Preferences:</strong> Remembers your language and
-                  theme settings
+                  display settings in your browser storage
                 </li>
                 <li>
-                  <strong>Security Tokens:</strong> Used for authentication and
-                  authorization
+                  <strong>Connected-account cookies (only if you connect one):</strong>{" "}
+                  Connecting GitHub sets mpt_gh_oauth (10 minutes, while you
+                  sign in) and mpt_gh_session (7 days). Connecting Reddit sets
+                  mpt_rd_oauth (10 minutes) and mpt_rd_session (7 days).
+                  Connecting Google sets mpt_oauth (10 minutes) and
+                  mpt_oauth_session (1 hour). All are HttpOnly and Secure, and
+                  are removed when you disconnect
                 </li>
               </ul>
 
@@ -79,12 +98,13 @@ const Cookies = () => {
               </p>
               <ul className="list-inside list-disc space-y-2 text-muted-foreground mt-4">
                 <li>
-                  <strong>Google Analytics 4:</strong> Tracks aggregated website
-                  usage statistics
+                  <strong>Analytics service:</strong> Tracks aggregated website
+                  usage statistics, only after you allow analytics (named in the
+                  list of services below)
                 </li>
                 <li>
-                  <strong>HubSpot Tracking Cookie (hubspotutk):</strong> Set when
-                  HubSpot tracking is allowed. When you submit a sign-up or
+                  <strong>CRM Tracking Cookie (hubspotutk):</strong> Set when
+                  tracking is allowed. When you submit a sign-up or
                   waitlist form, it links that submission to your earlier visits
                   to our site so we can see which pages and campaigns led to it
                 </li>
@@ -96,38 +116,39 @@ const Cookies = () => {
               </ul>
               <p className="mt-4 text-muted-foreground">
                 We do not use session recording or heatmap tools. The device scan
-                on our site asks two third-party services, ipify (api.ipify.org)
-                and ipapi.co, for your IP address and approximate location when
-                you load the scan. They necessarily see your IP address, and this
-                happens whether or not you have accepted analytics cookies,
-                because it is how the scan shows you what a website can see.
+                shows you your own IP address and location from our own service
+                (our servers read them from your connection and send them back to
+                you without storing them), so the scan does not ask any separate
+                service for them. Who does receive your IP address, and when, is
+                in the list below. It is written from the list the site
+                checks every outgoing call against, and it covers the services your
+                own browser contacts.
               </p>
+              <h3 className="mt-6 text-xl font-semibold text-foreground">
+                Outside services your browser contacts
+              </h3>
+              <CookiesRecipients />
               <p className="mt-4 text-muted-foreground">
-                Google Analytics 4 and HubSpot tracking only run after you
-                allow analytics in our consent banner. Google Analytics 4 does not
-                store full IP addresses. HubSpot tracking can identify you once
-                you submit a form with your email address; you can withdraw
-                consent at any time through the Cookie Management Center.
+                Our analytics services and our CRM provider&rsquo;s tracking
+                cookie only run after you allow analytics in our cookie banner.
+                Submitting a sign-up or contact form is different: the form goes
+                to our CRM whether or not you allowed analytics, because sending
+                it is what you asked for; only the tracking cookie waits for your
+                choice. That cookie can link the form to your earlier visits once
+                you give your email address. You can withdraw consent at any time
+                through the Cookie Management Center.
               </p>
 
               <h3 className="mt-6 text-xl font-semibold text-foreground">
                 2.3 Marketing / Advertising Cookies
               </h3>
               <p className="text-muted-foreground">
-                These cookies track your browsing behavior to show you targeted
-                advertisements. They may be set by us or by third-party advertising
-                partners.
+                We set no marketing or advertising cookies. We run no retargeting
+                pixels, advertising networks or social-media tracking, and none of
+                the services listed in section 2.2 is one. Campaign tags (UTM
+                parameters) in the links you arrive from are used only to tell us
+                which of our posts and pages bring visitors.
               </p>
-              <ul className="list-inside list-disc space-y-2 text-muted-foreground mt-4">
-                <li>
-                  <strong>Retargeting Pixels:</strong> Show ads on other websites
-                  based on your visit
-                </li>
-                <li>
-                  <strong>Conversion Tracking:</strong> Measure the effectiveness
-                  of advertising campaigns
-                </li>
-              </ul>
 
               <h3 className="mt-6 text-xl font-semibold text-foreground">
                 2.4 Preference Cookies
@@ -143,27 +164,17 @@ const Cookies = () => {
                 3. Third-Party Cookies
               </h2>
               <p className="text-muted-foreground">
-                We use services from third parties that may set their own cookies:
+                The outside services in section 2.2 may set their own cookies
+                or use similar storage when you allow them. We use no advertising
+                networks and no social-media tracking, so no cookies come from
+                those.
               </p>
-              <ul className="list-inside list-disc space-y-2 text-muted-foreground mt-4">
-                <li>
-                  <strong>Google Analytics:</strong> Analytics and website traffic
-                  analysis
-                </li>
-                <li>
-                  <strong>Stripe:</strong> Payment processing and fraud prevention
-                </li>
-                <li>
-                  <strong>Social Media Platforms:</strong> Share buttons and social
-                  tracking
-                </li>
-                <li>
-                  <strong>Advertising Networks:</strong> Targeted advertising and
-                  retargeting
-                </li>
-              </ul>
               <p className="mt-4 text-muted-foreground">
-                These third parties have their own privacy policies. We recommend
+                We set no payment cookies today, because we take no payments.
+                When paid plans open, a payment provider (named in section 5 of the Privacy
+                Policy as planned and not yet open) may set cookies, and we will list them
+                here before they are used. These
+                third parties have their own privacy policies. We recommend
                 reviewing their cookie and privacy policies to understand their
                 practices.
               </p>
@@ -183,7 +194,7 @@ const Cookies = () => {
                 </li>
                 <li>
                   <strong>Persistent Cookies:</strong> Remain on your device for a
-                  set period, typically 1-2 years (analytics and marketing cookies)
+                  set period, typically 1-2 years (analytics cookies)
                 </li>
               </ul>
             </section>
@@ -207,7 +218,7 @@ const Cookies = () => {
                   for functionality)
                 </li>
                 <li>
-                  <strong>Analytics & Marketing:</strong> Opt-in required (you must
+                  <strong>Analytics:</strong> Opt-in required (you must
                   consent)
                 </li>
               </ul>
@@ -288,6 +299,12 @@ const Cookies = () => {
                   not sent to us unless you submit it
                 </li>
                 <li>
+                  <strong>Sign-in session:</strong> If you create or sign in to a
+                  free account, your browser keeps a sign-in session in local
+                  storage (key mpt_account_session) until you sign out. It is
+                  used only to keep you signed in
+                </li>
+                <li>
                   <strong>IndexedDB:</strong> Stores larger amounts of data for
                   offline functionality
                 </li>
@@ -307,10 +324,11 @@ const Cookies = () => {
                 8. Cross-Domain Tracking
               </h2>
               <p className="text-muted-foreground">
-                Our cookies may be used to track your behavior across multiple
-                domains and services, including partner websites, for marketing
-                and analytics purposes. You can limit this through the cookie
-                management tools and browser settings above.
+                We do not use our cookies to follow you across other websites, and
+                we have no partner-website or advertising tracking. The analytics
+                cookies in section 2.2 measure use of this site only, and you can
+                limit them through the cookie management tools and browser
+                settings above.
               </p>
             </section>
 
@@ -402,11 +420,6 @@ const Cookies = () => {
                   <tr>
                     <td>Analytics</td>
                     <td>Website usage insights</td>
-                    <td>Yes</td>
-                  </tr>
-                  <tr>
-                    <td>Marketing</td>
-                    <td>Targeted advertising</td>
                     <td>Yes</td>
                   </tr>
                 </tbody>

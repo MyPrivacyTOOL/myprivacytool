@@ -1,4 +1,6 @@
 import type { Model, ModelRequest, ModelResponse } from "./types";
+import { recipientFetcher } from "../recipients/outbound";
+import { workerRecipientContext } from "../recipients/worker-ctx";
 
 /**
  * Data minimisation for any model call (docs/AI-PROVIDERS.md: "every model call sends the minimum"). Same rules as core-brain's redact():
@@ -18,13 +20,16 @@ export interface ChatModelConfig { baseUrl: string; apiKey: string; model: strin
  * allows for this identity are offered, and any other tool name the model returns is dropped (the gateway re-checks anyway).
  */
 export class ChatCompletionsModel implements Model {
+  private f: typeof fetch;
   constructor(private c: ChatModelConfig) {
     if (!/^https:\/\//.test(c.baseUrl)) throw new Error("baseUrl must be https");
     if (!c.apiKey || !c.model) throw new Error("apiKey and model required");
+    // The customer message (emails and phone numbers redacted first) is the only personal data sent. Host comes from MODEL_BASE_URL; today that is DashScope.
+    this.f = recipientFetcher("dashscope", ["message_text"], workerRecipientContext(null, { fetchImpl: c.fetchImpl }));
   }
   async complete(req: ModelRequest): Promise<ModelResponse> {
     const knowledge = req.knowledge.map((k) => `[${k.id}@${k.version}]\n${k.body}`).join("\n\n") || "(no approved knowledge matched)";
-    const res = await (this.c.fetchImpl ?? fetch)(`${this.c.baseUrl.replace(/\/$/, "")}/chat/completions`, {
+    const res = await this.f(`${this.c.baseUrl.replace(/\/$/, "")}/chat/completions`, {
       method: "POST",
       headers: { Authorization: `Bearer ${this.c.apiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({

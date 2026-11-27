@@ -1,0 +1,19 @@
+# MPC-9808 (EXT-21, TRUST-020): security claims on /privacy and the control behind each
+
+Checked 2026-11-18 against main HEAD 63f8a15 and the live site. Rule (Chris, 2026-11-18, Q8): keep a /privacy security claim only where it has a named owner and dated evidence; otherwise soften or remove it.
+"Proposed owner" is a role proposed by ClaudeKing; Chris to confirm each.
+
+| Claim (Privacy section 8) | Control | Evidence and date | Proposed owner | Next check | Verdict |
+|---|---|---|---|---|---|
+| All data transmitted over HTTPS (TLS 1.3) | Cloudflare terminates TLS for www.myprivacytool.io; HSTS `max-age=31536000; includeSubDomains` | Live handshake on 2026-11-18 negotiated TLSv1.3 (`curl --tlsv1.3`, HTTP 200); response headers `strict-transport-security`, `x-frame-options: SAMEORIGIN`, `x-content-type-options: nosniff`. docs/security-audit-mpc-7350.md line 42 (2026-10-06): every external call is HTTPS, Supabase REST is HTTPS-only | Engineering (ClaudeKing) | Re-run the curl check each quarter (see .github/workflows/smoke-site.yml for the existing site check) | TRUE. Kept. The page says TLS 1.3 only; TLS 1.2 is also accepted (`curl --tlsv1.2 --tls-max 1.2` returned 200), so the claim is true for modern browsers, not exclusive |
+| Sensitive data encrypted in our databases | Supabase encrypts the database volume (AES-256) at platform level; OAuth tokens get an extra application-level AES-256-GCM layer | docs/security-audit-mpc-7350.md lines 43 and 89 (2026-10-06): "Met at platform level"; no column-level encryption for emails or IPs | Engineering (ClaudeKing) | Confirm in the provider's current documentation when the project changes plan or region | PARTIAL. Kept, wording now says it is platform-level encryption |
+| Role-based access to sensitive data | Row-level security on every PII table | docs/security-audit-mpc-7350.md line 41 (2026-10-06) | Engineering (ClaudeKing) | Supabase advisors report after each migration batch (docs/SUPABASE-AUDIT.md) | TRUE. Unchanged |
+| Regular Audits: security assessments and vulnerability testing | One review: docs/security-audit-mpc-7350.md, 2026-10-06, covering four Workers and the Supabase project | One dated review; the same document says the live site and Workers could not be probed and that live headers and CORS are unverified. No schedule exists | none | none | FALSE as written ("regular"). Softened to "We reviewed ... in October 2026 and fixed what we found. We have no fixed audit schedule" |
+| Procedures to detect and respond to breaches (Incident Response) | Not found in the repo | No incident-response document found under docs/ | none | none | NOT EVIDENCED. Left unchanged here; Chris to decide whether to name an owner or soften it (filed with the follow-ups on MPC-9808) |
+
+**Update 2026-11-23 (MPC-10805, Chris: soften to what exists today):** /privacy section 8 now says only that there is a short written checklist for investigating a problem and rolling back a release (`docs/RUNBOOK.md` section 7) and that there is no full incident response plan and no drills. The earlier claim of procedures to detect and respond to breaches is gone. Naming an owner and writing a real plan is a separate task.
+
+Other findings from the same check, not changed here:
+
+- The sign-in email footer says "Questions, or want your data deleted? Write to hello@myprivacytool.io" (workers/scan-report/lib/accounts.js lines 83 and 89). The deletion page names privacy@. Five mailboxes are in use (privacy@, dpo@, legal@, accessibility@, support@) plus hello@; nothing in the repo shows which are monitored (docs/support-ai-backend-mpc-8528.md section 7).
+- Account deletion is a real delete: `POST /api/account/delete {confirm:"delete"}` deletes the account, all its scans (`mpt_delete_account`) and the sign-in identity (workers/scan-report/lib/accounts.js lines 217-230). It had not been described on /data-deletion; it is now (section 3).

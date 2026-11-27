@@ -5,6 +5,7 @@ import Seo from "@/components/Seo";
 import pageMeta from "@/data/pageMeta.json";
 import { validateEmail } from "@/lib/formFeedback";
 import { DEFAULT_SCAN_API_URL, resolveScanApiUrl } from "@/lib/webScan";
+import { recipientFetch } from "@/lib/recipientClient";
 
 // "Unsubscribe me" page. Two ways in:
 //  1. From a link in one of our emails (?e=<address>&t=<signed token>): shows a confirm button, and the opt-out happens
@@ -29,10 +30,10 @@ const Unsubscribe = () => {
     if (status === "loading") return;
     setStatus("loading");
     try {
-      const res = await fetch(`${API}/api/unsubscribe?e=${encodeURIComponent(e)}&t=${encodeURIComponent(t)}`, {
+      const res = await recipientFetch("scan-report", `${API}/api/unsubscribe?e=${encodeURIComponent(e)}&t=${encodeURIComponent(t)}`, {
         method: "POST",
         headers: { Accept: "application/json" },
-      });
+      }, ["email"]);
       setStatus(res.ok ? "done" : res.status === 400 ? "invalid" : "error");
     } catch {
       setStatus("error");
@@ -47,11 +48,11 @@ const Unsubscribe = () => {
     if (problem) return;
     setStatus("loading");
     try {
-      const res = await fetch(`${API}/api/unsubscribe-request`, {
+      const res = await recipientFetch("scan-report", `${API}/api/unsubscribe-request`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: email.trim() }),
-      });
+      }, ["email"]);
       setStatus(res.ok ? "sent" : res.status === 429 ? "limited" : "error");
     } catch {
       setStatus("error");

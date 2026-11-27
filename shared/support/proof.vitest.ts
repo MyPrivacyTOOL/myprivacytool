@@ -8,7 +8,7 @@ type Call = { url: string; body: unknown };
 const fake = (respond: (c: Call) => { status?: number; body?: unknown }) => {
   const calls: Call[] = [];
   const fetchImpl = (async (url: string, init: RequestInit) => { const c = { url, body: JSON.parse(init.body as string) }; calls.push(c); const r = respond(c); return new Response(r.body === undefined ? "" : JSON.stringify(r.body), { status: r.status ?? 200 }); }) as unknown as typeof fetch;
-  return { calls, store: new RestProofStore({ baseUrl: "https://x.test", serviceKey: "k", fetchImpl }) };
+  return { calls, store: new RestProofStore({ baseUrl: "https://x.supabase.co", serviceKey: "k", fetchImpl }) };
 };
 
 describe("proof tokens", () => {
@@ -30,7 +30,7 @@ describe("RestProofStore", () => {
     expect(id).toMatch(/^1111/);
     const sent = JSON.stringify(f.calls[0].body);
     expect(sent).not.toContain(token); expect(f.calls[0].body).toMatchObject({ p_token_hash: await hashProof(token), p_subject: "user-A", p_tenant: "t1", p_ttl_seconds: 600 });
-    expect(f.calls[0].url).toBe("https://x.test/rest/v1/rpc/support_issue_proof");
+    expect(f.calls[0].url).toBe("https://x.supabase.co/rest/v1/rpc/support_issue_proof");
   });
   it("redeem returns the identity, and null for a malformed token WITHOUT calling the database", async () => {
     const f = fake(() => ({ body: { subject_id: "user-A", tenant_id: "t1" } }));

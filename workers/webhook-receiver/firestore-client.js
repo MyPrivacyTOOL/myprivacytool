@@ -15,6 +15,13 @@
  *   FIRESTORE_API_KEY  — or use Workload Identity via service account JWT
  */
 
+import { callRecipient } from '../../shared/recipients/outbound.ts';
+import { workerRecipientContext } from '../../shared/recipients/worker-ctx.ts';
+
+// MPC-9885: the document id is the channel key (phone / email / user id) and the body is the conversation state. Registry key "firestore"
+// is gated by the FIRESTORE_SA_TOKEN flag, the same secret this file already requires.
+const STATE_ITEMS = ['email', 'name', 'phone', 'username'];
+
 const FIRESTORE_BASE = (projectId) =>
   `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents`;
 
@@ -35,14 +42,14 @@ export async function saveConversationState(env, key, state) {
 
   const fields = toFirestoreFields(state);
 
-  await fetch(url, {
+  await callRecipient('firestore', { url, sent: STATE_ITEMS, init: {
     method: 'PATCH',
     headers: {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${env.FIRESTORE_SA_TOKEN}`,
     },
     body: JSON.stringify({ fields }),
-  });
+  } }, workerRecipientContext(env));
 }
 
 /**
@@ -59,9 +66,9 @@ export async function getConversationState(env, key) {
   const docId = encodeURIComponent(key);
   const url = `${FIRESTORE_BASE(env.GCP_PROJECT_ID)}/conversations/${docId}`;
 
-  const res = await fetch(url, {
+  const res = await callRecipient('firestore', { url, sent: ['email', 'phone', 'username'], init: {
     headers: { 'Authorization': `Bearer ${env.FIRESTORE_SA_TOKEN}` },
-  });
+  } }, workerRecipientContext(env));
 
   if (res.status === 404) return null;
   if (!res.ok) {

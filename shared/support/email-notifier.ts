@@ -1,4 +1,6 @@
 import type { Channel, Notifier } from "./types";
+import { recipientFetcher } from "../recipients/outbound";
+import { workerRecipientContext } from "../recipients/worker-ctx";
 
 export interface ResendNotifierConfig { apiKey: string; from: string; fetchImpl?: typeof fetch; timeoutMs?: number }
 
@@ -12,11 +14,15 @@ const h = (s: string): string => { let x = 5381; for (let i = 0; i < s.length; i
  * address from message text.
  */
 export class ResendNotifier implements Notifier {
-  constructor(private c: ResendNotifierConfig) { if (!c.apiKey || !c.from) throw new Error("apiKey and from required"); }
+  private f: typeof fetch;
+  constructor(private c: ResendNotifierConfig) {
+    if (!c.apiKey || !c.from) throw new Error("apiKey and from required");
+    this.f = recipientFetcher("resend", ["email"], workerRecipientContext(null, { fetchImpl: c.fetchImpl }));
+  }
   async send(caseRef: string, channel: Channel, text: string, threadKey?: string, to?: string) {
     if (channel !== "email") throw new Error("ResendNotifier only sends email");
     if (!to || !EMAIL.test(to)) throw new Error("no valid reply address");
-    const res = await (this.c.fetchImpl ?? fetch)("https://api.resend.com/emails", {
+    const res = await this.f("https://api.resend.com/emails", {
       method: "POST",
       headers: { Authorization: `Bearer ${this.c.apiKey}`, "Content-Type": "application/json", "Idempotency-Key": `support-${caseRef}-${h(text)}` },
       body: JSON.stringify({ from: this.c.from, to: [to], subject: `Re: [${caseRef}] your request`, text, headers: threadKey ? { "In-Reply-To": threadKey, References: threadKey } : undefined }),

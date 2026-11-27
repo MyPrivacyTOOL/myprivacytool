@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { Mail, ShieldCheck, Scale, Accessibility, Building2 } from "lucide-react";
+import { Mail, ShieldCheck, Scale, Accessibility, Building2, LifeBuoy } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import Seo from "@/components/Seo";
@@ -23,11 +23,15 @@ const GENERAL_EMAIL = "privacy@myprivacytool.io";
 const TOPICS = ["Personal", "Business", "Press"];
 
 const DIRECT_CONTACTS = [
+  { icon: LifeBuoy, label: "Support", email: "support@myprivacytool.io" },
   { icon: ShieldCheck, label: "Privacy & data requests", email: "privacy@myprivacytool.io" },
   { icon: Building2, label: "Data protection officer", email: "dpo@myprivacytool.io" },
   { icon: Scale, label: "Legal", email: "legal@myprivacytool.io" },
   { icon: Accessibility, label: "Accessibility", email: "accessibility@myprivacytool.io" },
 ];
+
+// MPC-10831 (Chris, 2026-11-23): one box, unsubscribe-only. No marketing is sent from this form; a separate marketing opt-in comes only when a marketing send exists.
+const CONTACT_CONSENT_LABEL = "Email me a reply and any follow-up. I can unsubscribe at any time. This form has no separate marketing opt-in.";
 
 const Contact = () => {
   const [searchParams] = useSearchParams();
@@ -164,6 +168,7 @@ const Contact = () => {
             <div ref={consentRef}>
               <ConsentCheckbox
                 id="contact-consent"
+                label={CONTACT_CONSENT_LABEL}
                 checked={consent}
                 onChange={(v) => {
                   setConsent(v);
@@ -199,6 +204,7 @@ const Contact = () => {
               </div>
             </div>
           ))}
+          <p className="text-muted-foreground text-sm pt-2">We reply within 2 business days (Hong Kong time).</p>
           <p className="text-muted-foreground text-sm pt-2">
             Looking for answers fast? Try the <Link to="/faq" className="underline hover:text-foreground">FAQ</Link>.
           </p>

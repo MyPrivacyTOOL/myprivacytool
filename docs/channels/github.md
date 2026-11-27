@@ -4,7 +4,7 @@ A Cloudflare Worker (`workers/github-channel`) that connects a user's GitHub acc
 sanitized PaPIT v1 profile ([schema](../papit/schema-v1.md)) and caches it for 24h.
 
 Decisions recorded on the MPC-115 Notion task (2026-10-05): Worker not Next.js (A), Cloudflare is the
-host (B), Workers KV cache (C), `read:user` only (D), tokens kept until the user revokes (E), fixed activity
+host (B), Workers KV cache (C), `read:user` only (D), tokens kept until the user revokes (E; since MPC-11258 also deleted after 90 days unused), fixed activity
 and role rules (F, G), sorted-key canonical receipt (H), `key_version` column (I), RLS service-role only (J).
 
 ## Flow
@@ -36,8 +36,10 @@ SPA                      Worker (github-channel)                  GitHub        
 |---|---|
 | `GET /oauth/github/start` | Redirect to GitHub. Scope `read:user`, PKCE S256. |
 | `GET /oauth/github/callback` | On success 302 to `SUCCESS_REDIRECT`; on failure 302 with `?channel_error=<code>` (`access_denied`, `invalid_state`, `missing_code`, `connect_failed`). If the token cannot be stored it is revoked at GitHub. |
-| `GET /channels/github/profile` | `200` PaPIT JSON, header `X-Cache: HIT|MISS`. `401 unauthenticated` (no session), `401 reauthorize` (token revoked at GitHub; our copy is deleted), `404 not_connected`, `502 upstream_error`. |
-| `DELETE /channels/github` | User revoke: deletes the token row first, clears the cache, then revokes the grant at GitHub. |
+| `GET /channels/github/profile` | `200` PaPIT JSON, header `X-Cache: HIT|MISS`. `401 unauthenticated` (no session), `401 reauthorize` (token revoked at GitHub; our copy is deleted), `401 reconsent_required` (the person last connected 90 or more days ago; the stored token is not used and not deleted; MPC-10833), `404 not_connected`, `502 upstream_error`. The profile carries `expires_at` (generated_at + 30 days). |
+| `POST /papit/verify` | MPC-10833. Stateless check of a profile the caller holds: `200 {valid,expires_at}`, `410 profile_expired`, `422 invalid_profile` (not v1, receipt mismatch, or `expires_at` outside generated_at..+30 days), `400 bad_request`, `413 too_large` (over 32 KB). No session, nothing stored or logged. |
+| `DELETE /channels/github` | User revoke: deletes the token row first, clears the cache, then revokes the grant at GitHub. Needs the session cookie. |
+| `GET /oauth/github/remove` | MPC-10825: revoke **without a session**. Same GitHub sign-in as `/start`, with `intent: "remove"` in the HMAC-signed state cookie (never in the URL). The callback verifies state, exchanges the code, reads only `/user` `id`, then deletes that account's row and cache and revokes the grant (`DELETE /applications/{client_id}/grant` ends every token of this app for the user, including the one just issued). It stores nothing, issues no session and clears `mpt_gh_session`. Success: 302 to `SUCCESS_REDIRECT?channel_removed=github&revoked=1\|0`. Failure: `?channel_error=remove_access_denied\|invalid_state\|missing_code\|remove_failed`; on `remove_failed` the row is kept and the page says nothing was removed. |
 | `GET /health` | `{status:"ok"}` |
 
 The session cookie is `HttpOnly; Secure; SameSite=None` so the SPA (different origin) can call the Worker with
@@ -62,7 +64,10 @@ The session cookie is `HttpOnly; Secure; SameSite=None` so the SPA (different or
 The button is a plain link to the Worker's `/oauth/github/start`; after the GitHub round trip the Worker redirects back to
 `SUCCESS_REDIRECT` (`https://www.myprivacytool.io/?channel=github`). The page then reads `GET /channels/github/profile` with
 `credentials: "include"`, shows the sanitized profile, and offers **Disconnect** (`DELETE /channels/github`). `?channel_error=`
-codes are mapped to friendly copy and the raw code is never shown.
+codes are mapped to friendly copy and the raw code is never shown. When the 7-day session has ended (`401 unauthenticated`) the page offers
+**Remove my stored connection**, a plain link to `/oauth/github/remove` (MPC-10825); on return it reads `?channel_removed=github&revoked=` and says what was removed.
+The Connect page's snapshot row reads "Connection kept: Until you disconnect, or until the token goes unused for 90 days and we delete it automatically" (MPC-10825, MPC-11258). The `data_retention_days: 30` field stays in the PaPIT JSON as a declared
+snapshot validity (see [MPC-10833](../papit-limits-mpc-9794.md)); person-facing pages no longer present it as how long we keep the connection.
 
 - **Unlisted on purpose:** `noindex`, not in the sitemap or nav. Link to it when the channel is ready to launch.
 - After login the Worker redirects to `SUCCESS_REDIRECT` (`https://www.myprivacytool.io/connect/github`).
@@ -88,6 +93,36 @@ makes this rare, and the cost is one extra reconnect.
 GitHub allows 5,000 requests/hour per user token. A cold profile build costs at most 9 requests
 (`/user`, up to 3 pages of repos, 2 of starred, 3 of events). With a 24h cache one user uses about 9 requests per day.
 
+**Requests to this Worker (MPC-10833, 2026-11-24).** `POST /papit/verify` is covered by the zone's Cloudflare rate-limiting rule (zone `myprivacytool.io`, ruleset phase
+`http_ratelimit`, rule "MPT scan/API abuse limit: POST per IP + POST /papit/verify on channels"): block after 5 requests per 10 seconds per IP and Cloudflare location, for
+10 seconds. It is one rule on the Free plan, which allows only one, so the period and block time cannot be tuned and the count is approximate and per location: it slows
+abuse, it is not a hard cap. A live burst of 20 parallel requests saw 3 answered `429`. The rule lives in Cloudflare, not in this repo; to undo it, remove the added
+`(http.request.method eq "POST" and http.host eq "channels.myprivacytool.io" and http.request.uri.path eq "/papit/verify")` clause from the rule's expression. The Worker
+itself has no per-request limiter. The other routes on this host are GET, `DELETE /channels/*` (needs a session cookie and an allowed origin) and the OAuth redirects.
+
+## Consent age (MPC-10833)
+
+`channel_tokens.consented_at` is set when the person completes the OAuth consent screen (the callback) and is not touched by a token refresh. When a profile is
+requested, a stored token whose `consented_at` is 90 or more days old is not used: `401 reconsent_required`, the cached copy is dropped, the row is kept. Connecting
+again writes a new `consented_at`. A row without the column falls back to `created_at`; a row with neither is refused. The Reddit channel follows the same rule.
+Needs `supabase/migrations/20261124120000_mpc_10833_channel_tokens_consented_at.sql` applied BEFORE this version of the Worker is deployed (the Worker selects and writes the column).
+
+Reachability: the session cookie lasts 7 days and is only issued at connect, so a request with a valid cookie always comes within 7 days of consent. The 90-day check is a backstop
+for a longer session or a changed cookie lifetime. It does not clean up by itself: the daily purge below deletes a token the person never returns for.
+
+### Purge of tokens unused for 90 days (MPC-11258): scheduled daily, deletes
+
+`public.mpt_purge_stale_channel_tokens(p_dry_run boolean default true, p_days integer default 90)` (migration `20261126000000_mpc_11258_purge_stale_channel_tokens.sql`, service role only) finds
+GitHub and Reddit rows whose `updated_at` is older than 90 days. "Unused" means this: the Worker rewrites `updated_at` only when it saves the token (at connect and on every refresh), and
+access tokens last about 8 hours (GitHub) or 1 hour (Reddit), so `updated_at` is the last real use to within that lifetime. A profile served from the 24-hour cache does not touch the row and
+is not use. No usable connection is deleted: a refresh never moves `consented_at`, so a row this stale is already refused (see above). The result is provider and counts only, never an id,
+token or email. The function is still a dry run by default; only `p_dry_run => false` deletes. `p_days` under 30 is refused, a null mode is refused, and no other provider is touched.
+
+**Schedule.** `20261127074149_mpc_11258_schedule_stale_channel_token_purge.sql` creates the `pg_cron` job `mpt-purge-stale-channel-tokens`, daily at 03:17 UTC (11:17 HKT), which runs
+`select * from public.mpt_purge_stale_channel_tokens(false, 90);` and so **deletes** (Chris approved the schedule on 2026-11-26). It is skipped where `pg_cron` is absent. Apply that one file
+by itself, not with `supabase db push`. Deleted rows cannot be restored; the person connects again. Stop it with `select cron.unschedule('mpt-purge-stale-channel-tokens');`.
+Check it with `select jobname, schedule, command from cron.job where jobname = 'mpt-purge-stale-channel-tokens';`. Dry run: `select * from public.mpt_purge_stale_channel_tokens();`
+
 ## Setup
 
 1. **GitHub OAuth App** (github.com/settings/developers): Authorization callback URL = `REDIRECT_URI`
@@ -103,7 +138,15 @@ GitHub allows 5,000 requests/hour per user token. A cold profile build costs at 
    npx wrangler secret put SUPABASE_SERVICE_ROLE_KEY
    ```
    Local dev: copy `.dev.vars.example` to `.dev.vars` (gitignored), then `npx wrangler dev`.
-6. **Deploy**: run the "GitHub channel Worker" workflow manually (it refuses to deploy while `REPLACE_*` remain).
+6. **Deploy**: the "GitHub channel Worker" workflow (`.github/workflows/deploy-github-channel.yml`) deploys **on merge to `main`** whenever `workers/github-channel/**`,
+   `shared/recipients/**`, `scripts/ci/smoke-test.mjs` or the workflow itself changes, and can still be run by hand (workflow_dispatch). Never from a pull request.
+   Order: tests, pre-deploy check (repo secrets set, no `REPLACE_*`, `EXPECTED_SECRETS.txt` names only), snapshot of the Worker's secret names, deploy, FAIL if any secret
+   name changed or an expected one is missing, then a GET-only smoke test of the live Worker (`node scripts/ci/smoke-test.mjs github-channel`: `/health`; the GitHub sign-in
+   and the no-session remove route must both be a 302 to GitHub with `read:user`, S256, an HttpOnly state cookie and no intent in the URL; Reddit remove 503 or a 302 to Reddit;
+   profile without a session 401; POST to remove 404). If the smoke test fails the Worker is rolled back to the previous version and re-checked, and the job still ends red.
+   The same smoke test runs every 6 hours in `smoke-site.yml`. **Database changes are not deployed by this workflow**: a Worker that reads or writes a new column needs its migration
+   applied first (`deploy-supabase.yml` is manual), so check that before merging a Worker change. Manual rollback: `rollback.yml` is not wired to this Worker yet; use
+   `npx wrangler rollback` in `workers/github-channel` (Cloudflare account `35cb1717...`).
 
 ## Verifying tokens are ciphertext (manual acceptance check)
 
@@ -115,12 +158,12 @@ select user_id, provider, left(access_token_enc, 12) as prefix, key_version, sco
 
 ## Tests
 
-`node --test workers/github-channel/test/*.test.mjs` (28 tests; no network). GitHub, Supabase and KV are mocked, the cache TTL
+`node --test workers/github-channel/test/*.test.mjs` (no network). GitHub, Supabase and KV are mocked, the cache TTL
 test advances a mocked clock past 24h.
 
 ## Rollback
 
 1. Revert the commit adding `workers/github-channel`, the workflow, migration and docs.
-2. `alter table public.channel_tokens drop column if exists key_version;` (do not drop the table: it predates this task and may hold other rows)
+2. Roll the Worker back first (it uses `consented_at`), then `alter table public.channel_tokens drop column if exists consented_at;` (MPC-10833) and `alter table public.channel_tokens drop column if exists key_version;` (do not drop the table: it predates this task and may hold other rows)
 3. Revoke test tokens: GitHub > Settings > Applications > Authorized OAuth Apps, or `DELETE /channels/github`.
 4. `npx wrangler delete` the Worker, delete the `PROFILE_CACHE` KV namespace, remove the OAuth App secrets.

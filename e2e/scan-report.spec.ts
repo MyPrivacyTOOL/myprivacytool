@@ -2,7 +2,7 @@
 // its POST /api/scan is handed to the real Worker code (workers/scan-report/index.js) running in this test process with an in-memory
 // Supabase/Resend/HubSpot behind it, from the production origin. The test fails if the build sends nothing (e.g. a blank API URL), if the
 // Worker refuses what the build sends (400/403/413/429/500), or if the thank-you screen appears without a report request existing.
-import { test, expect } from "./fixtures";
+import { test, expect, e2eConsentRows } from "./fixtures";
 import worker from "../workers/scan-report/index.js";
 
 const EMAIL = "e2e-scan-report+mpc7535@example.com";
@@ -15,6 +15,18 @@ function fakeBackends() {
   const res = (status: number, body?: unknown) => ({ ok: status < 400, status, headers: { get: () => null }, text: async () => (body === undefined ? "" : JSON.stringify(body)), json: async () => body });
   const fetchImpl = async (input: unknown, init: RequestInit = {}) => {
     const url = String(input);
+    const consentRes = e2eConsentRows(url); if (consentRes) return consentRes;   // MPC-9888
+    const rpc = url.match(/rest\/v1\/rpc\/(\w+)/);
+    if (rpc) {   // CK-8503: the Worker asks the database to create the report request atomically (public.mpt_request_scan); same rules as the SQL function
+      if (rpc[1] !== "mpt_request_scan") return res(404, { code: "PGRST202" });   // any other function: like PostgREST, "not found"
+      const a = JSON.parse(String(init.body)) as { p_user_id: string; p_email: string; p_request_id?: string | null };
+      const since = Date.now() - 24 * 3600 * 1000;
+      const hit = (tables.scans ?? []).find((r) => r.user_id === a.p_user_id && Date.parse(String(r.created_at)) >= since);
+      if (hit) return res(200, [{ scan_id: hit.id, duplicate: true, request_id: hit.request_id ?? null }]);
+      const row: Row = { id: `id${++n}`, created_at: new Date().toISOString(), user_id: a.p_user_id, email_scanned: a.p_email, source: "web_scan", report_status: "pending", report_attempts: 0, ...(a.p_request_id ? { request_id: a.p_request_id } : {}) };
+      tables.scans.push(row);
+      return res(200, [{ scan_id: row.id, duplicate: false, request_id: a.p_request_id ?? null }]);
+    }
     const m = url.match(/rest\/v1\/(\w+)(\?.*)?$/);
     if (!m) return res(200, {});   // Resend, HubSpot, DNS, Gravatar...
     const [, table, qs] = m;
@@ -54,7 +66,7 @@ test.describe("/scan report request reaches the Worker", () => {
       globalThis.fetch = be.fetchImpl as unknown as typeof fetch;
       try {
         const workerReq = new Request("https://mpt-scan-report.example.workers.dev/api/scan", { method: "POST", headers: { "Content-Type": "application/json", Origin: ORIGIN }, body: req.postData() ?? "" });
-        const env = { SUPABASE_URL: "https://stub.supabase.test", SUPABASE_SERVICE_ROLE_KEY: "stub", RESEND_API_KEY: "stub", RECIPIENT_ALLOWLIST: "" };
+        const env = { SUPABASE_URL: "https://stub.supabase.co", SUPABASE_SERVICE_ROLE_KEY: "stub", RESEND_API_KEY: "stub", RECIPIENT_ALLOWLIST: "" };
         const out = await worker.fetch(workerReq, env, { waitUntil: (p: Promise<unknown>) => { pending.push(p); } });
         await Promise.all(pending);
         const text = await out.text();

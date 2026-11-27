@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import worker from './worker.js';
 
 const ENV = {
-  SUPABASE_URL: 'https://example.supabase.test',
+  SUPABASE_URL: 'https://example.supabase.co',
   SUPABASE_SERVICE_ROLE_KEY: 'sb_secret_test_key',
   CAIRN_BRIDGE_TOKEN: 'bridge-token',
   CAIRN_HASH_PEPPER: 'test-pepper',

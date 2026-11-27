@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { getUserAccessToken, resetTokenCache } from "./src/x-oauth";
 
 const log = { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
-const base = { SUPABASE_URL: "https://sb.test", SUPABASE_KEY: "svc", X_CLIENT_ID: "cid", X_CLIENT_SECRET: "csec", X_REFRESH_TOKEN: "boot-refresh", X_USER_ACCESS_TOKEN: "static" };
+const base = { SUPABASE_URL: "https://x.supabase.co", SUPABASE_KEY: "svc", X_CLIENT_ID: "cid", X_CLIENT_SECRET: "csec", X_REFRESH_TOKEN: "boot-refresh", X_USER_ACCESS_TOKEN: "static" };
 const hours = (h: number) => new Date(Date.now() + h * 3600_000).toISOString();
 
 /** A fake Supabase row store plus a fake X token endpoint. */
@@ -13,8 +13,8 @@ function world(row: null | { access_token: string; refresh_token: string; expire
   vi.spyOn(globalThis, "fetch").mockImplementation(async (u: unknown, init?: RequestInit) => {
     const url = String(u);
     calls.push({ url, init });
-    if (url.startsWith("https://sb.test") && (!init || !init.method || init.method === "GET")) return Response.json(stored ? [stored] : []);
-    if (url.startsWith("https://sb.test")) {
+    if (url.startsWith("https://x.supabase.co") && (!init || !init.method || init.method === "GET")) return Response.json(stored ? [stored] : []);
+    if (url.startsWith("https://x.supabase.co")) {
       const b = JSON.parse(init!.body as string);
       stored = { access_token: b.access_token, refresh_token: b.refresh_token, expires_at: b.expires_at };
       return new Response(null, { status: 201 });
@@ -42,7 +42,7 @@ describe("getUserAccessToken", () => {
     const w = world({ access_token: "stored-access", refresh_token: "r", expires_at: hours(1) });
     await getUserAccessToken(base, log);
     await getUserAccessToken(base, log);
-    expect(w.calls.filter((c) => c.url.startsWith("https://sb.test"))).toHaveLength(1);
+    expect(w.calls.filter((c) => c.url.startsWith("https://x.supabase.co"))).toHaveLength(1);
   });
 
   it("bootstraps from X_REFRESH_TOKEN when nothing is stored, then stores the rotated pair", async () => {
@@ -86,7 +86,7 @@ describe("getUserAccessToken", () => {
     const calls: string[] = [];
     vi.spyOn(globalThis, "fetch").mockImplementation(async (u: unknown) => {
       calls.push(String(u));
-      if (String(u).startsWith("https://sb.test")) return new Response("relation does not exist", { status: 404 });
+      if (String(u).startsWith("https://x.supabase.co")) return new Response("relation does not exist", { status: 404 });
       return Response.json({ access_token: "new-access", refresh_token: "new-refresh", expires_in: 7200 });
     });
     expect(await getUserAccessToken(base, log)).toBe("static");
@@ -103,8 +103,8 @@ describe("getUserAccessToken", () => {
     let writes = 0;
     vi.spyOn(globalThis, "fetch").mockImplementation(async (u: unknown, init?: RequestInit) => {
       const url = String(u);
-      if (url.startsWith("https://sb.test") && init?.method === "POST") { writes++; return new Response("no", { status: 500 }); }
-      if (url.startsWith("https://sb.test")) return Response.json([]);
+      if (url.startsWith("https://x.supabase.co") && init?.method === "POST") { writes++; return new Response("no", { status: 500 }); }
+      if (url.startsWith("https://x.supabase.co")) return Response.json([]);
       return Response.json({ access_token: "new-access", refresh_token: "new-refresh", expires_in: 7200 });
     });
     expect(await getUserAccessToken(base, log)).toBe("new-access");
@@ -122,8 +122,8 @@ describe("getUserAccessToken", () => {
     let stored: Record<string, unknown> = { access_token: "old", refresh_token: "revoked-refresh", expires_at: hours(-1) };
     vi.spyOn(globalThis, "fetch").mockImplementation(async (u: unknown, init?: RequestInit) => {
       const url = String(u);
-      if (url.startsWith("https://sb.test") && (!init || !init.method || init.method === "GET")) return Response.json([stored]);
-      if (url.startsWith("https://sb.test")) { stored = JSON.parse(init!.body as string); return new Response(null, { status: 201 }); }
+      if (url.startsWith("https://x.supabase.co") && (!init || !init.method || init.method === "GET")) return Response.json([stored]);
+      if (url.startsWith("https://x.supabase.co")) { stored = JSON.parse(init!.body as string); return new Response(null, { status: 201 }); }
       bodies.push(String(init!.body));
       return String(init!.body).includes("refresh_token=boot-refresh")
         ? Response.json({ access_token: "new-access", refresh_token: "new-refresh", expires_in: 7200 })
@@ -140,7 +140,7 @@ describe("getUserAccessToken", () => {
     let n = 0;
     vi.spyOn(globalThis, "fetch").mockImplementation(async (u: unknown, init?: RequestInit) => {
       const url = String(u);
-      if (url.startsWith("https://sb.test")) return Response.json([{ access_token: "old", refresh_token: "same", expires_at: hours(-1) }]);
+      if (url.startsWith("https://x.supabase.co")) return Response.json([{ access_token: "old", refresh_token: "same", expires_at: hours(-1) }]);
       n++;
       return new Response("no", { status: 400 });
     });

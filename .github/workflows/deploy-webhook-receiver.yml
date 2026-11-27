@@ -23,6 +23,7 @@ on:
       - 'src/types/hexagon.ts'
       - 'src/utils/remediationMapper.ts'
       - '.github/workflows/deploy-webhook-receiver.yml'
+      - 'shared/recipients/**'   # MPC-9885: the Workers bundle the recipient wrapper, so a change to it must redeploy them
   workflow_dispatch:
 
 concurrency:

@@ -1,3 +1,4 @@
+import { hasScanConsent } from '@/lib/scanConsent';
 import { nicknameFromHash, friendlyGraphics } from './friendlyLabels';
 import { hexagonLabel } from '../../shared/hexagon-registry/registry.js';
 import {
@@ -21,6 +22,7 @@ import {
   detectIndexedDB,
   detectCacheStorage,
 } from './storageDetection';
+import { recipientFetch } from './recipientClient';
 
 // Orientation data interface
 export interface OrientationData {
@@ -78,6 +80,8 @@ export interface DeviceData {
   };
   privacy: {
     doNotTrack: boolean;
+    /** False when the browser does not offer the setting at all (navigator.doNotTrack is null), which is not the same as the setting being off. */
+    doNotTrackSupported: boolean;
     cookiesEnabled: boolean;
   };
   // Language analysis fields
@@ -259,7 +263,7 @@ function getConnectionDisplay(): string {
   if (effectiveType === '4g') return 'Fast (4G/5G)';
   if (effectiveType === '3g') return 'Moderate (3G)';
   if (effectiveType === '2g') return 'Slow (2G)';
-  return 'WiFi'; // Default assumption for desktop
+  return 'Not available'; // MPC-7558: no Network Information API means no reading; never assume WiFi
 }
 
 // Get battery info (async)
@@ -319,7 +323,7 @@ export async function captureDeviceData(): Promise<DeviceData> {
     // MPC-7350: IP and approximate location come from our own Worker (Cloudflare request data), not from
     // third-party lookup services, so no third party sees the visitor's IP for this feature.
     const base = (import.meta.env.VITE_WORKER_ENDPOINT || 'https://api.myprivacytool.io').replace(/\/+$/, '');
-    const response = await fetch(`${base}/whoami`);
+    const response = await recipientFetch('whoami', `${base}/whoami`, undefined, []);
     if (response.ok) {
       const data = await response.json();
       ip = data.ip || ip;
@@ -365,6 +369,7 @@ export async function captureDeviceData(): Promise<DeviceData> {
     },
     privacy: {
       doNotTrack: navigator.doNotTrack === '1',
+      doNotTrackSupported: navigator.doNotTrack !== null && navigator.doNotTrack !== undefined,
       cookiesEnabled: navigator.cookieEnabled,
     },
     language: analyzeLanguageSettings(timezone),
@@ -459,7 +464,8 @@ export function generateHexagons(data: DeviceData): HexagonData[] {
     {
       id: 'privacy',
       label: 'Privacy Settings',
-      value: data.privacy.doNotTrack ? 'DNT Enabled' : 'DNT Disabled',
+      // MPC-7558: a browser without the setting is NOT CHECKED, not 'disabled'.
+      value: data.privacy.doNotTrackSupported === false ? 'Not available' : data.privacy.doNotTrack ? 'DNT Enabled' : 'DNT Disabled',
       icon: data.privacy.doNotTrack ? '🛡️' : '⚠️',
       confidence: 100,
       risk: data.privacy.doNotTrack 
@@ -490,7 +496,7 @@ export function generateHexagons(data: DeviceData): HexagonData[] {
         : data.session.referrer.includes('linkedin')
         ? 'LinkedIn'
         : data.session.referrer === 'Direct'
-        ? 'Direct Visit'
+        ? 'Direct or hidden'
         : 'External Link',
       icon: '🔍',
       confidence: 100,
@@ -651,7 +657,14 @@ export function determineUserProfile(data: DeviceData): {
 
 // Async version that includes battery info, user profile, and fingerprint hexagons
 let fingerprintScan: ReturnType<typeof scanFingerprints> | null = null;
-const runFingerprintScan = () => (fingerprintScan ??= scanFingerprints());
+// MPC-9888: the protection score uses STUN, so a scan computed before the Scan me click is redone once, after it.
+let scannedWithConsent = false;
+const runFingerprintScan = () => {
+  const now = hasScanConsent();
+  if (fingerprintScan && now && !scannedWithConsent) fingerprintScan = null;
+  scannedWithConsent = now;
+  return (fingerprintScan ??= scanFingerprints());
+};
 const scanFingerprints = () =>
   Promise.all([
     detectCanvasFingerprint().catch(() => null),
@@ -665,25 +678,23 @@ const scanFingerprints = () =>
 export async function generateHexagonsAsync(data: DeviceData): Promise<HexagonData[]> {
   const baseHexagons = generateHexagons(data);
   
-  // Try to get battery info
+  // Try to get battery info. MPC-7558: without the battery API the hexagon used to be silently absent; it is now present and says
+  // 'Not available' (NOT CHECKED).
   const batteryInfo = await getBatteryInfo();
-  if (batteryInfo) {
-    // Insert battery hexagon after connection
-    const connectionIndex = baseHexagons.findIndex(h => h.id === 'connection');
-    baseHexagons.splice(connectionIndex + 1, 0, {
-      id: 'battery',
-      label: 'Device Status',
-      value: batteryInfo.charging 
-        ? `Charging ${batteryInfo.level}%` 
-        : `Battery ${batteryInfo.level}%`,
-      icon: batteryInfo.charging ? '🔌' : '🔋',
-      confidence: 90,
-      risk: 'Battery level patterns reveal your daily routine and when you might be vulnerable.',
-      confirmed: false,
-      category: 'device',
-    });
-  }
-  
+  const connectionIndex = baseHexagons.findIndex(h => h.id === 'connection');
+  baseHexagons.splice(connectionIndex + 1, 0, {
+    id: 'battery',
+    label: 'Device Status',
+    value: !batteryInfo ? 'Not available' : batteryInfo.charging ? `Charging ${batteryInfo.level}%` : `Battery ${batteryInfo.level}%`,
+    icon: batteryInfo?.charging ? '🔌' : '🔋',
+    confidence: 90,
+    risk: batteryInfo
+      ? 'Battery level patterns reveal your daily routine and when you might be vulnerable.'
+      : 'This browser does not offer the battery API, so we could not check it.',
+    confirmed: false,
+    category: 'device',
+  });
+
   // Add user profile hexagon based on language analysis
   const userProfile = determineUserProfile(data);
   const profileEmoji = userProfile.profile === 'expatriate' ? '🌍' :
@@ -776,9 +787,9 @@ export async function generateHexagonsAsync(data: DeviceData): Promise<HexagonDa
   // Plugin/Extension Detection
   if (pluginsResult) {
     const extensionValue = pluginsResult.adBlocker 
-      ? 'Ad Blocker: Yes' 
+      ? 'Ad blocker likely' 
       : pluginsResult.pluginCount > 0 
-        ? `${pluginsResult.pluginCount} detected` 
+        ? `${pluginsResult.pluginCount} browser plug-in${pluginsResult.pluginCount === 1 ? '' : 's'} listed` 
         : 'None detected';
     fingerprintHexagons.push({
       id: 'extension-detection',
@@ -786,7 +797,7 @@ export async function generateHexagonsAsync(data: DeviceData): Promise<HexagonDa
       value: extensionValue,
       icon: '🧩',
       confidence: 85,
-      risk: 'Plugins and extensions. Browser extensions and plugins add to your unique fingerprint.',
+      risk: 'A guess from a decoy ad element and your browser\'s plug-in list. Websites cannot list your extensions this way, and neither can we.',
       confirmed: false,
       category: 'fingerprint',
     });
@@ -834,8 +845,9 @@ export async function generateHexagonsAsync(data: DeviceData): Promise<HexagonDa
   }
   
   // Run advanced fingerprint detection in parallel
+  // MPC-9888: the WebRTC check contacts Google STUN, so it runs inside the scan (after the Scan me click); before it the hexagon says so.
   const [webrtcResult, batteryResult, mediaResult] = await Promise.all([
-    detectWebRTCLeak().catch(() => null),
+    hasScanConsent() ? detectWebRTCLeak().catch(() => null) : Promise.resolve(null),
     detectBatteryStatus().catch(() => null),
     detectMediaDevices().catch(() => null),
   ]);
@@ -848,7 +860,9 @@ export async function generateHexagonsAsync(data: DeviceData): Promise<HexagonDa
   // Advanced Fingerprint Hexagons
   
   // 1. WebRTC Leak Detection
-  if (webrtcResult) {
+  const webrtcAwaitingScan = !hasScanConsent();
+  if (webrtcResult || webrtcAwaitingScan) {
+    const wr = webrtcResult ?? { localIPs: [] as string[], publicIPs: [] as string[], isLeaking: false, vpnDetected: false, state: undefined, detectorVersion: undefined };
     let webrtcValue = 'Blocked';
     let webrtcRisk = 'WebRTC is blocked. Your real IP is protected.';
     const webrtcConfidence = 100;
@@ -856,24 +870,30 @@ export async function generateHexagonsAsync(data: DeviceData): Promise<HexagonDa
     let webrtcHeadline = 'Your browser shared only some network details';
     let webrtcExplanation = 'Your browser let this page see some network details, but not a clear real address. This one needs investigation to know what else is visible.';
 
-    if (webrtcResult.localIPs.length === 0 && webrtcResult.publicIPs.length === 0) {
+    if (wr.localIPs.length === 0 && wr.publicIPs.length === 0) {
       webrtcValue = 'No Leak Detected';
       webrtcRisk = 'WebRTC is not leaking your IP address. Good for privacy!';
       webrtcHeadline = 'No address slipped out';
       webrtcExplanation = 'We could not see your network addresses from this page. Good. Some video-call sites may not work if your browser blocks this feature on purpose.';
-    } else if (webrtcResult.isLeaking) {
-      const leakedIPs = webrtcResult.publicIPs.slice(0, 2).join(', ');
+    } else if (wr.isLeaking) {
+      const leakedIPs = wr.publicIPs.slice(0, 2).join(', ');
       webrtcValue = `Leaking: ${leakedIPs.substring(0, 15)}${leakedIPs.length > 15 ? '...' : ''}`;
-      webrtcRisk = `CRITICAL: Your real IP (${webrtcResult.publicIPs[0]}) is exposed! ${webrtcResult.vpnDetected ? 'VPN detected but IP still leaking.' : 'Attackers can see your real location.'}`;
+      webrtcRisk = `CRITICAL: Your real IP (${wr.publicIPs[0]}) is exposed! ${wr.vpnDetected ? 'VPN detected but IP still leaking.' : 'Attackers can see your real location.'}`;
       webrtcHeadline = 'Your real address may be showing';
       webrtcExplanation = 'Your browser let this page see an internet address that may be your real one, even if you use a VPN. This can happen because browsers use a feature called WebRTC (made for video calls) that can share network details. This one needs investigation to know who else can see it. Switching off WebRTC in your browser settings, or using a VPN with leak protection, usually closes this.';
-    } else if (webrtcResult.vpnDetected) {
+    } else if (wr.vpnDetected) {
       webrtcValue = 'VPN Protected';
       webrtcRisk = 'VPN detected and working. Only local IPs visible.';
       webrtcHeadline = 'Your real address looks hidden';
       webrtcExplanation = 'The address we can see looks like it belongs to a VPN or similar service, so your own is likely hidden. We cannot be certain from here.';
     }
     
+    if (webrtcAwaitingScan) {   // MPC-9888: not checked yet; the Google STUN lookup runs when the visitor presses Scan me
+      webrtcValue = 'Runs when you scan';
+      webrtcRisk = 'Not checked yet: it runs when you press Scan me.';
+      webrtcHeadline = 'Runs when you scan';
+      webrtcExplanation = 'This check asks an outside server (Google) which address your browser shows. We do not do that until you press Scan me.';
+    }
     fingerprintHexagons.push({
       id: 'webrtc-leak',
       label: 'WebRTC Leak',
@@ -885,10 +905,11 @@ export async function generateHexagonsAsync(data: DeviceData): Promise<HexagonDa
       risk: webrtcRisk,
       confirmed: false,
       category: 'fingerprint',
-      observation: { state: webrtcResult.state, detectorVersion: webrtcResult.detectorVersion },
+      observation: webrtcAwaitingScan ? undefined : { state: webrtcResult!.state, detectorVersion: webrtcResult!.detectorVersion },
     });
   }
   
+
   // 2. Hardware Profile
   fingerprintHexagons.push({
     id: 'hardware-profile',
@@ -1133,7 +1154,7 @@ export async function generateHexagonsAsync(data: DeviceData): Promise<HexagonDa
   
   // 1. Google Services
   const googleValue = !googleResult.isLoggedIn 
-    ? 'Not Detected' 
+    ? 'Not checked' 
     : googleResult.services.length > 0 
       ? `${googleResult.services.length} services` 
       : 'Logged In';
@@ -1146,14 +1167,14 @@ export async function generateHexagonsAsync(data: DeviceData): Promise<HexagonDa
     confidence: 100,
     risk: googleResult.isLoggedIn 
       ? `Logged into Google: ${googleResult.services.join(', ')}. Google tracks your searches, location, and activity across the web.`
-      : 'No Google login detected. Your searches and browsing are not linked to a Google profile on this browser.',
+      : "Not checked: a web page cannot see whether you are signed in to Google, because it only sees this site's own cookies. No claim is made either way.",
     confirmed: false,
     category: 'social',
   });
   
   // 2. Meta/Facebook Services
   const metaValue = !metaResult.isLoggedIn 
-    ? 'Not Detected' 
+    ? 'Not checked' 
     : metaResult.services.length > 0 
       ? `${metaResult.services.length} services` 
       : 'Logged In';
@@ -1166,14 +1187,14 @@ export async function generateHexagonsAsync(data: DeviceData): Promise<HexagonDa
     confidence: 100,
     risk: metaResult.isLoggedIn 
       ? `Logged into Meta: ${metaResult.services.join(', ')}. Facebook Pixel tracks you on millions of websites.`
-      : 'No Meta login detected. Facebook cannot directly link your browsing to your social profile.',
+      : "Not checked: a web page cannot see whether you are signed in to Facebook or Instagram, because it only sees this site's own cookies. No claim is made either way.",
     confirmed: false,
     category: 'social',
   });
   
   // 3. Microsoft Services
   const microsoftValue = !microsoftResult.isLoggedIn 
-    ? 'Not Detected' 
+    ? 'Not checked' 
     : microsoftResult.services.length > 0 
       ? `${microsoftResult.services.length} services` 
       : 'Logged In';
@@ -1186,7 +1207,7 @@ export async function generateHexagonsAsync(data: DeviceData): Promise<HexagonDa
     confidence: 100,
     risk: microsoftResult.isLoggedIn 
       ? `Logged into Microsoft: ${microsoftResult.services.join(', ')}. Your Office 365 activity and Bing searches may be linked.`
-      : 'No Microsoft login detected on this browser.',
+      : "Not checked: a web page cannot see whether you are signed in to Microsoft, because it only sees this site's own cookies. No claim is made either way.",
     confirmed: false,
     category: 'social',
   });
@@ -1194,7 +1215,7 @@ export async function generateHexagonsAsync(data: DeviceData): Promise<HexagonDa
   // 4. Social Media Platforms
   const connectedPlatforms = socialResult.platforms.filter(p => p.loggedIn);
   const socialValue = connectedPlatforms.length === 0 
-    ? 'No Platforms' 
+    ? 'Not checked' 
     : `${connectedPlatforms.length} platform${connectedPlatforms.length > 1 ? 's' : ''}`;
   
   socialHexagons.push({
@@ -1205,14 +1226,14 @@ export async function generateHexagonsAsync(data: DeviceData): Promise<HexagonDa
     confidence: 95,
     risk: connectedPlatforms.length > 0 
       ? `Connected to: ${connectedPlatforms.map(p => p.name).slice(0, 3).join(', ')}${connectedPlatforms.length > 3 ? '...' : ''}. Each platform builds a profile of your interests and connections.`
-      : 'No social media logins detected. Social platforms cannot link your browsing to your accounts.',
+      : "Not checked: a web page cannot see whether you are signed in to social platforms, because it only sees this site's own cookies. No claim is made either way.",
     confirmed: false,
     category: 'social',
   });
   
   // 5. Cross-Site Identity / Account Linking
   const crossSiteValue = !crossSiteResult.ssoDetected 
-    ? 'Not Linked' 
+    ? 'Not checked' 
     : crossSiteResult.linkedAccounts > 0 
       ? `${crossSiteResult.linkedAccounts} connections` 
       : 'Linked';
@@ -1225,7 +1246,7 @@ export async function generateHexagonsAsync(data: DeviceData): Promise<HexagonDa
     confidence: 90,
     risk: crossSiteResult.ssoDetected 
       ? `CRITICAL: SSO detected! ${crossSiteResult.trackingNetwork.join(', ')} can link your identity across websites. Your browsing creates a unified profile.`
-      : 'No cross-site identity linking detected. Your accounts appear isolated.',
+      : "Not checked: a web page cannot see tracking or single sign-on cookies that belong to other sites. No claim is made either way.",
     confirmed: false,
     category: 'social',
   });
@@ -1376,18 +1397,19 @@ export async function generateHexagonsAsync(data: DeviceData): Promise<HexagonDa
         dnsHexagon.headline = 'Your lookups may be going the long way';
         dnsHexagon.explanation = 'When you open a website, your device first asks a service where it lives (a DNS lookup). Yours may be asking your internet provider instead of your VPN, so they could see which sites you visit. This one needs investigation to know how much is visible. Your VPN app often has a DNS leak protection switch; our guide shows how.';
         dnsHexagon.risk = `CRITICAL: DNS leak detected! Your real location (${dnsResult.actualLocation}) is exposed. ${dnsResult.vpnDetected ? 'VPN is not protecting your DNS queries.' : 'ISP can see all your browsing.'}`;
-      } else if (dnsResult.vpnDetected) {
-        dnsHexagon.value = 'VPN Protected';
-        dnsHexagon.icon = '🔒';
-        dnsHexagon.headline = 'Your lookups appear to go through your VPN';
-        dnsHexagon.explanation = 'Your website lookups appear to go through your VPN, which is what you want.';
-        dnsHexagon.risk = 'DNS is routed through VPN. Your real location is hidden.';
+      } else if (!dnsResult.checked) {
+        // MPC-9791: a blocked, unavailable or consent-less probe is NOT CHECKED, never "no leak".
+        dnsHexagon.value = 'Not checked';
+        dnsHexagon.icon = '❔';
+        dnsHexagon.headline = 'We could not run this check';
+        dnsHexagon.explanation = 'This check needs your browser to answer a network test, and it did not (it may be blocked, switched off or waiting for your Scan me press). So we make no claim either way.';
+        dnsHexagon.risk = 'Not checked: the browser test did not run, so nothing is claimed about your lookups.';
       } else {
-        dnsHexagon.value = 'No Leak Detected';
+        dnsHexagon.value = 'No leak seen';
         dnsHexagon.icon = '✅';
-        dnsHexagon.headline = 'Your lookups look normal';
-        dnsHexagon.explanation = 'We did not see your lookups leaving through an unexpected route.';
-        dnsHexagon.risk = 'No DNS leak detected. Your DNS queries are not exposing your location.';
+        dnsHexagon.headline = 'No address leaked in this test';
+        dnsHexagon.explanation = 'This test looks for a real internet address your browser gives away through WebRTC. None showed. It does not test which DNS service answers your lookups.';
+        dnsHexagon.risk = 'No address leaked in the WebRTC test. This is not a test of your DNS service.';
       }
     }
   }).catch(() => {

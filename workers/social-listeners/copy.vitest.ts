@@ -25,7 +25,8 @@ describe("bot English wording does not over-promise", () => {
   it("says what the bot can see and keep, what it cannot see, and that brokers are not searched yet", () => {
     expect(en["bot.first_hexagon.question"]).toMatch(/public details of your Telegram profile/);
     expect(en["bot.first_hexagon.question"]).toMatch(/don't get your phone number or contacts/);
-    expect(en["bot.first_hexagon.question"]).toMatch(/up to 90 days/);
+    expect(en["bot.first_hexagon.question"]).toMatch(/keep them until you ask me to delete them/);
+    expect(en["bot.first_hexagon.question"]).not.toMatch(/90 days/);
     expect(en["bot.first_hexagon.question"]).not.toMatch(/can't see your Telegram profile/);
     expect(en["bot.first_hexagon.brokers"]).toMatch(/not searched yet/i);
   });

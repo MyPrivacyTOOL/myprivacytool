@@ -10,6 +10,9 @@
  * fetchIdentity() costs at most 1 + 3 + 2 + 3 = 9 requests, and results are cached 24h.
  */
 
+import { callRecipient } from '../../../shared/recipients/outbound.ts';
+import { workerRecipientContext } from '../../../shared/recipients/worker-ctx.ts';
+
 const API = 'https://api.github.com';
 const MAX_PAGES = { repos: 3, starred: 2, events: 3 };
 
@@ -24,46 +27,56 @@ export class GitHubAdapterError extends Error {
 }
 
 export class GitHubAdapter extends SocialPlatformAdapter {
-  constructor({ token, fetchFn = fetch }) {
+  constructor({ token, fetchFn = undefined }) {
     super();
     this.token = token;
-    // Wrap so `fetch` is never invoked as a method of this object: Workers throws "Illegal invocation"
-    // when the global fetch is called with a different `this`.
-    this.fetchFn = (...args) => fetchFn(...args);
+    // The wrapper calls the injected function (or the global fetch, bound) itself, so `fetch` is never a method of this object
+    // (Workers throws "Illegal invocation" when the global fetch is called with a different `this`).
+    this.rctx = workerRecipientContext(null, { fetchImpl: fetchFn });
   }
 
   async get(path) {
-    const res = await this.fetchFn(`${API}${path}`, {
+    // MPC-9885: only /users/<login>/... carries the account name (username); /user, /user/repos and /user/starred carry none.
+    const res = await callRecipient('oauth-providers', { url: `${API}${path}`, sent: path.startsWith('/users/') ? ['username'] : [], init: {
       headers: {
         Authorization: `Bearer ${this.token}`,
         Accept: 'application/vnd.github+json',
         'X-GitHub-Api-Version': '2022-11-28',
         'User-Agent': 'myprivacytool-github-channel',
       },
-    });
+    } }, this.rctx);
     // Message carries status only: never the URL query, token or body.
     if (!res.ok) throw new GitHubAdapterError(res.status, `github api ${res.status}`);
     return res.json();
   }
 
-  async paged(path, maxPages) {
-    const out = [];
+  /** Up to maxPages pages of 100. `capped` is true when the last page allowed was still full: there may be more that we did not read. */
+  async pagedCapped(path, maxPages) {
+    const items = [];
+    let capped = false;
     for (let page = 1; page <= maxPages; page++) {
       const sep = path.includes('?') ? '&' : '?';
-      const items = await this.get(`${path}${sep}per_page=100&page=${page}`);
-      out.push(...items);
-      if (items.length < 100) break;
+      const got = await this.get(`${path}${sep}per_page=100&page=${page}`);
+      items.push(...got);
+      if (got.length < 100) break;
+      if (page === maxPages) capped = true;
     }
-    return out;
+    return { items, capped };
   }
+
+  async paged(path, maxPages) { return (await this.pagedCapped(path, maxPages)).items; }
 
   async fetchIdentity() {
     const profile = await this.get('/user');
+    // MPC-9795: each list reports whether the page cap cut it short.
     const [repos, starred, events] = await Promise.all([
-      this.paged('/user/repos?visibility=public&affiliation=owner&sort=pushed', MAX_PAGES.repos),
-      this.paged('/user/starred', MAX_PAGES.starred),
-      this.paged(`/users/${encodeURIComponent(profile.login)}/events/public`, MAX_PAGES.events),
+      this.pagedCapped('/user/repos?visibility=public&affiliation=owner&sort=pushed', MAX_PAGES.repos),
+      this.pagedCapped('/user/starred', MAX_PAGES.starred),
+      this.pagedCapped(`/users/${encodeURIComponent(profile.login)}/events/public`, MAX_PAGES.events),
     ]);
-    return { profile, repos, starred, events };
+    return {
+      profile, repos: repos.items, starred: starred.items, events: events.items,
+      coverage: { repos_capped: repos.capped, starred_capped: starred.capped, events_capped: events.capped },
+    };
   }
 }

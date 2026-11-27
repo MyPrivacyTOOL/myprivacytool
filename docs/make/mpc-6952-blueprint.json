@@ -1,0 +1,686 @@
+{
+  "name": "MPC-6952 Content distribution (Blog + approved posts → LinkedIn, Facebook, Instagram, YouTube queue)",
+  "metadata": {
+    "instant": true,
+    "version": 1,
+    "scenario": {
+      "dlq": false,
+      "maxErrors": 3,
+      "autoCommit": true,
+      "roundtrips": 1,
+      "sequential": true,
+      "confidential": false
+    }
+  },
+  "flow": [
+    {
+      "id": 1,
+      "mapper": {},
+      "module": "gateway:CustomWebHook",
+      "version": 1,
+      "metadata": {
+        "designer": {
+          "x": 0,
+          "y": 0
+        }
+      },
+      "parameters": {
+        "hook": 3856260,
+        "maxResults": 1
+      }
+    },
+    {
+      "id": 10,
+      "mapper": null,
+      "module": "builtin:BasicRouter",
+      "version": 1,
+      "metadata": {
+        "designer": {
+          "x": 300,
+          "y": 0
+        }
+      },
+      "routes": [
+        {
+          "flow": [
+            {
+              "id": 6,
+              "filter": {
+                "name": "Only when LinkedIn text is supplied",
+                "conditions": [
+                  [
+                    {
+                      "a": "{{1.linkedin_text}}",
+                      "o": "exist"
+                    }
+                  ]
+                ]
+              },
+              "mapper": {
+                "type": "ARTICLE",
+                "media": {
+                  "title": "{{1.title}}",
+                  "description": "{{1.excerpt}}",
+                  "originalUrl": "{{1.url}}?utm_source=linkedin&utm_medium=social&utm_campaign={{1.campaign}}"
+                },
+                "content": "{{1.linkedin_text}}",
+                "visibility": "PUBLIC",
+                "organization": "urn:li:organization:88918654",
+                "feedDistribution": "MAIN_FEED",
+                "isReshareDisabledByAuthor": false
+              },
+              "module": "linkedin:CreateTextShare",
+              "version": 2,
+              "metadata": {
+                "designer": {
+                  "x": 600,
+                  "y": -150
+                }
+              },
+              "parameters": {
+                "__IMTCONN__": 663639
+              }
+            }
+          ]
+        },
+        {
+          "flow": [
+            {
+              "id": 11,
+              "filter": {
+                "name": "Only approved daily-post envelopes (posts array)",
+                "conditions": [
+                  [
+                    {
+                      "a": "{{1.posts}}",
+                      "o": "exist"
+                    }
+                  ]
+                ]
+              },
+              "mapper": {
+                "array": "{{1.posts}}"
+              },
+              "module": "builtin:BasicFeeder",
+              "version": 1,
+              "metadata": {
+                "designer": {
+                  "x": 600,
+                  "y": 150
+                }
+              },
+              "parameters": {}
+            },
+            {
+              "id": 14,
+              "mapper": null,
+              "module": "builtin:BasicRouter",
+              "version": 1,
+              "metadata": {
+                "designer": {
+                  "x": 900,
+                  "y": 150
+                }
+              },
+              "routes": [
+                {
+                  "flow": [
+                    {
+                      "id": 15,
+                      "filter": {
+                        "name": "LinkedIn post with image_key (MPC-8366 image route)",
+                        "conditions": [
+                          [
+                            {
+                              "a": "{{11.platform}}",
+                              "b": "linkedin",
+                              "o": "text:equal"
+                            },
+                            {
+                              "a": "{{11.image_key}}",
+                              "o": "exist"
+                            }
+                          ]
+                        ]
+                      },
+                      "mapper": {
+                        "url": "https://www.myprivacytool.io/cdn-cgi/image/width=1200,height=630,fit=pad,background=%23ffffff,format=jpeg/https://assets.myprivacytool.io/{{11.image_key}}",
+                        "method": "get",
+                        "serializeUrl": false,
+                        "shareCookies": false
+                      },
+                      "module": "http:ActionGetFile",
+                      "version": 3,
+                      "metadata": {
+                        "designer": {
+                          "x": 1200,
+                          "y": -100
+                        }
+                      },
+                      "parameters": {
+                        "handleErrors": false
+                      }
+                    },
+                    {
+                      "id": 16,
+                      "mapper": {
+                        "type": "ARTICLE",
+                        "media": {
+                          "title": "{{11.title}}",
+                          "thumbnail": {
+                            "data": "{{15.data}}",
+                            "fileName": "{{15.fileName}}",
+                            "thumbnailAltText": "{{11.title}}"
+                          },
+                          "description": "{{11.cta}}",
+                          "originalUrl": "{{11.link_url}}"
+                        },
+                        "content": "{{11.body}}",
+                        "visibility": "PUBLIC",
+                        "organization": "urn:li:organization:88918654",
+                        "feedDistribution": "MAIN_FEED",
+                        "isReshareDisabledByAuthor": false
+                      },
+                      "module": "linkedin:CreateTextShare",
+                      "version": 2,
+                      "metadata": {
+                        "designer": {
+                          "x": 1500,
+                          "y": -100
+                        }
+                      },
+                      "parameters": {
+                        "__IMTCONN__": 663639
+                      }
+                    },
+                    {
+                      "id": 20,
+                      "mapper": {
+                        "url": "https://mpt-content-approval.myprivacytool.workers.dev/receipt",
+                        "data": "{\"receipt_id\":\"{{1.drafted_content_id}}:linkedin\",\"drafted_content_id\":\"{{1.drafted_content_id}}\",\"platform\":\"linkedin\",\"status\":\"published\",\"make_run_id\":\"{{executionId}}\",\"post_id\":\"{{16.id}}\",\"post_url\":\"https://www.linkedin.com/feed/update/{{16.id}}/\",\"published_at\":\"{{formatDate(now; \"YYYY-MM-DD[T]HH:mm:ss[Z]\"; \"UTC\")}}\"}",
+                        "gzip": true,
+                        "method": "post",
+                        "headers": [
+                          {
+                            "name": "x-receipt-token",
+                            "value": "__RECEIPT_TOKEN__"
+                          }
+                        ],
+                        "timeout": 20,
+                        "useMtls": false,
+                        "bodyType": "raw",
+                        "contentType": "application/json",
+                        "serializeUrl": false,
+                        "shareCookies": false,
+                        "parseResponse": false,
+                        "followRedirect": true,
+                        "followAllRedirects": false,
+                        "useQuerystring": false,
+                        "rejectUnauthorized": true
+                      },
+                      "module": "http:ActionSendData",
+                      "onerror": [
+                        {
+                          "id": 24,
+                          "module": "builtin:Ignore",
+                          "version": 1,
+                          "metadata": {
+                            "designer": {
+                              "x": 2400,
+                              "y": -100
+                            }
+                          }
+                        }
+                      ],
+                      "version": 3,
+                      "metadata": {
+                        "designer": {
+                          "x": 1800,
+                          "y": -100
+                        }
+                      },
+                      "parameters": {
+                        "handleErrors": false
+                      }
+                    }
+                  ]
+                },
+                {
+                  "flow": [
+                    {
+                      "id": 12,
+                      "filter": {
+                        "name": "Only the LinkedIn post without image_key",
+                        "conditions": [
+                          [
+                            {
+                              "a": "{{11.platform}}",
+                              "b": "linkedin",
+                              "o": "text:equal"
+                            },
+                            {
+                              "a": "{{11.image_key}}",
+                              "o": "notexist"
+                            }
+                          ]
+                        ]
+                      },
+                      "mapper": {
+                        "type": "ARTICLE",
+                        "media": {
+                          "title": "{{11.title}}",
+                          "description": "{{11.cta}}",
+                          "originalUrl": "{{11.link_url}}"
+                        },
+                        "content": "{{11.body}}",
+                        "visibility": "PUBLIC",
+                        "organization": "urn:li:organization:88918654",
+                        "feedDistribution": "MAIN_FEED",
+                        "isReshareDisabledByAuthor": false
+                      },
+                      "module": "linkedin:CreateTextShare",
+                      "version": 2,
+                      "metadata": {
+                        "designer": {
+                          "x": 1200,
+                          "y": 100
+                        }
+                      },
+                      "parameters": {
+                        "__IMTCONN__": 663639
+                      }
+                    },
+                    {
+                      "id": 21,
+                      "mapper": {
+                        "url": "https://mpt-content-approval.myprivacytool.workers.dev/receipt",
+                        "data": "{\"receipt_id\":\"{{1.drafted_content_id}}:linkedin\",\"drafted_content_id\":\"{{1.drafted_content_id}}\",\"platform\":\"linkedin\",\"status\":\"published\",\"make_run_id\":\"{{executionId}}\",\"post_id\":\"{{12.id}}\",\"post_url\":\"https://www.linkedin.com/feed/update/{{12.id}}/\",\"published_at\":\"{{formatDate(now; \"YYYY-MM-DD[T]HH:mm:ss[Z]\"; \"UTC\")}}\"}",
+                        "gzip": true,
+                        "method": "post",
+                        "headers": [
+                          {
+                            "name": "x-receipt-token",
+                            "value": "__RECEIPT_TOKEN__"
+                          }
+                        ],
+                        "timeout": 20,
+                        "useMtls": false,
+                        "bodyType": "raw",
+                        "contentType": "application/json",
+                        "serializeUrl": false,
+                        "shareCookies": false,
+                        "parseResponse": false,
+                        "followRedirect": true,
+                        "followAllRedirects": false,
+                        "useQuerystring": false,
+                        "rejectUnauthorized": true
+                      },
+                      "module": "http:ActionSendData",
+                      "onerror": [
+                        {
+                          "id": 25,
+                          "module": "builtin:Ignore",
+                          "version": 1,
+                          "metadata": {
+                            "designer": {
+                              "x": 2100,
+                              "y": 100
+                            }
+                          }
+                        }
+                      ],
+                      "version": 3,
+                      "metadata": {
+                        "designer": {
+                          "x": 1500,
+                          "y": 100
+                        }
+                      },
+                      "parameters": {
+                        "handleErrors": false
+                      }
+                    }
+                  ]
+                },
+                {
+                  "flow": [
+                    {
+                      "id": 13,
+                      "filter": {
+                        "name": "Only the Facebook post",
+                        "conditions": [
+                          [
+                            {
+                              "a": "{{11.platform}}",
+                              "b": "facebook",
+                              "o": "text:equal"
+                            }
+                          ]
+                        ]
+                      },
+                      "mapper": {
+                        "link": "{{11.link_url}}",
+                        "message": "{{11.body}}",
+                        "page_id": "105634291085696"
+                      },
+                      "module": "facebook-pages:CreatePost",
+                      "version": 6,
+                      "metadata": {
+                        "designer": {
+                          "x": 1200,
+                          "y": 300
+                        }
+                      },
+                      "parameters": {
+                        "__IMTCONN__": 3897030
+                      }
+                    },
+                    {
+                      "id": 22,
+                      "mapper": {
+                        "url": "https://mpt-content-approval.myprivacytool.workers.dev/receipt",
+                        "data": "{\"receipt_id\":\"{{1.drafted_content_id}}:facebook\",\"drafted_content_id\":\"{{1.drafted_content_id}}\",\"platform\":\"facebook\",\"status\":\"published\",\"make_run_id\":\"{{executionId}}\",\"post_id\":\"{{13.id}}\",\"published_at\":\"{{formatDate(now; \"YYYY-MM-DD[T]HH:mm:ss[Z]\"; \"UTC\")}}\"}",
+                        "gzip": true,
+                        "method": "post",
+                        "headers": [
+                          {
+                            "name": "x-receipt-token",
+                            "value": "__RECEIPT_TOKEN__"
+                          }
+                        ],
+                        "timeout": 20,
+                        "useMtls": false,
+                        "bodyType": "raw",
+                        "contentType": "application/json",
+                        "serializeUrl": false,
+                        "shareCookies": false,
+                        "parseResponse": false,
+                        "followRedirect": true,
+                        "followAllRedirects": false,
+                        "useQuerystring": false,
+                        "rejectUnauthorized": true
+                      },
+                      "module": "http:ActionSendData",
+                      "onerror": [
+                        {
+                          "id": 26,
+                          "module": "builtin:Ignore",
+                          "version": 1,
+                          "metadata": {
+                            "designer": {
+                              "x": 2100,
+                              "y": 300
+                            }
+                          }
+                        }
+                      ],
+                      "version": 3,
+                      "metadata": {
+                        "designer": {
+                          "x": 1500,
+                          "y": 300
+                        }
+                      },
+                      "parameters": {
+                        "handleErrors": false
+                      }
+                    }
+                  ]
+                },
+                {
+                  "flow": [
+                    {
+                      "id": 17,
+                      "filter": {
+                        "name": "Only the Instagram photo post (image assets only)",
+                        "conditions": [
+                          [
+                            {
+                              "a": "{{11.platform}}",
+                              "b": "instagram",
+                              "o": "text:equal"
+                            },
+                            {
+                              "a": "{{11.content_type}}",
+                              "b": "image",
+                              "o": "text:equal"
+                            }
+                          ]
+                        ]
+                      },
+                      "mapper": {
+                        "caption": "{{11.body}}",
+                        "accountId": "17841433471308305",
+                        "image_url": "{{11.asset_url}}"
+                      },
+                      "module": "instagram-business:CreatePostPhoto",
+                      "version": 1,
+                      "metadata": {
+                        "designer": {
+                          "x": 1200,
+                          "y": 500
+                        }
+                      },
+                      "parameters": {
+                        "__IMTCONN__": 12403850
+                      }
+                    },
+                    {
+                      "id": 23,
+                      "mapper": {
+                        "url": "https://mpt-content-approval.myprivacytool.workers.dev/receipt",
+                        "data": "{\"receipt_id\":\"{{1.drafted_content_id}}:instagram\",\"drafted_content_id\":\"{{1.drafted_content_id}}\",\"platform\":\"instagram\",\"status\":\"published\",\"make_run_id\":\"{{executionId}}\",\"post_id\":\"{{17.id}}\",\"published_at\":\"{{formatDate(now; \"YYYY-MM-DD[T]HH:mm:ss[Z]\"; \"UTC\")}}\"}",
+                        "gzip": true,
+                        "method": "post",
+                        "headers": [
+                          {
+                            "name": "x-receipt-token",
+                            "value": "__RECEIPT_TOKEN__"
+                          }
+                        ],
+                        "timeout": 20,
+                        "useMtls": false,
+                        "bodyType": "raw",
+                        "contentType": "application/json",
+                        "serializeUrl": false,
+                        "shareCookies": false,
+                        "parseResponse": false,
+                        "followRedirect": true,
+                        "followAllRedirects": false,
+                        "useQuerystring": false,
+                        "rejectUnauthorized": true
+                      },
+                      "module": "http:ActionSendData",
+                      "onerror": [
+                        {
+                          "id": 27,
+                          "module": "builtin:Ignore",
+                          "version": 1,
+                          "metadata": {
+                            "designer": {
+                              "x": 2100,
+                              "y": 500
+                            }
+                          }
+                        }
+                      ],
+                      "version": 3,
+                      "metadata": {
+                        "designer": {
+                          "x": 1500,
+                          "y": 500
+                        }
+                      },
+                      "parameters": {
+                        "handleErrors": false
+                      }
+                    }
+                  ]
+                },
+                {
+                  "flow": [
+                    {
+                      "id": 30,
+                      "filter": {
+                        "name": "YouTube post on every third day of the month (Hong Kong date): take the next queued video",
+                        "conditions": [
+                          [
+                            {
+                              "a": "{{11.platform}}",
+                              "b": "youtube",
+                              "o": "text:equal"
+                            },
+                            {
+                              "a": "{{formatDate(now; \"D\"; \"Asia/Hong_Kong\") - 3 * floor(formatDate(now; \"D\"; \"Asia/Hong_Kong\") / 3)}}",
+                              "b": "0",
+                              "o": "number:equal"
+                            }
+                          ]
+                        ]
+                      },
+                      "mapper": {
+                        "limit": 1,
+                        "query": "'1BY35B4kgAJEiEBwzsWnKZ09P_CejTB5k' in parents and mimeType contains 'video/' and trashed = false",
+                        "select": "map",
+                        "retrieve": "file",
+                        "searchType": "custom"
+                      },
+                      "module": "google-drive:searchForFilesFolders",
+                      "version": 4,
+                      "metadata": {
+                        "designer": {
+                          "x": 1200,
+                          "y": 700
+                        }
+                      },
+                      "parameters": {
+                        "__IMTCONN__": 12409578
+                      }
+                    },
+                    {
+                      "id": 31,
+                      "mapper": {
+                        "file": "{{30.id}}",
+                        "select": "map",
+                        "formatDrawings": "application/pdf",
+                        "formatDocuments": "application/pdf",
+                        "formatSpreadsheets": "application/pdf",
+                        "formatPresentations": "application/pdf"
+                      },
+                      "module": "google-drive:getAFile",
+                      "version": 4,
+                      "metadata": {
+                        "designer": {
+                          "x": 1500,
+                          "y": 700
+                        }
+                      },
+                      "parameters": {
+                        "__IMTCONN__": 12409578
+                      }
+                    },
+                    {
+                      "id": 32,
+                      "mapper": {
+                        "data": "{{31.data}}",
+                        "title": "{{11.title}}",
+                        "fileName": "{{31.name}}",
+                        "categoryId": "28",
+                        "description": "{{11.body}}",
+                        "privacyStatus": "public",
+                        "containsSyntheticMedia": false,
+                        "selfDeclaredMadeForKids": false
+                      },
+                      "module": "youtube:uploadVideo",
+                      "version": 4,
+                      "metadata": {
+                        "designer": {
+                          "x": 1800,
+                          "y": 700
+                        }
+                      },
+                      "parameters": {
+                        "__IMTCONN__": 12360720
+                      }
+                    },
+                    {
+                      "id": 33,
+                      "mapper": {
+                        "file": "{{30.id}}",
+                        "move": "drive",
+                        "select": "file",
+                        "folderId": "1yvtoQXQjttShzh4l7myzCzROGr64_Vum",
+                        "destination": "drive"
+                      },
+                      "module": "google-drive:moveAFileIntoAFolder",
+                      "version": 4,
+                      "metadata": {
+                        "designer": {
+                          "x": 2100,
+                          "y": 700
+                        }
+                      },
+                      "parameters": {
+                        "__IMTCONN__": 12409578
+                      }
+                    },
+                    {
+                      "id": 34,
+                      "mapper": {
+                        "url": "https://mpt-content-approval.myprivacytool.workers.dev/receipt",
+                        "data": "{\"receipt_id\":\"{{1.drafted_content_id}}:youtube\",\"drafted_content_id\":\"{{1.drafted_content_id}}\",\"platform\":\"youtube\",\"status\":\"published\",\"make_run_id\":\"{{executionId}}\",\"post_id\":\"{{32.id}}\",\"post_url\":\"https://www.youtube.com/watch?v={{32.id}}\",\"published_at\":\"{{formatDate(now; \"YYYY-MM-DD[T]HH:mm:ss[Z]\"; \"UTC\")}}\"}",
+                        "gzip": true,
+                        "method": "post",
+                        "headers": [
+                          {
+                            "name": "x-receipt-token",
+                            "value": "__RECEIPT_TOKEN__"
+                          }
+                        ],
+                        "timeout": 20,
+                        "useMtls": false,
+                        "bodyType": "raw",
+                        "contentType": "application/json",
+                        "serializeUrl": false,
+                        "shareCookies": false,
+                        "parseResponse": false,
+                        "followRedirect": true,
+                        "followAllRedirects": false,
+                        "useQuerystring": false,
+                        "rejectUnauthorized": true
+                      },
+                      "module": "http:ActionSendData",
+                      "onerror": [
+                        {
+                          "id": 28,
+                          "module": "builtin:Ignore",
+                          "version": 1,
+                          "metadata": {
+                            "designer": {
+                              "x": 3000,
+                              "y": 700
+                            }
+                          }
+                        }
+                      ],
+                      "version": 3,
+                      "metadata": {
+                        "designer": {
+                          "x": 2400,
+                          "y": 700
+                        }
+                      },
+                      "parameters": {
+                        "handleErrors": false
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

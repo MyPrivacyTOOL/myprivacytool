@@ -5,6 +5,9 @@
 //   3. save the 6 drafts to D1 agent_execution_logs (one row per platform)
 //   4. post to Slack #mpt-content-approval with Approve All / Reject / Edit & Resubmit buttons (handled by mpt-content-approval)
 
+import { callRecipient } from '../../shared/recipients/outbound.ts';
+import { workerRecipientContext } from '../../shared/recipients/worker-ctx.ts';
+
 export const PLATFORMS = ['x', 'linkedin', 'instagram', 'facebook', 'pinterest', 'youtube'];
 const PLATFORM_NAMES = { x: 'X', linkedin: 'LinkedIn', instagram: 'Instagram', facebook: 'Facebook', pinterest: 'Pinterest', youtube: 'YouTube' };
 // Where each draft goes once approved, shown under the draft so the reviewer sees the destination and can open it.
@@ -27,6 +30,25 @@ const PLATFORM_RULES = {
 const BRAND_KEYWORDS = /voice|tone|messag|language|social|do'?s|don'?t|never|always|guardrail/i;
 const BRAND_CHAR_CAP = 6000;
 const CTA = 'Check your exposure';
+// Content System v1, phase 1: every post links to the free scan, not the homepage. Must match SCAN_URL in mpt-content-approval.
+export const SCAN_URL = 'https://myprivacytool.io/scan';
+export const scanLink = (platform, date) => `${SCAN_URL}?utm_source=${platform}&utm_medium=social&utm_campaign=${CAMPAIGN}&utm_content=${date}`;
+// The approved claims list (Notion 3f528547eaa78138a742c1f3f7c14086, approved by Chris 2026-10-12, decisions 2026-10-14).
+// It goes first in the system prompt and is never truncated; claimViolations() enforces it after drafting.
+export const CLAIMS_RULES = [
+  'APPROVED CLAIMS (the only product claims you may make, in this wording):',
+  '- "We never sell your data."',
+  '- "Check your exposure." (the call to action)',
+  '- "The scan is free."',
+  '- MyPrivacyTOOL publishes free step-by-step opt-out guides (Spokeo, Whitepages, Singapore and Hong Kong do-not-call) at myprivacytool.io/opt-out-guides.',
+  'BLOCKED (never say or imply):',
+  '- That MyPrivacyTOOL removes, deletes or keeps data off brokers. Teach self-service opt-outs only.',
+  '- Any number of brokers or sites, any statistic or percentage, success rates, timeframes, customer results.',
+  '- Whether scan results are or are not stored.',
+  '- Dark web monitoring, APAC law coverage, "no sign-up", "fastest", "100%", "all brokers", guarantees.',
+  '- Prices of any kind, and founder credentials or years of experience.',
+  'Voice: revealing, never menacing. Calm and practical; no fear, no hacker imagery, no invented facts.',
+].join('\n');
 // Must equal CAMPAIGN in workers/mpt-content-approval/worker.js so a post's text link and its link card report as one GA4 campaign.
 const CAMPAIGN = 'mpc-7033-daily';
 const TITLED = ['pinterest', 'youtube'];
@@ -66,6 +88,9 @@ export function buildPrompt(platform, topic, date, guardrailText, hint = {}) {
     system: [
       'You are the social copywriter for MyPrivacyTOOL. Follow these brand guardrails exactly. Tone: Empowering Detective: confident, clear, helpful, never alarmist. No fabricated statistics, no personal data.',
       '',
+      CLAIMS_RULES,
+      '',
+      'Further brand guidance (the claims rules above win if anything conflicts):',
       guardrailText || '(no guardrails cached)',
       '',
       'Reply with a single JSON object and nothing else.',
@@ -77,7 +102,7 @@ export function buildPrompt(platform, topic, date, guardrailText, hint = {}) {
       ...(hint.pillar ? [`Content pillar: ${hint.pillar}`] : []),
       ...(hint.format_type ? [`Format: ${hint.format_type}`] : []),
       `Rules: ${PLATFORM_RULES[platform]}`,
-      `End with the CTA "${CTA}" linking to https://myprivacytool.io?utm_source=${platform}&utm_medium=social&utm_campaign=${CAMPAIGN}&utm_content=${date}`,
+      `End with the CTA "${CTA}" and this exact link: ${scanLink(platform, date)}`,
       'Return JSON: {"copy": string' + (TITLED.includes(platform) ? ', "title": string' : '') + (platform === 'youtube' ? ', "script": string' : '') + (platform === 'instagram' ? ', "slides": string[]' : '') + '}',
     ].join('\n'),
   };
@@ -101,12 +126,54 @@ export function parseDraft(platform, text) {
   return { platform, ...d, cta: CTA };
 }
 
+// Each rule: [pattern, reason shown to the reviewer and fed back to the model on the rewrite].
+const BLOCKED_PATTERNS = [
+  [/\b100\s?%|\b\d+(\.\d+)?\s?%|\bper ?cent\b/i, 'states a percentage or statistic'],
+  [/\bdark[\s-]?web\b/i, 'mentions dark web monitoring'],
+  [/\b(top\s+)?\d[\d,]*\+?\s+(data[\s-])?(brokers?|people[\s-]search sites?)\b/i, 'states a broker count'],
+  [/\ball (data[\s-])?brokers\b/i, 'says "all brokers"'],
+  [/\b(we|myprivacytool|our (plans?|service|tool|team))\s+(will\s+)?(removes?|deletes?|erases?|scrubs?|wipes?)\b|\bkeeps? (it|your data|your details|you) off\b|\bremoval service\b/i, 'claims MyPrivacyTOOL removes data'],
+  [/(?:[$€£¥]|\bhk\$|\bus\$|\busd|\bhkd)\s?\d/i, 'states a price'],
+  [/\bsuccess rates?\b|\bguarantee[ds]?\b/i, 'claims a success rate or guarantee'],
+  [/\b(we|myprivacytool)\s+(do not |don't |never )?(store|keep|save|retain)s?\b|\b(scan )?results (are|is|aren't|are not) (not )?(stored|saved|kept|deleted)\b/i, 'describes data storage'],
+  [/\bno sign[\s-]?up\b|\bfastest\b/i, 'uses a blocked phrase ("no sign-up" or "fastest")'],
+  [/\b\d+\+?\s+years?\b[^.\n]{0,30}\b(experience|in (security|privacy|cyber))/i, 'states founder credentials'],
+];
+
+/** Reasons a draft breaks the approved claims list or the link rule; empty means it passes. */
+export function claimViolations(draft) {
+  const text = [draft.copy, draft.title, draft.script, ...(Array.isArray(draft.slides) ? draft.slides : [])].filter((t) => typeof t === 'string').join('\n');
+  const out = BLOCKED_PATTERNS.filter(([re]) => re.test(text)).map(([, why]) => why);
+  if (!/myprivacytool\.io\/scan\b/i.test(draft.copy ?? '')) out.push('the copy does not link to myprivacytool.io/scan');
+  const links = (draft.copy ?? '').match(/myprivacytool\.io(\/[^\s)?#]*)?/gi) ?? [];
+  if (links.some((l) => !/myprivacytool\.io\/(scan|opt-out-guides)\b/i.test(l))) out.push('links to a MyPrivacyTOOL page other than /scan or /opt-out-guides');
+  return out;
+}
+
+const MAX_DRAFT_TRIES = 2;
+/** Draft one platform; a draft that breaks the claims list is rewritten once with the reasons, then fails loudly. */
+export async function draftPlatform(env, platform, topic, date, guard, hint = {}) {
+  const prompt = buildPrompt(platform, topic, date, guard, hint);
+  let reasons = [];
+  for (let i = 0; i < MAX_DRAFT_TRIES; i++) {
+    const p = reasons.length ? { ...prompt, user: `${prompt.user}\nYour previous draft was rejected because it ${reasons.join('; ')}. Rewrite it so it follows every rule.` } : prompt;
+    const draft = parseDraft(platform, await callLlm(env, p));
+    reasons = claimViolations(draft);
+    if (!reasons.length) return draft;
+  }
+  throw new Error(`${platform}: claims check failed: ${reasons.join('; ')}`);
+}
+
 async function callLlm(env, prompt) {
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: { 'x-api-key': env.ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
-    body: JSON.stringify({ model: env.LLM_MODEL, max_tokens: 2000, system: prompt.system, messages: [{ role: 'user', content: prompt.user }] }),
-  });
+  const res = await callRecipient('anthropic', {
+    url: 'https://api.anthropic.com/v1/messages',
+    init: {
+      method: 'POST',
+      headers: { 'x-api-key': env.ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
+      body: JSON.stringify({ model: env.LLM_MODEL, max_tokens: 2000, system: prompt.system, messages: [{ role: 'user', content: prompt.user }] }),
+    },
+    sent: [],
+  }, workerRecipientContext(env));
   if (!res.ok) throw new Error(`Anthropic API ${res.status}: ${(await res.text()).slice(0, 300)}`);
   const body = await res.json();
   return (body.content ?? []).filter((b) => b.type === 'text').map((b) => b.text).join('');
@@ -129,14 +196,48 @@ export function slackBlocks(taskId, topic, drafts) {
 }
 
 async function postSlack(env, topic, taskId, drafts) {
-  const res = await fetch('https://slack.com/api/chat.postMessage', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${env.SLACK_BOT_TOKEN}`, 'Content-Type': 'application/json; charset=utf-8' },
-    body: JSON.stringify({ channel: env.SLACK_CHANNEL, text: `MPT daily drafts ready for approval (${taskId})`, blocks: slackBlocks(taskId, topic, drafts), unfurl_links: false }),
-  });
+  const res = await callRecipient('slack', {
+    url: 'https://slack.com/api/chat.postMessage',
+    init: {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${env.SLACK_BOT_TOKEN}`, 'Content-Type': 'application/json; charset=utf-8' },
+      body: JSON.stringify({ channel: env.SLACK_CHANNEL, text: `MPT daily drafts ready for approval (${taskId})`, blocks: slackBlocks(taskId, topic, drafts), unfurl_links: false }),
+    },
+    sent: [],
+  }, workerRecipientContext(env));
   const body = await res.json().catch(() => ({}));
   if (!res.ok || !body.ok) throw new Error(`Slack post failed: ${body.error ?? res.status}`);
   return { channel: body.channel, ts: body.ts };
+}
+
+// Receipts for approved posts normally arrive within a minute. A platform still "handed_off" long after approval means the Make
+// receipt step or the Worker callback broke while the post may well be live, so the channel is told with the daily drafts.
+// Window: handed off 6 to 48 hours ago, so each case alerts at most twice and old test rows never alert.
+const RECEIPT_OVERDUE_MS = 6 * 3600e3;
+const RECEIPT_ALERT_WINDOW_MS = 48 * 3600e3;
+
+export async function warnOverdueReceipts(env, date, nowMs = Date.now()) {
+  const { results } = await env.AGENT_LOGS.prepare(
+    "SELECT content_id, platform FROM publication_receipts WHERE state = 'handed_off' AND handed_off_at < ? AND handed_off_at > ? AND content_id <= ? ORDER BY content_id, platform",
+  ).bind(new Date(nowMs - RECEIPT_OVERDUE_MS).toISOString(), new Date(nowMs - RECEIPT_ALERT_WINDOW_MS).toISOString(), taskIdFor(date)).all();
+  if (!results.length) return 0;
+  const lines = results.map((r) => `${r.content_id.replace('daily-posts-', '')}: ${PLATFORM_NAMES[r.platform] ?? r.platform}`);
+  const res = await callRecipient('slack', {
+    url: 'https://slack.com/api/chat.postMessage',
+    init: {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${env.SLACK_BOT_TOKEN}`, 'Content-Type': 'application/json; charset=utf-8' },
+      body: JSON.stringify({
+        channel: env.SLACK_CHANNEL,
+        text: `:warning: Receipts overdue: ${lines.join(', ')}. These posts were handed to Make more than 6 hours ago and never confirmed. They may be live. Check the platform and the Make run history (https://eu1.make.com/4179/scenarios/7817044/logs), and do not replay a run that already posted.`,
+        unfurl_links: false,
+      }),
+    },
+    sent: [],
+  }, workerRecipientContext(env));
+  const body = await res.json();
+  if (!body.ok) throw new Error(`Slack alert failed: ${body.error}`);
+  return results.length;
 }
 
 export async function generateDailyPosts(env, date, hint = {}) {
@@ -159,7 +260,7 @@ export async function generateDailyPosts(env, date, hint = {}) {
     const topic = resolveTopic(hint, schedule, platform);
     if (!topic) throw new Error(`${platform}: no topic for ${date}`);
     try {
-      const draft = { ...parseDraft(platform, await callLlm(env, buildPrompt(platform, topic, date, guard, hint))), topic, ...(Array.isArray(hint?.asset_tags) && hint.asset_tags.length ? { asset_tags: hint.asset_tags } : {}) };
+      const draft = { ...(await draftPlatform(env, platform, topic, date, guard, hint)), topic, ...(Array.isArray(hint?.asset_tags) && hint.asset_tags.length ? { asset_tags: hint.asset_tags } : {}) };
       await log(env, taskId, 'drafted', { draft });
       have.set(platform, draft);
     } catch (e) {
@@ -172,6 +273,7 @@ export async function generateDailyPosts(env, date, hint = {}) {
   const drafts = PLATFORMS.map((p) => have.get(p));
   const slack = await postSlack(env, resolveTopic(hint, schedule, 'x') ?? drafts[0].topic, taskId, drafts);
   await log(env, taskId, 'notified', { draft: slack });
+  await warnOverdueReceipts(env, date).catch((e) => console.error('receipt alert failed', String(e)));
   return 'notified';
 }
 

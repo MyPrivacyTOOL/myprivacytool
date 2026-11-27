@@ -6,7 +6,7 @@ Approval: Chris approved the welcome-back screen and the threshold (>=12 of 20 c
 
 **How consent works now:** only a browser whose held scan was saved with BOTH the save consent and the separate "Recognise this device?" consent (`save_consent_at` and `recognise_consent_at` on the contact link) is compared, and only against other scans with both. Scans saved before the opt-in existed are not recognition candidates. Not yet verified live: the end-to-end test (scan with both boxes ticked, then a second scan in the same browser) and the MPC-7471 `/scan` report-request check.
 
-Principle (Chris): MyPrivacyTOOL is not a tracker, it is a mirror. Recognition happens in the open, with consent, and is shown to the visitor with how it was done.
+Principle (Chris, restated by the Open Tracker decision, MPC-9882): We do what trackers do, with your permission, in the open, then show you what it reveals and how to stop it. Recognition happens in the open, with consent, and is shown to the visitor with how it was done.
 
 ## What is built
 

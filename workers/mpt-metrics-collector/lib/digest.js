@@ -80,7 +80,8 @@ export function buildDigest({ weekOf, current, previous, failedSources = [], age
   }
 
   const gap = isNum(c.paceGapPct) ? ` (${c.paceGapPct > 0 ? '+' : ''}${fmt(c.paceGapPct)}% vs pace)` : '';
-  lines.push(`Pace: ${c.paceStatus || 'unavailable'}${gap}`);
+  const ads = [isNum(c.adCostPerScan) && c.adCostPerScan > 0 ? `ad cost per scan ${fmt(c.adCostPerScan)}` : null, isNum(c.cac) && c.cac > 0 ? `CAC ${fmt(c.cac)}` : null].filter(Boolean);
+  lines.push(`Pace: ${c.paceStatus || 'unavailable'}${gap}${ads.length ? ` | Google Ads: ${ads.join(', ')}` : ''}`);
 
   const m = movers(c, previous);
   if (m.length) {

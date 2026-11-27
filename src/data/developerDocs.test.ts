@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import ts from "typescript";
 import { describe, expect, it } from "vitest";
-import { BASES, ENDPOINTS, LANG_LABEL, SNIPPETS, type Lang } from "./developerDocs";
+import { BASES, ENDPOINTS, LANG_LABEL, PAPIT_LIMITS, PAPIT_SCHEMA, SNIPPETS, type Lang } from "./developerDocs";
 
 const ROOT = path.resolve(__dirname, "../..");
 const read = (rel: string) => readFileSync(path.join(ROOT, rel), "utf8");
@@ -20,6 +20,18 @@ describe("developer docs match the Workers", () => {
         expect(src, `${e.method} ${e.path} not found in ${e.source}`).toContain(e.path);
       }
     }
+  });
+
+  // MPC-9914 (EXT-03): the hash is a key, not authentication; consent and ownership are enforced before any write.
+  it("lead-capture docs say consent is required and the email hash is not authentication", () => {
+    const e = ENDPOINTS.find((x) => x.id === "lead-capture")!;
+    const text = JSON.stringify(e);
+    expect(text).toMatch(/Consent required/);
+    expect(text).toMatch(/not authentication/);
+    expect(text).not.toMatch(/auth":"None\. The Worker/);
+    expect(e.request.fields.find((f) => f.name === "consent")?.required).toBe(true);
+    const src = read(e.source);
+    expect(src.indexOf("Consent required")).toBeLessThan(src.indexOf("const nr = await callRecipient('notion'"));
   });
 
   it("uses the hosts declared in each wrangler.toml (workers.dev, or a custom domain)", () => {
@@ -94,5 +106,116 @@ describe("snippets", () => {
     const tampered = JSON.parse(JSON.stringify(papit));
     tampered.behavioral.activity_level = "high";
     expect(await verify(tampered)).toBe(false);
+  });
+});
+
+// MPC-9794 (CRYPTO-001, PRIVACY-023): the receipt is a checksum, not proof of origin, and the limits are published one by one.
+describe("PaPIT limits wording", () => {
+  it("says the receipt is a checksum that does not prove who produced the profile", () => {
+    const d = SNIPPETS.find((s) => s.id === "papit-verify")!.description;
+    expect(d).toMatch(/checksum, not a signature/);
+    expect(d).toMatch(/does not prove who produced/);
+    expect(d).not.toMatch(/detect any edit/i);
+  });
+  it("lists receipt, validity, cache, session, token and revocation, and says issued profiles cannot be recalled", () => {
+    const names = PAPIT_LIMITS.map((l) => l.item);
+    for (const n of ["Receipt", "Snapshot validity", "Cache", "Browser session", "Access token", "Revocation"]) expect(names).toContain(n);
+    const text = PAPIT_LIMITS.map((l) => l.detail).join(" ");
+    expect(text).toMatch(/cannot be recalled/);
+    expect(text).toMatch(/24 hours/);
+    expect(text).toMatch(/7 days/);
+  });
+  // MPC-10825: a person can remove a stored connection with no session; the route exists in the Worker and the pages say how long we keep it.
+  it("documents revocation without a session, and the route exists in both Workers' source", () => {
+    expect(PAPIT_LIMITS.map((l) => l.item)).toContain("Revocation without a session");
+    const e = ENDPOINTS.find((x) => x.id === "github-remove")!;
+    expect(e.path).toBe("/oauth/github/remove");
+    expect(JSON.stringify(e)).toMatch(/intent=remove/);
+    expect(read("workers/github-channel/index.js")).toContain("'/oauth/github/remove'");
+    expect(read("workers/github-channel/lib/reddit-routes.js")).toContain("'/oauth/reddit/remove'");
+  });
+  it("person-facing copy says the connection is kept until you disconnect and never calls 30 days the validity of the connection", () => {
+    const guide = read("src/content/guides/githubProfile.tsx");
+    expect(guide).not.toMatch(/valid for 30 days|30 days of validity/);
+    expect(guide).toMatch(/until you disconnect/);
+    expect(guide.replace(/\s+/g, " ").match(/We delete a stored token automatically if it is not used for 90 days\./g)).toHaveLength(2);
+    expect(guide).toMatch(/Remove my stored connection/);
+    expect(read("src/components/ConnectGitHub.tsx")).not.toMatch(/data_retention_days/);
+    expect(read("src/pages/Privacy.tsx")).toMatch(/If your 7-day session has ended, you can still remove the stored connection/);
+  });
+  it("the stated lifetimes match the Worker constants", () => {
+    const idx = readFileSync(path.join(ROOT, "workers/github-channel/index.js"), "utf8");
+    const cache = readFileSync(path.join(ROOT, "workers/github-channel/lib/cache.js"), "utf8");
+    expect(idx).toMatch(/SESSION_TTL_MS = 7 \* 24 \* 60 \* 60 \* 1000/);
+    expect(cache).toMatch(/CACHE_TTL_SECONDS = 24 \* 60 \* 60/);
+    const papit = readFileSync(path.join(ROOT, "workers/github-channel/lib/papit.js"), "utf8");
+    expect(papit).toMatch(/PROFILE_VALIDITY_DAYS = 30;/);
+    expect(papit).toMatch(/data_retention_days: PROFILE_VALIDITY_DAYS/);
+  });
+});
+
+// MPC-9795 (TECH-011, TECH-012, COPY-017, DEV-006): window, caps, the 'skills' name and empty interests are published, and match the adapter.
+describe("PaPIT sampling wording", () => {
+  const text = PAPIT_LIMITS.map((l) => `${l.item} ${l.detail}`).join(" ");
+  it("publishes the 300-event / 90-day window, the page caps, the skills caveat and the empty-interests states", () => {
+    expect(text).toMatch(/at most 300 events from that window/);
+    expect(text).toMatch(/300 of your own public repos/);
+    expect(text).toMatch(/200 of your most recently starred/);
+    expect(text).toMatch(/does not measure skill/);
+    expect(text).toMatch(/no_stars/);
+    expect(text).toMatch(/stars_without_topics/);
+  });
+  it("the page caps stated match MAX_PAGES in the adapter (100 per page)", () => {
+    const m = /MAX_PAGES = \{ repos: (\d+), starred: (\d+), events: (\d+) \}/.exec(read("workers/github-channel/lib/adapter.js"))!;
+    expect(m.slice(1).map(Number)).toEqual([3, 2, 3]);
+    expect(PAPIT_SCHEMA).toContain("data_coverage");
+  });
+});
+
+// MPC-10833: the profile carries expires_at and stale ones are refused; a token is not used 90 days after consent. The limits say so, and match the code.
+describe("PaPIT expiry and re-consent wording", () => {
+  const limit = (item: string) => PAPIT_LIMITS.find((l) => l.item === item)!.detail;
+  it("says expires_at is 30 days after generated_at, what refuses a stale profile, and that nothing else checks it", () => {
+    const v = limit("Snapshot validity");
+    expect(v).toMatch(/expires_at, 30 days after generated_at/);
+    expect(v).toMatch(/POST \/papit\/verify refuses a profile past it with 410 profile_expired/);
+    expect(v).toMatch(/Nothing else checks it/);
+    expect(v).toMatch(/unkeyed checksum/);
+    expect(PAPIT_SCHEMA).toMatch(/expires_at: string/);
+    expect(PAPIT_SCHEMA).not.toMatch(/not enforced/);
+  });
+  it("says the token is not used 90 days after connecting, a refresh does not restart that, and that a daily job deletes it after 90 days unused", () => {
+    const t = limit("Access token");
+    expect(t).toMatch(/90 days after the user last connected/);
+    expect(t).toMatch(/401 reconsent_required/);
+    expect(t).toMatch(/refresh does not restart the 90 days/);
+    expect(t).toMatch(/daily job deletes a stored token that has not been saved or refreshed for 90 days/);
+    expect(t).not.toMatch(/do not delete the stored token automatically|not built/);
+  });
+  it("documents POST /papit/verify with 200, 410, 422, 400 and 413, and reconsent_required on the profile call", () => {
+    const ep = ENDPOINTS.find((e) => e.path === "/papit/verify")!;
+    expect(ep.method).toBe("POST");
+    expect(ep.responses.map((r) => r.status)).toEqual(["200", "410", "422", "400", "413", "429"]);
+    const profile = ENDPOINTS.find((e) => e.path === "/channels/github/profile")!;
+    expect(profile.responses.some((r) => r.body?.includes("reconsent_required"))).toBe(true);
+    expect(new Set(ENDPOINTS.map((e) => e.id)).size).toBe(ENDPOINTS.length);
+  });
+  it("the stated numbers match the Worker constants and routes", () => {
+    const papit = read("workers/github-channel/lib/papit.js");
+    expect(papit).toMatch(/PROFILE_VALIDITY_DAYS = 30;/);
+    expect(papit).toMatch(/CONSENT_MAX_DAYS = 90;/);
+    expect(papit).toMatch(/expires_at: profileExpiry\(now\)/);
+    expect(read("workers/github-channel/lib/reddit-papit.js")).toMatch(/expires_at: profileExpiry\(now\)/);
+    expect(read("workers/github-channel/index.js")).toMatch(/'\/papit\/verify' && request\.method === 'POST'/);
+    const verify = read("workers/github-channel/lib/verify.js");
+    expect(verify).toMatch(/MAX_VERIFY_BYTES = 32 \* 1024/);
+    // The rate limit is a Cloudflare zone rule (docs/channels/github.md "Rate limits", #877), so the published numbers are checked against that doc.
+    const gh = read("docs/channels/github.md");
+    expect(gh).toMatch(/block after 5 requests per 10 seconds per IP and Cloudflare location, for\s+10 seconds/);
+    const notes = ENDPOINTS.find((e) => e.path === "/papit/verify")!.notes!.join(" ");
+    expect(notes).toMatch(/after about 5 POSTs in 10 seconds/);
+    expect(notes).toMatch(/blocks an IP address for 10 seconds/);
+    expect(read("workers/github-channel/index.js")).not.toMatch(/ratelimit|RATE_LIMITER|VERIFY_LIMITER/i); // the Worker has no limiter of its own
+    for (const code of ["410", "422", "400", "413"]) expect(verify).toContain(code);
   });
 });

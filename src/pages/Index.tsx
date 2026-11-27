@@ -1,12 +1,17 @@
+import { STORAGE_NOTE } from "@/data/trustCopy";
 import { useEffect, useState, useRef, useMemo } from 'react';
+import FeatureStatus from "@/components/FeatureStatus";
 import { hexTileV2Enabled } from '@/config/hexagonTile';
-import { HERO_TILES_LINE1, HERO_TILES_LINE2, HERO_DASHBOARD_LINE2, heroDashboardLine1 } from '@/lib/scanCopy';
+import { HERO_TILES_LINE1, HERO_TILES_LINE2, HERO_DASHBOARD_LINE2, heroDashboardLine1, countSentence } from '@/lib/scanCopy';
 import { HEXAGON_COUNT } from '../../shared/hexagon-registry/registry.js';
 import HexagonGrid from '@/components/HexagonGrid';
 import { WebScanDashboard } from '@/components/dashboard/WebScanDashboard';
 import { honeycombDashboardEnabled } from '@/config/honeycombDashboard';
+import { deviceHeroEnabled } from '@/config/deviceHero';
 import ShadowHands from '@/components/ShadowHands';
-import DeviceIcon from '@/components/DeviceIcon';
+import DeviceRevealScreen from '@/components/DeviceRevealScreen';
+import { PRODUCT_SENTENCE } from '@/lib/productSentence';
+import { identifyDevice, hedgeDeviceHexagon, readDeviceSignalsWithModel, type DeviceIdentity } from '@/lib/deviceIdentity';
 import FederatedLearningModal, { shouldShowFederatedModal } from '@/components/FederatedLearningModal';
 import { captureDeviceData, generateHexagonsAsync, HexagonData, DeviceData } from '@/lib/deviceDetection';
 import { RefreshCw } from 'lucide-react';
@@ -17,7 +22,9 @@ import logoFull from '@/assets/logo-full.png';
 import {
   trackFunnelStep,
   trackDeviceProfile,
+  analyticsAllowed,
   startSessionTimer,
+  trackScanStart,
   trackSessionDuration,
   trackError,
   trackScrollToFooter,
@@ -25,12 +32,20 @@ import {
 } from '@/lib/analytics';
 import { afterFirstPaint } from '@/lib/idle';
 import { hasConsent, onConsentChange } from '@/lib/cookieConsent';
-import { markScanStarted, rememberCompletedScan, trackResults } from '@/lib/webScan';
+import { markScanStarted, rememberCompletedScan, trackResults, writeFootprintScan } from '@/lib/webScan';
 import ScanNumberNotice from '@/components/ScanNumberNotice';
+import ScanRecipientsPanel from '@/components/ScanRecipientsPanel';   // MPC-9893
 import WelcomeBack from '@/components/WelcomeBack';
+import TelegramHandoffNotice from '@/components/TelegramHandoffNotice';
+import FootprintPathHost from '@/components/FootprintPathHost';
 import ScanSavingNotice from '@/components/ScanSavingNotice';
 import { useOrientation } from '@/hooks/useOrientation';
 import { useDeviceMotion } from '@/hooks/useDeviceMotion';
+import { recipientScript } from '@/lib/recipientClient';
+import ScanConsentText, { scanMeLabel } from '@/components/ScanConsentText';
+import { adoptExistingConsent, ConsentError, giveScanConsent, hasScanConsent, onScanConsent } from '@/lib/scanConsent';
+import { setChoice } from '@/lib/cookieConsent';
+import { loadTurnstile } from '@/lib/turnstile';
 
 const Index = () => {
   const [hexagons, setHexagons] = useState<HexagonData[]>([]);
@@ -38,9 +53,36 @@ const Index = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showFederatedModal, setShowFederatedModal] = useState(false);
+  // null until the signals are read; then certain (carousel) or unknown (hexagon path)
+  const [identity, setIdentity] = useState<DeviceIdentity | null>(null);
+  // The full-screen reveal is shown until the visitor continues (or presses Escape)
+  const [revealDone, setRevealDone] = useState(false);
   const federatedCheckDone = useRef(false);
   const footerRef = useRef<HTMLElement>(null);
   const footerTracked = useRef(false);
+  // MPC-9888: nothing leaves this page for an outside party until Scan me is pressed. The page still reads the browser's own signals on load
+  // (local only, nothing sent); the outside-server checks (Google STUN) and the analytics/Turnstile scripts start at the click.
+  const [consented, setConsented] = useState(() => hasScanConsent());
+  const [consenting, setConsenting] = useState(false);
+  const [consentError, setConsentError] = useState('');
+  useEffect(() => onScanConsent(() => setConsented(hasScanConsent())), []);
+  // Consent is portable: a link from a channel carries ?scan=<uuid>; a journey that already consented is not asked again.
+  useEffect(() => { void adoptExistingConsent(new URLSearchParams(window.location.search).get('scan')); }, []);
+  const handleScanMe = async () => {
+    if (consenting) return;
+    setConsenting(true);
+    setConsentError('');
+    try {
+      await giveScanConsent();
+      setChoice(true);          // Scan me also counts as the analytics choice (design 8.1); the banner stays for visitors who never scan
+      trackScanStart('home');   // CK-11491: after both choices, so the gate is open
+      void loadTurnstile();     // Cloudflare's script loads now, at the click (design 8.2)
+    } catch (err) {
+      setConsentError(err instanceof ConsentError && err.kind === 'stale' ? 'This page is out of date. Please reload it and try again.' : 'We could not record your agreement just now, so nothing was scanned. Please press the button to try again.');
+    } finally {
+      setConsenting(false);
+    }
+  };
 
   // MPC-7470 (D12): when the scan first completes it is kept in this browser only (sessionStorage), never sent. It is saved on the server only
   // if the visitor reaches the contact step, gives an email and ticks the separate save box. Not on every live orientation refresh. Off unless VITE_SAVE_WEB_SCANS is "true".
@@ -49,6 +91,7 @@ const Index = () => {
     if (loading || hexagons.length === 0 || scanRemembered.current) return;
     scanRemembered.current = true;
     rememberCompletedScan(hexagons);
+    writeFootprintScan(hexagons); // MPC-9898: the visitor's own values for /footprint/ (this browser only)
   }, [loading, hexagons]);
 
   // MPC-7493: funnel steps for a saved scan. The scan starts when the page opens; once the results are on screen we report "results viewed" and the
@@ -56,12 +99,14 @@ const Index = () => {
   useEffect(() => {
     markScanStarted();
   }, []);
+  // Unknown device: the Device Type hexagon asks instead of asserting the old regex guess
+  const displayHexagons = useMemo(() => hedgeDeviceHexagon(hexagons, identity), [hexagons, identity]);
   const resultsShown = !loading && hexagons.length > 0;
   useEffect(() => (resultsShown ? trackResults() : undefined), [resultsShown]);
 
   // Real-time orientation and motion hooks
   const orientation = useOrientation();
-  const { motion } = useDeviceMotion();
+  const { motion, permission: motionPermission, requestPermission: requestMotionPermission } = useDeviceMotion();
 
   // Merge live orientation/motion data into deviceData
   const liveDeviceData = useMemo(() => {
@@ -90,12 +135,14 @@ const Index = () => {
     if (liveDeviceData && !loading) {
       generateHexagonsAsync(liveDeviceData).then(setHexagons);
     }
-  }, [liveDeviceData, loading]);
+  }, [liveDeviceData, loading, consented]);
 
   useEffect(() => {
     // Start session timer on mount
     startSessionTimer();
     trackFunnelStep('page_load');
+
+    readDeviceSignalsWithModel().then((signals) => setIdentity(identifyDevice(signals)));
 
     async function loadDeviceData() {
       try {
@@ -106,9 +153,7 @@ const Index = () => {
         const data = await captureDeviceData();
         setDeviceData(data);
         
-        // Track device profile for analytics
-        trackDeviceProfile(data as DeviceData);
-        
+        // MPC-10790: the device profile (city, country, ISP) is no longer sent from here, on mount. It goes out once, after the Scan me click (effect below).
         const hexagonData = await generateHexagonsAsync(data);
         setHexagons(hexagonData);
         
@@ -158,25 +203,39 @@ const Index = () => {
     return () => observer.disconnect();
   }, []);
 
-  // Load HubSpot embed script only after cookie consent (Cookie Policy: HubSpot runs after consent)
+  // Load HubSpot embed script only after cookie consent (Cookie Policy: HubSpot runs after consent). MPC-10790 (decision A): "Accept analytics" alone is not
+  // enough either; the script waits for the Scan me click (the scan consent), like GA4.
   useEffect(() => {
     const scriptId = 'hs-forms-embed';
+    let requested = false; // the wrapper adds the <script> a tick later; this stops a second consent event starting a second load
     const load = () => {
-      if (!hasConsent() || document.getElementById(scriptId)) return;
-      const script = document.createElement('script');
-      script.id = scriptId;
-      script.src = 'https://js-na2.hsforms.net/forms/embed/246502821.js';
-      script.defer = true;
-      document.body.appendChild(script);
+      if (!analyticsAllowed() || requested || document.getElementById(scriptId)) return;
+      requested = true;
+      // MPC-9886: through the registry ("hubspot", basis user_action). Same consent test as before.
+      void recipientScript('hubspot', 'https://js-na2.hsforms.net/forms/embed/246502821.js', { id: scriptId, defer: '' }).catch(() => { requested = false; });
     };
     load();
-    const unsubscribe = onConsentChange(load);
+    const unsubscribeChoice = onConsentChange(load);
+    const unsubscribeScan = onScanConsent(load);
     return () => {
-      unsubscribe();
+      unsubscribeChoice();
+      unsubscribeScan();
+      requested = false;
       const existing = document.getElementById(scriptId);
       if (existing) existing.remove();
     };
   }, []);
+
+  // MPC-10790: the device profile reaches GA4 once per page view, and only when the visitor may be measured (analytics chosen AND the Scan me click made).
+  // Before that the event is not queued anywhere, so it cannot flush when the tag loads later.
+  const [analyticsChoice, setAnalyticsChoice] = useState(() => hasConsent());
+  useEffect(() => onConsentChange(() => setAnalyticsChoice(hasConsent())), []);
+  const profileTracked = useRef(false);
+  useEffect(() => {
+    if (profileTracked.current || !deviceData || !consented || !analyticsChoice || !analyticsAllowed()) return;
+    profileTracked.current = true;
+    trackDeviceProfile(deviceData as DeviceData);
+  }, [deviceData, consented, analyticsChoice]);
 
   // The newsletter form is a HubSpot embed; HubSpot posts a message to the page when it submits successfully.
   useEffect(() => {
@@ -252,6 +311,9 @@ const Index = () => {
 
         {/* Description Text */}
         <section className="text-center pb-4 sm:pb-6 px-4" aria-label="Introduction">
+          <p className="text-base sm:text-xl font-semibold text-foreground mb-3" data-testid="product-sentence">
+            {PRODUCT_SENTENCE}
+          </p>
           {hexTileV2Enabled() ? (
             <>
               <p className="text-sm sm:text-lg text-foreground">
@@ -276,19 +338,42 @@ const Index = () => {
               </p>
             </>
           )}
+          <p className="mt-2 text-xs sm:text-sm text-muted-foreground">{countSentence()}.</p>
         </section>
 
-        {/* Live Device Tracking Hero */}
-        <section className="py-4 sm:py-8 px-4" aria-label="Real-time device tracking">
-          <div className="max-w-[280px] sm:max-w-sm mx-auto">
-            <DeviceIcon 
-              deviceType={liveDeviceData?.device?.type || 'Smartphone'}
-              rotationAngle={orientation.angle}
-              beta={motion.beta}
-              gamma={motion.gamma}
-            />
-          </div>
-        </section>
+        {/* MPC-9888: the consent block. Pressing the button is the agreement (no toggle, no second click). */}
+        {!consented && (
+          <section className="text-center pb-6 px-4" aria-label="Scan consent">
+            <ScanConsentText className="mb-4" />
+            <Button size="lg" onClick={handleScanMe} disabled={consenting} data-testid="scan-me">
+              {consenting ? '…' : scanMeLabel()}
+            </Button>
+            {consentError && <p role="alert" className="mt-3 text-sm text-destructive">{consentError}</p>}
+          </section>
+        )}
+
+        {/* Device reveal: a full-screen opening moment, hidden while the experience is reworked (src/config/deviceHero.ts) */}
+        {deviceHeroEnabled() && !revealDone && (
+          <DeviceRevealScreen
+            identity={identity}
+            rotationAngle={orientation.angle}
+            beta={motion.beta}
+            gamma={motion.gamma}
+            motionPrompt={motionPermission === 'unknown'}
+            onEnableMotion={() => { void requestMotionPermission(); }}
+            onDone={(jumpToSpotlight) => {
+              setRevealDone(true);
+              if (jumpToSpotlight && !honeycombDashboardEnabled()) {
+                window.setTimeout(() => {
+                  document.getElementById('hexagon-browser')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }, 60);
+              }
+            }}
+          />
+        )}
+
+        {/* MPC-10614: the Footprint Path, behind VITE_FOOTPRINT_PATH / ?path=1; renders nothing while the switch is off */}
+        <FootprintPathHost />
 
         {/* Hexagon Grid Section */}
         <section id="how-it-works" className="pb-12" aria-label="Your detected data points">
@@ -311,13 +396,19 @@ const Index = () => {
             <>
               {/* The scan is complete here (loading is over), which is when WebScanDashboard must mount: it keeps its own answers from then on. */}
               {honeycombDashboardEnabled() ? (
-                <WebScanDashboard scanned={hexagons} title="Your Digital Footprint" />
+                <WebScanDashboard scanned={displayHexagons} title="Your Digital Footprint" />
               ) : (
-                <HexagonGrid hexagons={hexagons} deviceData={deviceData || undefined} />
+                <HexagonGrid
+                  hexagons={displayHexagons}
+                  deviceData={deviceData || undefined}
+                  spotlightId={deviceHeroEnabled() && identity && !identity.certain ? 'browser' : undefined}
+                />
               )}
               <ScanSavingNotice variant="scan" />
               <WelcomeBack hexagons={hexagons} />
+              <TelegramHandoffNotice />
               <ScanNumberNotice />
+              <ScanRecipientsPanel />
             </>
           )}
         </section>
@@ -332,7 +423,7 @@ const Index = () => {
               See your footprint as a beehive
             </h2>
             <p className="text-sm sm:text-base text-muted-foreground mb-5">
-              Open the curtain and watch the 54 data points appear one by one.
+              Open the curtain and watch the 54 data points appear one by one.<FeatureStatus feature="F9" />
             </p>
             <Button asChild>
               <a href="/footprint/">Open the footprint</a>
@@ -344,10 +435,10 @@ const Index = () => {
         <section className="pb-12 px-4" aria-labelledby="journey-teaser-heading">
           <div className="max-w-2xl mx-auto text-center rounded-2xl border border-surface-border bg-brand-soft p-6 sm:p-8">
             <h2 id="journey-teaser-heading" className="text-xl sm:text-2xl font-bold text-foreground mb-2">
-              Get clean before you go agentic
+              See what&apos;s out there about you, and what an AI agent could find.
             </h2>
             <p className="text-sm sm:text-base text-muted-foreground mb-5">
-              Eight steps from seeing your footprint to bringing AI agents on board safely.
+              Eight steps from seeing your footprint to bringing AI agents on board safely.<FeatureStatus feature="F9" state="in_build" />
             </p>
             <Button asChild>
               <Link to="/journey">See your journey</Link>
@@ -386,9 +477,7 @@ const Index = () => {
             </div>
 
             <p className="text-xs text-muted-foreground mt-4 max-w-md mx-auto">
-              The scan runs in your browser and its results aren't stored on our
-              servers, unless you choose to save your scan with your email, in which case we keep it for 12 months, then delete it automatically. We only store what you choose to submit, such as your email
-              address, and we use analytics only with your consent.{" "}
+              {STORAGE_NOTE}{" "}
               <a href="/privacy" className="underline hover:text-foreground">
                 Privacy Policy
               </a>

@@ -36,7 +36,7 @@ function setup(envOver: Record<string, unknown> = {}, o: { brain?: unknown; chat
   }));
   const brain = vi.fn(async () => Response.json(o.brain ?? decision()));
   const env = {
-    TELEGRAM_WEBHOOK_SECRET: "s", TELEGRAM_BOT_TOKEN: TOKEN, SUPABASE_URL: "https://sb.test", SUPABASE_KEY: "svc",
+    TELEGRAM_WEBHOOK_SECRET: "s", TELEGRAM_BOT_TOKEN: TOKEN, SUPABASE_URL: "https://x.supabase.co", SUPABASE_KEY: "svc",
     CORE_BRAIN: { fetch: brain }, TELEGRAM_BASELINE_SCAN: "on", PROBE_TELEGRAM_IDS: String(ID), ...envOver,
   } as unknown as Env;
   const post = (u: unknown) => worker.fetch(new Request("https://x/webhook/telegram", { method: "POST", headers: { "X-Telegram-Bot-Api-Secret-Token": "s" }, body: JSON.stringify(u) }), env);
@@ -56,6 +56,17 @@ describe("baseline scan gating", () => {
     expect(snaps()).toHaveLength(1);
     expect(tg("sendMessage")).toHaveLength(2); // the existing Y reply, then the report
     expect(tg("sendMessage")[1].body.text).toMatch(/risk \(draft test report\): \d+ \/ 30 - (Low|Medium|High) exposure/);
+  });
+  it("MPC-8689: with the footprint switch on the report carries the Count it in my web scan button and the delete hint; with it off, neither", async () => {
+    const on = setup({ TELEGRAM_FOOTPRINT_LINKS: "on" });
+    await on.post(yes());
+    const msg = on.tg("sendMessage")[1].body;
+    expect(msg.reply_markup).toEqual({ inline_keyboard: [[{ text: "Count it in my web scan", callback_data: "fp|link" }]] });
+    expect(msg.text).toContain("DELETE MY DATA");
+    const off = setup();
+    await off.post(yes());
+    expect(off.tg("sendMessage")[1].body.reply_markup).toBeUndefined();
+    expect(off.tg("sendMessage")[1].body.text).not.toContain("DELETE MY DATA");
   });
   it("does nothing when the flag is off (default) or the sender is not allow-listed; existing reply unchanged", async () => {
     for (const over of [{ TELEGRAM_BASELINE_SCAN: undefined }, { PROBE_TELEGRAM_IDS: "999" }, { PROBE_TELEGRAM_IDS: undefined }]) {

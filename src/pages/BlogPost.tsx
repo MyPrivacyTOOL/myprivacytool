@@ -1,10 +1,13 @@
 import React, { useEffect, useRef } from 'react';
+import FeatureStatus from "@/components/FeatureStatus";
 import { Helmet } from 'react-helmet';
 import Seo from '@/components/Seo';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Share2, Copy } from 'lucide-react';
+import { ArrowLeft, Share2, Copy, ShieldCheck } from 'lucide-react';
+import { HEXAGONS, HEXAGON_GROUPS, HEXAGON_COUNT, HEXAGON_ALWAYS_COUNT } from '../../shared/hexagon-registry/registry.js';
+import { countSentence } from '../../shared/hexagon-registry/countSentence.js';
 import blogPosts from '@/data/blogPosts.json';
 import { guides } from '@/content/guides';
 import { trackBlogCtaClick, trackBlogPostView, trackBlogScrollDepth } from '@/lib/analytics';
@@ -20,85 +23,68 @@ const toIsoDate = (d: string) => {
 const blogContent: { [key: string]: React.ReactNode } = {
   "how-exposed-are-you": (
       <div className="article article-headings:text-foreground article-p:text-foreground article-li:text-foreground article-strong:text-foreground article-a:text-brand max-w-none">
-        <p>Your digital footprint is likely larger than you think. Your personal data is collected, packaged, sold, and used in ways you may not have agreed to, and you can take control of it.</p>
-        
-        <h2>The 46 Privacy Vectors Exposing Your Data</h2>
-        <p>We've identified 46 distinct sources where your personal information is currently exposed:</p>
-        
-        <h3>Data Broker Networks (12)</h3>
+        <p>Your personal data is everywhere. Not because you posted it, and not because you signed up willingly. Brokers, marketers, data aggregators, and forgotten websites have been collecting, trading, and selling pieces of you for years.</p>
+        <p>You probably know some of this happens. But do you know how much of your information is out there, where it lives, and what someone could do with it? That is what MyPrivacyTOOL is built to help you answer.</p>
+
+        <h2>The Scale of the Exposure</h2>
+        <p>Every day, your data moves. When you fill out a form online, even a simple contact submission, that information does not stay in one place. It can be sold, aggregated, and cross-referenced with other datasets. By the time you close the browser tab, your name, email, phone number, and address may already be held by companies you have never heard of.</p>
+        <p>This is the data broker industry. People-search sites such as Whitepages, PeopleFinders, and Spokeo exist to collect, organize, and sell personal information. They draw on public records, scrape social media, and buy lists from other brokers, then sell access to marketers, employers, landlords, and anyone else willing to pay. The result is a fragmented portrait of you, scattered across hundreds of databases, most of which you do not know exist.</p>
+        <p>Add the data you did leave behind on purpose: social media profiles, old email accounts, forgotten job applications, abandoned shopping carts, archived forum posts. These can sit online indefinitely, indexed by search engines and open to anyone.</p>
+        <p>Then there are breaches. Large companies lose customer data regularly. Equifax exposed about 147 million people in 2017, and Yahoo has said that all three billion of its accounts were affected by its 2013 breach. Each breach can put another copy of your information in circulation.</p>
+        <p>The question is not whether your data is exposed. It is how exposed, and what can be done about it.</p>
+
+        <h2>The 54 Privacy Vectors Exposing Your Data</h2>
+        <p>{countSentence()}. Here is what the web scan checks:<FeatureStatus feature="F9" /></p>
+
+        {/* MPC-9832: the real 54 web-scan hexagons, grouped by the registry's own groups. Rendered from the registry so the
+            list and its counts cannot drift from the scan again (the old hand-written lists added up to 46). */}
+        {HEXAGON_GROUPS.map((group) => {
+          const items = HEXAGONS.filter((h) => h.group === group);
+          return (
+            <React.Fragment key={group}>
+              <h3>{group} ({items.length})</h3>
+              <ul>
+                {items.map((h) => (
+                  <li key={h.id}>{h.label}</li>
+                ))}
+              </ul>
+            </React.Fragment>
+          );
+        })}
+        <p>{HEXAGON_ALWAYS_COUNT} of the {HEXAGON_COUNT} run on every scan; the other {HEXAGON_COUNT - HEXAGON_ALWAYS_COUNT} run only when your device offers them.</p>
+
+        <h2>Why You Should Care</h2>
+        <p>Privacy is not about having something to hide. It is about control: knowing what information exists in your name and deciding who gets to see it. When your data is exposed:</p>
         <ul>
-          <li>PeopleFinder, TruthFinder, Spokeo</li>
-          <li>WhitePages Pro, Instant Checkmate</li>
-          <li>People.com, FastBackgroundCheck</li>
-          <li>MyLife, ZoomInfo, Apollo</li>
-          <li>Hunter.io, Lusha</li>
-          <li>Clearbit (corporate)</li>
+          <li><strong>Marketers learn your vulnerabilities.</strong> They track your browsing and build behavioral profiles of what you search for, buy, and care about, then target you with precision.</li>
+          <li><strong>Scammers get a roadmap.</strong> A name, address, phone number, and email are the raw material of social engineering. With them, someone can impersonate you, attempt password resets, or call your bank pretending to be you.</li>
+          <li><strong>Employers and landlords decide on incomplete information.</strong> An old record, a negative review, or a name mix-up with someone else can cost you an opportunity without you ever knowing why.</li>
+          <li><strong>Your safety can be at risk.</strong> For journalists, activists, and survivors of abuse, an exposed address or phone number is a physical threat. Data brokers do not distinguish between private citizens and people in danger.</li>
+          <li><strong>Your autonomy shrinks.</strong> When you are tracked, categorized, and targeted constantly, you are being nudged and sorted into groups that can shape the prices you see and the information that reaches you.</li>
         </ul>
-        
-        <h3>Social Media & Public Records (8)</h3>
+        <p>Privacy underpins dignity, autonomy, and safety. When it is gone, everything else becomes negotiable.</p>
+
+        <h2>How MyPrivacyTOOL Works</h2>
+        <p>Most privacy tools start by selling you removal. MyPrivacyTOOL starts with visibility, because you cannot manage what you cannot see.</p>
+        <ol>
+          <li><strong>Run your scan.</strong> The free scan shows what your browser, device and network reveal, and your emailed report adds what your email address reveals. It does not search data-broker sites for you.</li>
+          <li><strong>See what was found.</strong> Each check is marked found, checked and clear, or not checked, so you can see what was actually checked rather than a vague score. We check a broker listing only when you paste the address of a page that lists you.</li>
+          <li><strong>Understand the exposure.</strong> Know what information is exposed, who can access it, and what someone could do with it.</li>
+          <li><strong>Take control.</strong> Follow our step-by-step opt-out guides to remove or restrict your listings at brokers that allow it. Some opt-outs take minutes. Others take waiting, paperwork, or a paid service, and we say so up front.</li>
+        </ol>
+        <p>Automated removal requests<FeatureStatus feature="F4" /> and breach monitoring with alerts<FeatureStatus feature="F5" /> are not live yet, and we label them so you can see what works today and what is still coming.</p>
+
+        <h2>What Makes This Different</h2>
         <ul>
-          <li>LinkedIn (scraped by dozens of B2B brokers)</li>
-          <li>Facebook (through Meta's advertiser network)</li>
-          <li>Twitter/X (public archive APIs)</li>
-          <li>Public records databases (criminal, property, marriage)</li>
-          <li>Court records (civil litigation)</li>
-          <li>Voter registration data</li>
-          <li>DMV & driver's license records</li>
-          <li>Property tax assessor records</li>
+          <li><strong>We show what we checked, and what we did not.</strong> A result marked not checked is not the same as clear, and we do not blur the two.</li>
+          <li><strong>We do not use fear to sell.</strong> We tell you what is exposed and what it can mean. If your exposure is small, we will tell you that too.</li>
+          <li><strong>We explain the why.</strong> Privacy is not abstract. We show what could happen if specific data is exposed, to inform you rather than to frighten you.</li>
+          <li><strong>We give you control, not false security.</strong> We do not claim to protect you forever. Some removals are permanent and some need repeating, and we are honest about which is which.</li>
         </ul>
-        
-        <h3>AI & Machine Learning Training (7)</h3>
-        <ul>
-          <li>OpenAI's GPT training corpus (Common Crawl)</li>
-          <li>Google's Gemini dataset</li>
-          <li>Anthropic's Claude training</li>
-          <li>Meta's LLaMA models</li>
-          <li>Mistral AI datasets</li>
-          <li>Stability AI image training</li>
-          <li>Academic AI research repositories</li>
-        </ul>
-        
-        <h3>Advertising Networks & Trackers (10)</h3>
-        <ul>
-          <li>Google Analytics (on 80% of the web)</li>
-          <li>Meta Pixel (on 25% of sites)</li>
-          <li>Third-party cookies (still present on 70% of sites)</li>
-          <li>Behavioral targeting networks</li>
-          <li>Email tracking (Superhuman, Mailchimp, HubSpot)</li>
-          <li>Mobile app SDKs collecting location</li>
-          <li>WiFi network data collection</li>
-          <li>Inferential targeting (predicting behavior from browsing)</li>
-          <li>Lookalike audiences (targeting based on your type)</li>
-          <li>Cross-device tracking</li>
-        </ul>
-        
-        <h3>Forgotten Accounts & Unused Services (9)</h3>
-        <ul>
-          <li>Old email accounts (with recovery data still linked)</li>
-          <li>Social platforms you haven't used in 5+ years</li>
-          <li>Fitness trackers with location history</li>
-          <li>Smart home device accounts</li>
-          <li>Streaming service accounts</li>
-          <li>Financial app connections</li>
-          <li>Job search platforms</li>
-          <li>Dating apps (sometimes never deleted)</li>
-          <li>Beta testing accounts</li>
-        </ul>
-        
-        <h2>Why This Matters</h2>
-        <p>The combination of these 46 vectors creates a complete digital shadow profile of you. Advertisers, employers, landlords, and others can use it to:</p>
-        <ul>
-          <li>Reconstruct your entire movement history</li>
-          <li>Predict your health status, financial situation, and life choices</li>
-          <li>Make impersonation or identity theft easier</li>
-          <li>Deny you opportunities based on inferred data</li>
-          <li>Target you with highly tailored messaging</li>
-        </ul>
-        
-        <h2>What You Can Do Right Now</h2>
-        <p>Check your exposure with MyPrivacyTOOL to see where your data is. We'll map all 46 vectors for you, then give you step-by-step removal instructions for each one.</p>
-        
-        <p>The map changes weekly as new brokers emerge and existing ones evolve. A one-time fix isn't enough, so ongoing monitoring and regular removal rounds help keep your footprint small.</p>
+
+        <h2>Your Privacy, Your Choice</h2>
+        <p>You did not choose to be in these databases, but you can choose what happens next. Take the scan, see your exposure, understand what it means, and then decide what to do.</p>
+        <p>The map changes weekly as new brokers emerge and existing ones evolve. A one-time fix isn't enough, so regular removal rounds help keep your footprint small.</p>
       </div>
   ),
   "25-years-mass-surveillance": (
@@ -420,9 +406,10 @@ export default function BlogPost() {
   const jsonLd: object[] = [
     {
       '@context': 'https://schema.org',
-      '@type': 'Article',
+      '@type': 'NewsArticle',
       headline: post.title,
       description: post.excerpt,
+      ...(post.image ? { image: [`${SITE_URL}${post.image}`] } : {}),
       author: { '@type': 'Organization', name: post.author },
       publisher: { '@type': 'Organization', name: 'MyPrivacyTOOL', url: SITE_URL },
       datePublished: toIsoDate(post.date),
@@ -508,6 +495,18 @@ export default function BlogPost() {
                 {post.readTime} min read
               </div>
             </div>
+
+            {/* MPC-6802: invite readers to add us as a Google preferred source */}
+            <a
+              href="https://www.google.com/preferences/source?q=myprivacytool.io"
+              target="_blank"
+              rel="noopener noreferrer"
+              data-testid="google-preferred-source-link"
+              className="inline-flex items-center gap-2 rounded-full border border-border px-3 py-1 text-xs font-medium text-muted-foreground hover:text-foreground"
+            >
+              <ShieldCheck className="w-4 h-4" aria-hidden="true" />
+              Add us as a preferred source on Google
+            </a>
           </div>
         </div>
       </div>

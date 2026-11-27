@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { getAssignment, pickVariant, type Experiment } from "./abTest";
+import { EXPERIMENTS, getAssignment, pickVariant, type Experiment } from "./abTest";
 
 const exp = (over: Partial<Experiment> = {}): Experiment => ({
   id: "t",
@@ -70,5 +70,20 @@ describe("getAssignment", () => {
       throw new Error("blocked");
     });
     expect(["control", "b"]).toContain(getAssignment(exp(), "").variantId);
+  });
+});
+
+describe("mobile_hive split", () => {
+  it("is 80% readable_tiles and a 20% control hold-back, and the control is the first variant", () => {
+    const v = EXPERIMENTS.mobile_hive.variants;
+    expect(v[0].id).toBe("control");
+    expect(v.map((x) => x.weight)).toEqual([20, 80]);
+    expect(pickVariant(v, 0)).toBe("control");
+    expect(pickVariant(v, 0.199)).toBe("control");
+    expect(pickVariant(v, 0.2)).toBe("readable_tiles");
+    expect(pickVariant(v, 0.999)).toBe("readable_tiles");
+  });
+  it("ships off: with the build flag unset everyone is the control", () => {
+    expect(EXPERIMENTS.mobile_hive.enabled).toBe(false);
   });
 });

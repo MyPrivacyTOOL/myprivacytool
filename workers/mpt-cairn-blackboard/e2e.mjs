@@ -3,6 +3,8 @@
 // It never prints a secret or the test data, deletes everything it created even when a check fails, and exits non-zero on any failure.
 //   BRIDGE_URL, CAIRN_TOKEN (one-time test token), SUPABASE_URL, SUPABASE_KEY, NOTION_TOKEN, NOTION_CAIRN_{SESSIONS,FACTS,INTENTS}_DB
 import assert from 'node:assert/strict';
+import { callRecipient } from '../../shared/recipients/outbound.ts';
+import { workerRecipientContext } from '../../shared/recipients/worker-ctx.ts';
 
 const need = (k) => { const v = process.env[k]; if (!v) throw new Error(`${k} is not set`); return v; };
 const BRIDGE = need('BRIDGE_URL').replace(/\/$/, '');
@@ -18,19 +20,21 @@ const RAW_PHONE = '+1-555-010-0199';
 const GAP_MS = Number(process.env.E2E_GAP_MS ?? 4000); // writes are spaced past the mirror's 3 s soft lock so each one is mirrored
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const log = (m) => console.log(m);
+const rctx = workerRecipientContext(process.env);
 
-async function bridge(path, { method = 'POST', body } = {}) {
-  const res = await fetch(`${BRIDGE}${path}`, { method, headers: { authorization: `Bearer ${TOKEN}`, 'content-type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body) });
+// `sent` names the personal-data items in the request body (the test seed email, a test username and a test phone number).
+async function bridge(path, { method = 'POST', body, sent = [] } = {}) {
+  const res = await callRecipient('internal-workers', { url: `${BRIDGE}${path}`, init: { method, headers: { authorization: `Bearer ${TOKEN}`, 'content-type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body) }, sent }, rctx);
   return { status: res.status, json: await res.json().catch(() => ({})) };
 }
-const commit = (action, payload) => bridge('/api/cairn/blackboard/commit', { body: { session_id: SID, action, payload } });
+const commit = (action, payload, sent = []) => bridge('/api/cairn/blackboard/commit', { body: { session_id: SID, action, payload }, sent });
 async function sb(path, { method = 'GET', prefer } = {}) {
-  const res = await fetch(`${SB}/rest/v1/${path}`, { method, headers: { apikey: KEY, ...(prefer ? { Prefer: prefer } : {}) } });
+  const res = await callRecipient('supabase', { url: `${SB}/rest/v1/${path}`, init: { method, headers: { apikey: KEY, ...(prefer ? { Prefer: prefer } : {}) } }, sent: [] }, rctx);
   if (!res.ok) throw new Error(`supabase ${method} ${path.split('?')[0]} -> HTTP ${res.status}`);
   return method === 'GET' ? res.json() : null;
 }
 async function notion(path, method = 'GET', body) {
-  const res = await fetch(`https://api.notion.com/v1/${path}`, { method, headers: { Authorization: `Bearer ${NT}`, 'Notion-Version': '2022-06-28', 'content-type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body) });
+  const res = await callRecipient('notion', { url: `https://api.notion.com/v1/${path}`, init: { method, headers: { Authorization: `Bearer ${NT}`, 'Notion-Version': '2022-06-28', 'content-type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body) }, sent: [] }, rctx);
   return { status: res.status, json: await res.json().catch(() => ({})) };
 }
 const queryDb = async (db, filter) => (await notion(`databases/${db}/query`, 'POST', { filter, page_size: 100 })).json.results ?? [];
@@ -51,7 +55,7 @@ let failure = null;
 try {
   // 1. The Worker is up and fully configured (a new secret takes a few seconds to reach every location).
   const health = await until('Worker /health to report configured with the Notion mirror on', async () => {
-    const r = await fetch(`${BRIDGE}/health`); const j = await r.json().catch(() => ({}));
+    const r = await callRecipient('internal-workers', { url: `${BRIDGE}/health`, init: undefined, sent: [] }, rctx); const j = await r.json().catch(() => ({}));
     return j.ok && j.configured && j.notion_sync ? j : null;
   }, 90000);
   ok(`Worker is live and configured (version ${health.version})`);
@@ -65,7 +69,7 @@ try {
   ok('Notion integration can open the Sessions, Facts and Intent databases');
 
   // 3. Start a session through the bridge.
-  let r = await commit('start_session', { seed_email: SEED, investigation_goal: 'MPC-8413 end-to-end test. Safe to delete.', max_facts: 10 });
+  let r = await commit('start_session', { seed_email: SEED, investigation_goal: 'MPC-8413 end-to-end test. Safe to delete.', max_facts: 10 }, ['email']);
   assert.equal(r.status, 200, `start_session -> HTTP ${r.status} ${r.json.error ?? ''}`);
   assert.equal(r.json.created, true);
   ok('start_session created the test session');
@@ -75,7 +79,7 @@ try {
   r = await commit('write_facts', { facts: [
     { fact_id: 'cairn-fact-e2e-user', description: 'username found on a public profile', fact_type: 'username', fact_value: 'e2e_test_user', confidence_score: 0.9, source_name: 'e2e', discovery_chain: ['cairn-fact-seed-001', 'cairn-intent-e2e-1'] },
     { fact_id: 'cairn-fact-e2e-phone', description: `phone ${RAW_PHONE} listed on the profile`, fact_type: 'phone', fact_value: RAW_PHONE, confidence_score: 0.6, extracted_metadata: { phone: RAW_PHONE, country_code: '+1' } },
-  ] });
+  ] }, ['username', 'phone']);
   assert.equal(r.status, 200, `write_facts -> HTTP ${r.status} ${r.json.error ?? ''}`);
   assert.equal(r.json.facts_written, 2);
   ok('write_facts stored 2 facts');

@@ -57,7 +57,7 @@ describe("GithubIssueIntake (MPC-8529, not activated)", () => {
 
 describe("follow-up metrics (MPC-8529)", () => {
   const row = { unresolved_cases: "3", overdue_actions: "0", retry_exhausted: "0", delivery_failing: "1", reopened_cases: "2", resolved_cases: "9", oldest_open_age_seconds: "3600" };
-  const mk = (status: number, body: unknown) => ({ baseUrl: "http://127.0.0.1:3000", serviceKey: "k", restPrefix: "", fetchImpl: (async () => new Response(JSON.stringify(body), { status })) as unknown as typeof fetch });
+  const mk = (status: number, body: unknown) => ({ baseUrl: "https://x.supabase.co", serviceKey: "k", restPrefix: "", fetchImpl: (async () => new Response(JSON.stringify(body), { status })) as unknown as typeof fetch });
   it("reads counts (bigint strings included) from the view", async () => {
     expect(await readFollowupMetrics(mk(200, [row]))).toEqual({ unresolvedCases: 3, overdueActions: 0, retryExhausted: 0, deliveryFailing: 1, reopenedCases: 2, resolvedCases: 9, oldestOpenAgeSeconds: 3600 });
   });

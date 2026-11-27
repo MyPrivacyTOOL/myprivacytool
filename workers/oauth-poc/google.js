@@ -3,6 +3,10 @@
  * Pure functions over fetch/WebCrypto so they run in Workers and Node 20+.
  */
 
+// MPC-9885: the four server-side calls to Google go through the recipient wrapper (key "oauth-providers"). `fetchFn` stays the test seam.
+import { callRecipient } from '../../shared/recipients/outbound.ts';
+import { workerRecipientContext } from '../../shared/recipients/worker-ctx.ts';
+
 export const AUTH_URL   = 'https://accounts.google.com/o/oauth2/v2/auth';
 export const TOKEN_URL  = 'https://oauth2.googleapis.com/token';
 export const REVOKE_URL = 'https://oauth2.googleapis.com/revoke';
@@ -71,38 +75,46 @@ export async function buildAuthUrl({ clientId, redirectUri, state, verifier }) {
   return u.toString();
 }
 
-export async function exchangeCode({ code, verifier, clientId, clientSecret, redirectUri }, fetchFn = fetch) {
-  const res = await fetchFn(TOKEN_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      code, client_id: clientId, client_secret: clientSecret,
-      redirect_uri: redirectUri, grant_type: 'authorization_code', code_verifier: verifier,
-    }),
-  });
+export async function exchangeCode({ code, verifier, clientId, clientSecret, redirectUri }, fetchFn = undefined, rctx = workerRecipientContext(null, { fetchImpl: fetchFn })) {
+  const res = await callRecipient('oauth-providers', {
+    url: TOKEN_URL,
+    init: {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        code, client_id: clientId, client_secret: clientSecret,
+        redirect_uri: redirectUri, grant_type: 'authorization_code', code_verifier: verifier,
+      }),
+    },
+    sent: [],   // one-time code, PKCE verifier and our own client credentials; no visitor data item
+  }, rctx);
   if (!res.ok) throw new Error(`token exchange failed: ${res.status}`);
   return res.json();
 }
 
 /** Describes THIS token only (client, scopes, expiry). Not a list of other apps' grants. */
-export async function tokenInfo(accessToken, fetchFn = fetch) {
-  const res = await fetchFn(`${TOKENINFO_URL}?access_token=${encodeURIComponent(accessToken)}`);
+export async function tokenInfo(accessToken, fetchFn = undefined, rctx = workerRecipientContext(null, { fetchImpl: fetchFn })) {
+  const res = await callRecipient('oauth-providers', { url: `${TOKENINFO_URL}?access_token=${encodeURIComponent(accessToken)}`, sent: [] }, rctx);
   if (!res.ok) throw new Error(`tokeninfo failed: ${res.status}`);
   return res.json();
 }
 
-export async function userInfo(accessToken, fetchFn = fetch) {
-  const res = await fetchFn(USERINFO_URL, { headers: { Authorization: `Bearer ${accessToken}` } });
+export async function userInfo(accessToken, fetchFn = undefined, rctx = workerRecipientContext(null, { fetchImpl: fetchFn })) {
+  const res = await callRecipient('oauth-providers', { url: USERINFO_URL, init: { headers: { Authorization: `Bearer ${accessToken}` } }, sent: [] }, rctx);   // the token is the credential; the profile comes back, none is sent
   if (!res.ok) throw new Error(`userinfo failed: ${res.status}`);
   return res.json();
 }
 
 /** Revokes a token MPT itself holds. Google offers no call to revoke other apps' tokens. */
-export async function revoke(token, fetchFn = fetch) {
-  const res = await fetchFn(REVOKE_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({ token }),
-  });
+export async function revoke(token, fetchFn = undefined, rctx = workerRecipientContext(null, { fetchImpl: fetchFn })) {
+  const res = await callRecipient('oauth-providers', {
+    url: REVOKE_URL,
+    init: {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ token }),
+    },
+    sent: [],
+  }, rctx);
   return res.ok;
 }

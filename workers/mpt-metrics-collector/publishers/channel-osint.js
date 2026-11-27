@@ -5,13 +5,15 @@ import { previousHkWeek } from '../lib/hk.js';
 import { rollupWeek, buildWeeklyText } from '../lib/channel-osint.js';
 import { slack } from './slack-digest.js';
 import { notion, MARKER } from './notion.js';
+import { callRecipient } from '../../../shared/recipients/outbound.ts';
+import { recipientCtx } from '../lib/recipient-ctx.js';
 
 export const channelOsintConfigured = (env) => Boolean(env.SUPABASE_URL && env.SUPABASE_SERVICE_ROLE_KEY && env.SLACK_BOT_TOKEN && env.MPTSLACK_CHANNEL_ID);
 
 /** Daily rows for the week, newest pull per day. */
 export async function weekRows(env, week) {
   const q = `source=eq.channel_osint&report=eq.funnel_daily&period_start=gte.${week.start.toISOString()}&period_start=lt.${week.end.toISOString()}&order=captured_at.desc&select=period_start,status,error,payload`;
-  const res = await fetch(`${env.SUPABASE_URL}/rest/v1/mpt_raw_metrics?${q}`, { headers: { apikey: env.SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}` } });
+  const res = await callRecipient('supabase', { url: `${env.SUPABASE_URL}/rest/v1/mpt_raw_metrics?${q}`, init: { headers: { apikey: env.SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}` } }, sent: [] }, recipientCtx(env));
   if (!res.ok) throw new Error(`supabase read mpt_raw_metrics failed: HTTP ${res.status}`);
   const latest = new Map();
   for (const r of await res.json()) if (!latest.has(r.period_start)) latest.set(r.period_start, r);
@@ -72,7 +74,7 @@ export function channelOsintProperties(day, p, readAt, error) {
 export async function publishChannelOsintDay(env, day, now = new Date()) {
   const ds = env.NOTION_CHANNEL_OSINT_DATA_SOURCE_ID || DEFAULT_CHANNEL_OSINT_DS;
   const start = new Date(Date.parse(`${day}T00:00:00Z`) - 8 * 3600000).toISOString();
-  const res = await fetch(`${env.SUPABASE_URL}/rest/v1/mpt_raw_metrics?source=eq.channel_osint&report=eq.funnel_daily&period_start=eq.${start}&order=captured_at.desc&limit=1&select=captured_at,status,error,payload`, { headers: { apikey: env.SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}` } });
+  const res = await callRecipient('supabase', { url: `${env.SUPABASE_URL}/rest/v1/mpt_raw_metrics?source=eq.channel_osint&report=eq.funnel_daily&period_start=eq.${start}&order=captured_at.desc&limit=1&select=captured_at,status,error,payload`, init: { headers: { apikey: env.SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}` } }, sent: [] }, recipientCtx(env));
   if (!res.ok) throw new Error(`supabase read mpt_raw_metrics failed: HTTP ${res.status}`);
   const row = (await res.json())[0];
   if (!row) return { day, status: 'no_data', written: 0 };

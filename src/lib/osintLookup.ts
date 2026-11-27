@@ -10,6 +10,7 @@
  * - The API key is passed in by the caller (Worker env); this module never reads process.env.
  * - 24h cache keyed by SHA-256 of type+value; the raw value is never stored or echoed in errors.
  */
+import { recipientFetch } from '@/lib/recipientClient';
 
 // Types
 export type InputType = 'email' | 'phone' | 'handle' | 'domain';
@@ -232,6 +233,8 @@ export async function osintLookup(
   if (inputType !== 'email') return notChecked(inputValue, inputType, 'unsupported_type');
   const provider: BreachProvider | undefined = options.provider ?? (options.apiKey ? 'hibp' : undefined);
   if (!provider) return notChecked(inputValue, inputType, 'no_provider');
+  // MPC-9886, decision B (Director, 2026-11-08): no XposedOrNot without a licence. The host is registered enabled:false; refuse before any request, cache or network.
+  if (provider === 'xposedornot') return notChecked(inputValue, inputType, 'provider_not_licensed');
   if (provider === 'hibp' && !options.apiKey) return notChecked(inputValue, inputType, 'no_api_key');
 
   if (!options.skipCache) {
@@ -239,12 +242,15 @@ export async function osintLookup(
     if (cached) return cached;
   }
 
-  const fetchImpl = options.fetchImpl ?? fetch;
+  // MPC-9886: no raw fetch. A caller that injects its own fetch (tests) keeps it; otherwise the call goes through the recipient registry, which refuses a recipient that is not enabled.
+  const isXon = (provider as BreachProvider) === 'xposedornot';
+  const fetchImpl: typeof fetch = options.fetchImpl ?? (((input: RequestInfo | URL, init?: RequestInit) =>
+    isXon ? recipientFetch('xposedornot', String(input), init, ['email']) : recipientFetch('hibp', String(input), init, ['email'])) as typeof fetch);
   let result: OsintLookupResult;
   try {
     let breaches: HibpBreach[];
     let pastes: HibpPaste[] = [];
-    if (provider === 'xposedornot') {
+    if ((provider as BreachProvider) === 'xposedornot') { // unreachable while the licence gate above holds; kept so re-enabling is one line
       breaches = await xonCheckEmail(inputValue, fetchImpl);
     } else {
       const [rawBreaches, rawPastes] = await Promise.all([

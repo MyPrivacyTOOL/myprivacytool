@@ -7,9 +7,16 @@
 // archives nothing if Supabase cannot be read. It prints counts only, never a value.
 //   NOTION_TOKEN, NOTION_CAIRN_{SESSIONS,FACTS,INTENTS}_DB, SUPABASE_URL, SUPABASE_KEY
 import { reconcile, notionConfigured } from './notion-sync.js';
+import { callRecipient } from '../../shared/recipients/outbound.ts';
+import { workerRecipientContext } from '../../shared/recipients/worker-ctx.ts';
 
+// Reads session ids only: no personal data in the request.
 async function sb(env, path, { method = 'GET' } = {}) {
-  const res = await fetch(`${env.SUPABASE_URL}/rest/v1/${path}`, { method, headers: { apikey: env.SUPABASE_KEY, 'content-type': 'application/json' } });
+  const res = await callRecipient('supabase', {
+    url: `${env.SUPABASE_URL}/rest/v1/${path}`,
+    init: { method, headers: { apikey: env.SUPABASE_KEY, 'content-type': 'application/json' } },
+    sent: [],
+  }, workerRecipientContext(env));
   if (!res.ok) throw new Error(`supabase ${method} ${path.split('?')[0]} -> HTTP ${res.status}`);
   return res;
 }

@@ -46,7 +46,7 @@ export const EXPERIMENTS = {
     enabled: import.meta.env.VITE_AB_PRICING_HEADLINE_ENABLED === "true",
     variants: [
       { id: "control", weight: 50 }, // "Pricing"
-      { id: "free_first", weight: 50 }, // "Know your exposure for free. Removal is planned."
+      { id: "free_first", weight: 50 }, // "Know your exposure for free. Wipe your footprints with a plan."
     ],
   },
   pricing_cta: {
@@ -87,6 +87,17 @@ export const EXPERIMENTS = {
     variants: [
       { id: "control", weight: 50 }, // share link first, then "we email them for you"
       { id: "email_first", weight: 50 }, // email form first, then the share link
+    ],
+  },
+  // Phone landing page: do visitors engage more when every hexagon shows its value, and the header carries a "Check My Exposure" button?
+  // Two changes in one variant on purpose (cheapest test of the idea); split them if it wins. No new copy: the button reuses existing wording.
+  mobile_hive: {
+    id: "mobile_hive",
+    description: "Readable hexagon tiles (values shown) and a header button on phones",
+    enabled: import.meta.env.VITE_AB_MOBILE_HIVE_ENABLED === "true",
+    variants: [
+      { id: "control", weight: 20 }, // 20% hold-back: small tiles with no value line, no header button. A sanity check, not a measurement (too little traffic)
+      { id: "readable_tiles", weight: 80 }, // two bigger tiles per row with values, header button on its own row below the md breakpoint
     ],
   },
 } as const satisfies Record<string, Experiment>;

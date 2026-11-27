@@ -1,5 +1,6 @@
 import type { HexagonData } from "@/lib/deviceDetection";
 import { SCAN_API_URL, earlierScanNumber, recognitionEnabled, toPayload } from "@/lib/webScan";
+import { recipientFetch } from "@/lib/recipientClient";
 
 // MPC-7494 (F5, the open mirror). Recognition happens in the open: the visitor is told, shown how, and decides. Off unless the site save flag
 // AND VITE_RECOGNITION_ENABLED are exactly "true"; the Worker has its own switch (RECOGNITION_ENABLED). Contract: docs/open-mirror-mpc-7494.md.
@@ -27,11 +28,11 @@ export async function recogniseReturningDevice(hexagons: HexagonData[]): Promise
   const held = recognitionEnabled() && hexagons.length > 0 ? earlierScanNumber() : null;
   if (!held) return null;
   try {
-    const res = await fetch(`${base()}/api/recognise`, {
+    const res = await recipientFetch("scan-report", `${base()}/api/recognise`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ hexagons: toPayload(hexagons), held_scan_number: held }),
-    });
+    }, ["scan_result"]);
     if (!res.ok) return null;
     const data = (await res.json()) as { recognised?: unknown };
     return data.recognised === true && isRecognised(data) ? data : null;
@@ -43,11 +44,11 @@ export async function recogniseReturningDevice(hexagons: HexagonData[]): Promise
 /** The visitor's "Delete my record": the MPC-7488 deletion route by the matched scan number. True only when the Worker says it is gone. */
 export async function deleteRecognisedRecord(scanNumber: string): Promise<boolean> {
   try {
-    const res = await fetch(`${base()}/api/recognise/delete`, {
+    const res = await recipientFetch("scan-report", `${base()}/api/recognise/delete`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ scan_number: scanNumber }),
-    });
+    }, []);
     if (!res.ok) return false;
     return ((await res.json()) as { deleted?: unknown }).deleted === true;
   } catch {

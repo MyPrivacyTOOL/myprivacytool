@@ -2,6 +2,7 @@
 // (a signed .json, or a .pdf plus its .pdf.sig.json) and turns the server's answer into plain words. Nothing is stored or kept.
 
 import { bytesToBase64 } from '@/lib/signedReport';
+import { recipientFetch } from '@/lib/recipientClient';
 
 export type Verdict =
   | { kind: 'verified'; signedAt: string | null; timestamped: boolean }
@@ -34,7 +35,7 @@ async function readText(f: File): Promise<string> {
   return await f.text();
 }
 
-export async function verifyUploaded(files: File[], fetchImpl: typeof fetch = fetch): Promise<Verdict> {
+export async function verifyUploaded(files: File[], fetchImpl?: typeof fetch): Promise<Verdict> {
   const pdf = files.find((f) => f.name.toLowerCase().endsWith('.pdf'));
   const jsons = files.filter((f) => f.name.toLowerCase().endsWith('.json'));
   if (files.length === 0) return { kind: 'need_more', message: 'Choose the signed report file you downloaded.' };
@@ -57,7 +58,7 @@ export async function verifyUploaded(files: File[], fetchImpl: typeof fetch = fe
 
   let res: Response;
   try {
-    res = await fetchImpl('/api/verify-report', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+    res = await recipientFetch('cloudflare-edge', '/api/verify-report', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }, [], fetchImpl ? { fetchImpl } : {});
   } catch {
     return { kind: 'error', message: 'We could not reach the checker. Try again in a moment.' };
   }

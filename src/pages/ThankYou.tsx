@@ -2,6 +2,7 @@ import { useEffect, useMemo } from "react";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { ArrowRight, BookOpen, Check, Code2, FileText, HelpCircle, ScanLine, ShieldCheck } from "lucide-react";
 import Seo from "@/components/Seo";
+import { STORAGE_NOTE } from "@/data/trustCopy";
 import pageMeta from "@/data/pageMeta.json";
 import { trackThankYouNextStep, trackThankYouView } from "@/lib/analytics";
 
@@ -20,7 +21,7 @@ interface SourceCopy {
 const COPY: Record<string, SourceCopy> = {
   start: {
     title: "You're on the list.",
-    body: "Thanks. We'll email you when your free privacy report is ready. We only use your email for that, and you can unsubscribe at any time.",
+    body: "Thanks. We'll send you product updates. This does not send a report: to get your free privacy report, run the scan on the scan page. We only use your email for updates, and you can unsubscribe at any time.",
   },
   "ai-access-check": {
     title: "You're on the waitlist.",
@@ -132,8 +133,7 @@ export default function ThankYou() {
             <ShieldCheck size={16} className="text-brand" aria-hidden="true" /> How we handle your data
           </h2>
           <p className="text-xs text-muted-foreground leading-relaxed mb-4">
-            The scan runs in your browser and its results aren't stored on our servers, unless you choose to save your scan with your email, in which case we keep it for 12 months, then delete it automatically. We only keep what you choose to
-            submit, such as your email address, and we use analytics only with your consent.
+            {STORAGE_NOTE}
           </p>
           <ul className="flex flex-wrap gap-x-5 gap-y-2 text-xs">
             {TRUST_LINKS.map(({ key, to, label }) => (

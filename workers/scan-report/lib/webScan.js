@@ -5,11 +5,15 @@
 // Everything in a scan comes from the visitor's browser, so it is untrusted text: strict shape, short strings, no control
 // characters, never logged. Values are stored as given (escaped later, when anything renders them).
 // Switch: WEB_SCAN_SAVE_ENABLED must be exactly "true" (wrangler.toml: "true" since 2026-10-12, MPC-7470; "false" is the rollback).
+import { consentColumnsForWebScan } from '../../../shared/recipients/consent.ts';
+
 
 // Wording versions of the tick-box label the visitor saw. The site sends the version with the request; an unknown version
 // (for example a stale cached page with different wording) is rejected, so every stored consent record names text we can show.
 // Add a new entry here whenever the label in src/lib/saveConsent.ts changes.
-export const SAVE_CONSENT_VERSIONS = ['2026-10-12-v1'];
+export const SAVE_CONSENT_VERSIONS = ['2026-10-12-v1', '2026-11-08-v1'];
+// MPC-9817: the wording of the one-step tick "Keep my scan and create my free account". A request that carries one of these versions asks for an account as well (acted on only while ACCOUNTS_ENABLED is "true").
+export const ACCOUNT_CONSENT_VERSIONS = ['2026-11-08-v1'];
 // MPC-7494: versions of the SEPARATE "Recognise this device" tick box wording (src/lib/saveConsent.ts, RECOGNISE_CONSENT_LABEL). The Worker rejects a version it does not know.
 export const RECOGNISE_CONSENT_VERSIONS = ['2026-10-12-v1'];
 
@@ -103,9 +107,19 @@ export async function readCappedJson(request, max) {
   try { return { body: JSON.parse(text) }; } catch { return { status: 400 }; }
 }
 
-export async function saveWebScan(sb, hexagons, { startedMs, previousScanNumber } = {}) {
+export async function saveWebScan(sb, hexagons, { startedMs, previousScanNumber, scanConsent = null } = {}) {
   const bytes = new TextEncoder().encode(JSON.stringify(hexagons)).length;
-  const row = await sb.insert('web_scans', { source: 'web', hexagon_count: hexagons.length, results: hexagons, results_bytes: bytes });
+  const base = { source: 'web', hexagon_count: hexagons.length, results: hexagons, results_bytes: bytes };
+  // MPC-9887 (design 2.3): the consent fields are copied onto the scan, and the client-generated scan id the consent was given under becomes the scan number.
+  // If that id is already a saved scan (a second scan in the same journey) the row gets a fresh number and still carries the consent fields.
+  let row;
+  if (scanConsent) {
+    const copied = consentColumnsForWebScan(scanConsent);
+    try { row = await sb.insert('web_scans', { id: scanConsent.scan_id, ...base, ...copied }); }
+    catch (e) { if (e.status !== 409) throw e; row = await sb.insert('web_scans', { ...base, ...copied }); }
+  } else {
+    row = await sb.insert('web_scans', base);
+  }
   // MPC-7493: the first funnel steps and the return link. Best effort: a failure here never costs the visitor their scan number.
   const now = Date.now();
   await recordEvent(sb, row.id, 'scan_finished', { at: now });
@@ -157,17 +171,19 @@ export function validateStep(body) {
 // Saves the scan and links it to the contact in one step, with the consent record (when and which wording) on the link.
 // Never throws: a failure must not cost the visitor their report. If the link cannot be written the scan row is removed again,
 // so a scan never stays stored without a contact and a consent record. Returns { saved, scanNumber }.
-export async function saveWebScanForContact(env, sb, { hexagons, contactId, version, recogniseVersion, startedMs, previousScanNumber, now = new Date() }) {
+export async function saveWebScanForContact(env, sb, { hexagons, contactId, version, recogniseVersion, startedMs, previousScanNumber, scanConsent = null, now = new Date() }) {
   if (!webScanEnabled(env) || !contactId || !SAVE_CONSENT_VERSIONS.includes(version)) return { saved: false };
   let scanNumber;
   try {
-    scanNumber = await saveWebScan(sb, hexagons, { startedMs, previousScanNumber });
+    scanNumber = await saveWebScan(sb, hexagons, { startedMs, previousScanNumber, scanConsent });
   } catch (e) {
     console.error('web scan save failed:', e.status || 'error');   // status only: the message could carry visitor values
     return { saved: false };
   }
   try {
     await sb.insert('web_scan_contacts', { web_scan_id: scanNumber, channel: 'email', contact_id: contactId, save_consent_at: now.toISOString(), save_consent_version: version,
+      // MPC-9817: the one-step tick. The account itself is created only when the click-to-confirm email proves the inbox (MPC-9813); this just records that it was asked for.
+      ...(env.ACCOUNTS_ENABLED === 'true' && ACCOUNT_CONSENT_VERSIONS.includes(version) ? { account_requested_at: now.toISOString() } : {}),
       // MPC-7494: only when the visitor ticked the separate recognise box (a known wording version); otherwise the link carries no recognition consent.
       ...(RECOGNISE_CONSENT_VERSIONS.includes(recogniseVersion) ? { recognise_consent_at: now.toISOString(), recognise_consent_version: recogniseVersion } : {}) });
     await recordEvent(sb, scanNumber, 'contact_given');   // MPC-7493

@@ -3,12 +3,14 @@
 // Four things stay separate and are never merged into one score: the baseline (never overwritten), the user's intention, the self-report, and the re-check observation.
 // Skipping, keeping or closing a prompt is never completion. Sharing is a plain Telegram share link the user chooses to open: nothing personal is in it.
 import { RISK_VERSION, SCAN_VERSION, scanAllowed } from "./baseline-scan";
+import { deleteReply, eraseSender } from "./delete-my-data";
 import { DRAFT_BANNER, type Guide, guideFor, listedGuides } from "./fix-guides";
 import { type BaselineRow, type Outcome, RECHECK_VERSION, type Recheck, type Summary, issueOutcome, recheckFrom, summarise, comparable } from "./fix-recheck";
+import { callRecipient } from "../../../shared/recipients/outbound";
 import type { Logger } from "./logger";
 import { call } from "./probe-reader";
 import { type SenderIds, senderFilter, senderIds } from "./sender-key";
-import type { Env } from "./shared";
+import { type Env, recipientCtx } from "./shared";
 
 const TIMEOUT_MS = 5000;
 const DAY_MS = 86_400_000;
@@ -46,10 +48,14 @@ export const isFixWizardUpdate = (env: Env, update: unknown): boolean => {
 async function rest(env: Env, method: string, path: string, body?: unknown, prefer?: string): Promise<{ ok: boolean; rows: Record<string, unknown>[] }> {
   if (!env.SUPABASE_URL || !env.SUPABASE_KEY) return { ok: false, rows: [] };
   try {
-    const res = await fetch(`${env.SUPABASE_URL.replace(/\/+$/, "")}/rest/v1/${path}`, {
-      method, headers: { apikey: env.SUPABASE_KEY, authorization: `Bearer ${env.SUPABASE_KEY}`, "Content-Type": "application/json", ...(prefer ? { Prefer: prefer } : {}) },
-      body: body === undefined ? undefined : JSON.stringify(body), signal: AbortSignal.timeout(TIMEOUT_MS),
-    });
+    const res = await callRecipient("supabase", {
+      url: `${env.SUPABASE_URL.replace(/\/+$/, "")}/rest/v1/${path}`,
+      init: {
+        method, headers: { apikey: env.SUPABASE_KEY, authorization: `Bearer ${env.SUPABASE_KEY}`, "Content-Type": "application/json", ...(prefer ? { Prefer: prefer } : {}) },
+        body: body === undefined ? undefined : JSON.stringify(body), signal: AbortSignal.timeout(TIMEOUT_MS),
+      },
+      sent: ["username", "scan_result"], // sender key filter; fix-list progress on the saved snapshot
+    }, recipientCtx(env));
     let rows: Record<string, unknown>[] = [];
     try { const j = await res.json(); rows = Array.isArray(j) ? j : []; } catch { /* empty body */ }
     return { ok: res.ok, rows };
@@ -95,7 +101,7 @@ function listView(base: BaselineRow, items: Map<string, Item>): View {
   const guides = listedGuides();
   return {
     text: ["Fix list from your scan of " + day(base.created_at) + ".", "Pick an item. Skipping or keeping something is fine; it does not count as fixed.", "", ...guides.map((g) => `${g.label}: ${status(g, items.get(g.code))}`), "", HELP_LINE].join("\n"),
-    keyboard: [...guides.map((g) => [{ text: g.label, callback_data: data(base, "o", g.code) }]), [{ text: "Scan again", callback_data: data(base, "r") }]],
+    keyboard: [...guides.map((g) => [{ text: g.label, callback_data: data(base, "o", g.code) }]), [{ text: "Scan again", callback_data: data(base, "r") }], [{ text: "Delete my scan data", callback_data: data(base, "dd") }]],
   };
 }
 function questionView(base: BaselineRow, g: Guide): View {
@@ -178,6 +184,7 @@ async function send(env: Env, chatId: string, messageId: number | null, v: View)
   await call(env, "sendMessage", body);
 }
 
+const CONFIRM_DELETE = "Delete your saved scan results, fix-list progress, any DEEP results and your consent record? I will stop re-checking your profile and this cannot be undone. This does not change your Telegram settings, which stay as you left them.";
 const plain = (text: string): View => ({ text: text + "\n\n" + HELP_LINE });
 const CONSENT_TEXT = {
   withdrawn: "I can only re-check while your consent to the scan is confirmed, and it is not confirmed now. Nothing was looked up.",
@@ -198,6 +205,12 @@ export async function handleFixWizard(env: Env, update: unknown, log: Logger): P
     const messageId = p.kind === "cb" ? p.cb.messageId : null;
     if (p.kind === "cb") await call(env, "answerCallbackQuery", { callback_query_id: p.cb.id });
     const reply = (v: View) => send(env, chatId, messageId, v);
+
+    if (p.kind === "cb") {
+      const [, , dact] = p.cb.data.split("|");
+      if (dact === "dd") return reply({ text: CONFIRM_DELETE, keyboard: [[{ text: "Yes, delete everything", callback_data: ["fw", p.cb.data.split("|")[1], "dy"].join("|") }], [{ text: "No, keep it", callback_data: ["fw", p.cb.data.split("|")[1], "l"].join("|") }]] });
+      if (dact === "dy") return reply({ text: deleteReply(await eraseSender(env, fromId, log)) });   // same erase as STOP; works even if the scan is already gone
+    }
 
     const ids = await senderIds(env, fromId);   // gate 3: plain id, or its HMAC when TELEGRAM_ID_HMAC_KEY is set
     const base = await loadBaseline(env, ids);
@@ -256,5 +269,5 @@ async function rescan(env: Env, base: BaselineRow, ids: SenderIds, update: unkno
   log.info("fix_wizard_rescan", { completeness: run.r.completeness, saved: run.saved, comparable: comparable(base) });
   const share = `https://t.me/share/url?url=${encodeURIComponent("https://myprivacytool.io/scan")}&text=${encodeURIComponent(SHARE_TEXT)}`;
   return { text: summaryText(base, summarise(base, run.r), run.r, items) + "\n\nOptional: the Share button opens Telegram's share picker with a generic message. It contains none of your details, and nothing is sent unless you choose a chat.",
-    keyboard: [[{ text: "Share (optional)", url: share }], [{ text: "Back to list", callback_data: data(base, "l") }]] };
+    keyboard: [[{ text: "Share (optional)", url: share }], [{ text: "Delete my scan data", callback_data: data(base, "dd") }], [{ text: "Back to list", callback_data: data(base, "l") }]] };
 }

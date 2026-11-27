@@ -158,13 +158,13 @@ const Content = () => (
       companies may be holding more than they should.
     </p>
 
-    <h3>Run a scan for broker exposure</h3>
+    <h3>See what a free scan covers</h3>
     <p>
       Manual searching misses a lot, because many broker pages are not indexed well by
       search engines. A{" "}
       <Link to={blogCtaHref("remove-personal-information-from-internet")}>free scan</Link>{" "}
-      can show where your details appear across data-broker and people-search sites, so you
-      know which requests are worth your time.
+      shows what your browser, device and network reveal. It does not search data-broker or
+      people-search sites for you, so keep running the searches above.
     </p>
 
     <h2 id="old-accounts">Step 2: Close old accounts and tighten social privacy</h2>
@@ -408,9 +408,10 @@ const Content = () => (
       a service built around US brokers may do little for data held in Asia-Pacific. At
       MyPrivacyTOOL, the{" "}
       <Link to={blogCtaHref("remove-personal-information-from-internet")}>free scan</Link>{" "}
-      shows where your data is exposed, and removal requests can be automated once you know
-      what needs to go. Use the scan results as a to-do list even if you decide to handle
-      requests yourself.
+      shows what your browser, device and email address reveal, and our{" "}
+      <Link to="/opt-out-guides">opt-out guides</Link> cover broker removals you can send
+      yourself. When paid plans open, we plan to offer a paid service that sends removal
+      requests for you; it is not available today.
     </p>
 
     <h2 id="how-long">How long it takes and when to re-check</h2>
@@ -647,10 +648,10 @@ const Content = () => (
       deadline and, if the answer is unsatisfactory, escalate to the PCPD, PDPC or OAIC.
     </p>
     <p>
-      If you would rather not manage all of this by hand, you can start with a{" "}
+      If you want a starting point, you can run a{" "}
       <Link to={blogCtaHref("remove-personal-information-from-internet")}>free scan</Link>{" "}
-      to see where your information is exposed, and then decide which requests you want to
-      handle yourself.
+      to see what your browser, device and email address reveal. The searches and removal
+      requests in this guide are still yours to send.
     </p>
   </>
 );

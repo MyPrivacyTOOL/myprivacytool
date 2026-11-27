@@ -27,6 +27,18 @@ describe("every workflow is valid YAML with triggers and jobs", () => {
   }
 });
 
+// The `runner` context does not exist in workflow-level or job-level `env` (GitHub rejects the whole file at dispatch time, which CI on the PR never exercises).
+// Use $RUNNER_TEMP inside a step instead. Found on setup-resend-webhook.yml, MPC-8751.
+describe("workflow-level and job-level env never use the runner context", () => {
+  for (const f of readdirSync(wfDir).filter((x) => x.endsWith(".yml"))) {
+    it(f, () => {
+      const wf = load(f);
+      const envs = [wf.env, ...Object.values(wf.jobs).map((j) => j.env)].filter(Boolean);
+      for (const env of envs) for (const v of Object.values(env)) expect(String(v)).not.toMatch(/\$\{\{[^}]*\brunner\./);
+    });
+  }
+});
+
 describe("ci.yml (merge blocking)", () => {
   const wf = load("ci.yml");
   it("runs on every pull request and on pushes to main", () => {
@@ -56,7 +68,7 @@ describe("ci.yml (merge blocking)", () => {
 });
 
 describe("deploy workflows: pre-deploy checks, smoke test, rollback", () => {
-  const DEPLOYS = { "deploy-mpt-leads.yml": "mpt-leads", "deploy-oauth-poc.yml": "oauth-poc", "deploy-webhook-receiver.yml": "webhook-receiver" };
+  const DEPLOYS = { "deploy-mpt-leads.yml": "mpt-leads", "deploy-oauth-poc.yml": "oauth-poc", "deploy-webhook-receiver.yml": "webhook-receiver", "deploy-github-channel.yml": "github-channel" };
   for (const [file, worker] of Object.entries(DEPLOYS)) {
     describe(file, () => {
       const wf = load(file);
@@ -88,6 +100,33 @@ describe("deploy workflows: pre-deploy checks, smoke test, rollback", () => {
       });
     });
   }
+  // MPC-10825 follow-up: the GitHub channel Worker deploys on merge (it used to be manual-only, so merged Worker changes silently never shipped).
+  describe("deploy-github-channel.yml: deploys on merge to main, never from a pull request", () => {
+    const wf = load("deploy-github-channel.yml");
+    it("runs on push to main for Worker, workflow, smoke-script and recipient-wrapper changes, and by hand", () => {
+      expect(wf.on.push.branches).toEqual(["main"]);
+      expect(wf.on.push.paths).toEqual(expect.arrayContaining(["workers/github-channel/**", ".github/workflows/deploy-github-channel.yml", "scripts/ci/smoke-test.mjs", "shared/recipients/**"]));
+      expect(wf.on).toHaveProperty("workflow_dispatch");
+    });
+    it("the deploy job needs the tests and never runs on a pull request", () => {
+      expect(wf.jobs.deploy.needs).toBe("test");
+      expect(wf.jobs.deploy.if).toContain("github.event_name == 'workflow_dispatch'");
+      expect(wf.jobs.deploy.if).toContain("github.ref == 'refs/heads/main'");
+      expect(wf.jobs.deploy.if).not.toMatch(/pull_request/);
+    });
+    it("keeps the wrangler ERESOLVE workaround on both wrangler steps", () => {
+      for (const s of steps(wf, "deploy").filter((x) => x.uses?.startsWith("cloudflare/wrangler-action"))) expect(s.env.NPM_CONFIG_LEGACY_PEER_DEPS).toBe("true");
+    });
+    it("fails (not warns) when the secret names change or an expected one is missing", () => {
+      const verify = steps(wf, "deploy").find((x) => x.name === "Verify secrets survived the deploy").run;
+      expect(verify).toContain("secret names changed across deploy");
+      expect(verify).toContain("expected secrets missing");
+      expect(verify).not.toContain("::warning::");
+    });
+    it("never puts a secret value in a run script (secrets only reach env or with)", () => {
+      for (const s of steps(wf, "deploy")) expect(s.run ?? "").not.toMatch(/\$\{\{\s*secrets\./);
+    });
+  });
   it("scan-report runs the pre-deploy check too", () => {
     expect(runs(load("deploy-scan-report.yml"), "deploy").join("\n")).toContain("check-env.mjs --require CLOUDFLARE_API_TOKEN,CLOUDFLARE_ACCOUNT_ID --worker workers/scan-report");
   });
@@ -112,6 +151,34 @@ describe("rollback.yml", () => {
     expect(s.find((x) => /rollback/.test(x.with?.command ?? "") && !/list/.test(x.with.command)).if).toBe("env.DRY_RUN != 'true'");
     expect(s.some((x) => /secret names changed across rollback/.test(x.run ?? ""))).toBe(true);
     expect(s.some((x) => /smoke-test\.mjs/.test(x.run ?? ""))).toBe(true);
+  });
+});
+
+describe("deploy.yml: core-brain post-deploy smoke test, auto-rollback and state check", () => {
+  const s = steps(load("deploy.yml"), "deploy");
+  const deployIdx = s.findIndex((x) => x.name === "Deploy core-brain (MPC-7257)");
+  const smoke = s.find((x) => x.id === "smoke");
+  const rollback = s.find((x) => /rollback --yes/.test(x.with?.command ?? ""));
+  const state = s.find((x) => /core-brain-gates\.mjs/.test(x.run ?? ""));
+  it("smoke-tests the live core-brain after the deploy, for core-brain only", () => {
+    expect(smoke.run).toContain("smoke-test.mjs core-brain");
+    expect(s.indexOf(smoke)).toBeGreaterThan(deployIdx);
+    expect(smoke.if).toContain("matrix.worker == 'core-brain'");
+  });
+  it("rolls back core-brain only when its own smoke test failed, then re-checks", () => {
+    expect(rollback.if).toContain("steps.smoke.outcome == 'failure'");
+    expect(rollback.if).toContain("matrix.worker == 'core-brain'");
+    expect(rollback.with.workingDirectory).toBe("workers/core-brain");
+    expect(s.indexOf(rollback)).toBeGreaterThan(s.indexOf(smoke));
+    const recheck = s.find((x) => /smoke-test\.mjs core-brain --retries 3/.test(x.run ?? ""));
+    expect(s.indexOf(recheck)).toBeGreaterThan(s.indexOf(rollback));
+  });
+  it("checks the Supabase read after deploy without rolling back, and skips the Qwen gate", () => {
+    expect(state.run).toContain("--skip-qwen");
+    expect(state.if).toBe("matrix.worker == 'core-brain'");
+    expect(state.env.WEBHOOK_SECRET).toBe("${{ secrets.WEBHOOK_SECRET }}");
+    expect(state.run).not.toContain("secrets.");
+    expect(s.indexOf(state)).toBeGreaterThan(s.indexOf(smoke));
   });
 });
 

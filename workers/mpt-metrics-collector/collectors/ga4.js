@@ -4,6 +4,8 @@
 // GA4 reads dates in the PROPERTY's reporting timezone, which must be Asia/Hong_Kong; every response carries
 // metadata.timeZone and a report from a property in any other timezone is rejected (status=error, nothing stored).
 import { previousHkDay, previousHkWeek, hkWeekday } from '../lib/hk.js';
+import { callRecipient } from '../../../shared/recipients/outbound.ts';
+import { recipientCtx } from '../lib/recipient-ctx.js';
 
 export const GA4_PROPERTY_ID = '515216281';
 const SCOPE = 'https://www.googleapis.com/auth/analytics.readonly';
@@ -44,11 +46,11 @@ export function getAccessToken(env, now = new Date()) {
       let key;
       try { key = JSON.parse(env.GA4_SERVICE_ACCOUNT_JSON); } catch { throw new Error('GA4_SERVICE_ACCOUNT_JSON is not valid JSON'); }
       if (!key.client_email || !key.private_key) throw new Error('GA4_SERVICE_ACCOUNT_JSON lacks client_email/private_key');
-      const res = await fetch(TOKEN_URL, {
+      const res = await callRecipient('ga4-data-api', { url: TOKEN_URL, init: {
         method: 'POST',
         headers: { 'content-type': 'application/x-www-form-urlencoded' },
         body: new URLSearchParams({ grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer', assertion: await signJwt(key, now) }),
-      });
+      }, sent: [] }, recipientCtx(env));
       if (!res.ok) throw new Error(`GA4 token request failed: HTTP ${res.status}`);
       const { access_token } = await res.json();
       if (!access_token) throw new Error('GA4 token response had no access_token');
@@ -61,11 +63,11 @@ export function getAccessToken(env, now = new Date()) {
 
 export async function runReport(env, request) {
   const token = await getAccessToken(env);
-  const res = await fetch(`https://analyticsdata.googleapis.com/v1beta/properties/${GA4_PROPERTY_ID}:runReport`, {
+  const res = await callRecipient('ga4-data-api', { url: `https://analyticsdata.googleapis.com/v1beta/properties/${GA4_PROPERTY_ID}:runReport`, init: {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}`, 'content-type': 'application/json' },
     body: JSON.stringify({ ...request, limit: request.limit ?? 250, keepEmptyRows: false }),
-  });
+  }, sent: [] }, recipientCtx(env));
   if (!res.ok) throw new Error(`GA4 runReport failed: HTTP ${res.status}`);
   const data = await res.json();
   if (!data || !Array.isArray(data.metricHeaders ?? [])) throw new Error('GA4 runReport returned an unexpected shape');
@@ -100,6 +102,10 @@ export const reports = [
   report('daily_source_medium', (p) => ({ dateRanges: range(p), dimensions: dims('sessionSource', 'sessionMedium'), metrics: metrics('sessions'), orderBys: [{ metric: { metricName: 'sessions' }, desc: true }] })),
   report('daily_country', (p) => ({ dateRanges: range(p), dimensions: dims('country'), metrics: metrics('sessions', 'activeUsers'), orderBys: [{ metric: { metricName: 'sessions' }, desc: true }] })),
   report('daily_landing_page', (p) => ({ dateRanges: range(p), dimensions: dims('landingPage'), metrics: metrics('sessions'), orderBys: [{ metric: { metricName: 'sessions' }, desc: true }] })),
+  // MPC-11111: landing page x source x device with bounce and duration, so a bounce spike (e.g. 2026-11-20, 11 sessions from Facebook)
+  // can be split into crawler/prefetch traffic vs a broken page without a second manual pull.
+  // Stored untouched, like every other report.
+  report('daily_landing_source_device', (p) => ({ dateRanges: range(p), dimensions: dims('landingPage', 'sessionSource', 'deviceCategory'), metrics: metrics('sessions', 'bounceRate', 'averageSessionDuration'), orderBys: [{ metric: { metricName: 'sessions' }, desc: true }] })),
   // Mondays (HKT) only: previous Mon..Sun active users (the weekly view reads this).
   report('weekly_overview', (p) => ({ dateRanges: range(p), metrics: metrics('activeUsers') }), { period: lastWeek, only: (now) => hkWeekday(now) === 1 }),
 ];

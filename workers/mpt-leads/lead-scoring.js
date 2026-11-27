@@ -1,5 +1,8 @@
 // MPC-7500: lead enrichment (Hunter) + readiness scoring for the mpt-leads Worker.
 // Pure functions plus one fetch wrapper; no module state. Scores are 0-100, High Priority is > 80.
+// MPC-9885: the Hunter call goes through the recipient wrapper (key "hunter", flag HUNTER_API_KEY).
+import { callRecipient } from '../../shared/recipients/outbound.ts';
+import { workerRecipientContext } from '../../shared/recipients/worker-ctx.ts';
 
 export const HIGH_PRIORITY_THRESHOLD = 80;
 
@@ -54,11 +57,11 @@ export function normaliseHunter(payload) {
 
 // Fetch Hunter combined enrichment. Returns { status: 'ok'|'not_found'|'error'|'disabled', data }.
 // 'error' means retry later (network, 429, 5xx); 'not_found' is a final answer (score on domain/geo alone).
-export async function hunterEnrich(env, email) {
+export async function hunterEnrich(env, email, rctx = workerRecipientContext(env)) {
   if (!env.HUNTER_API_KEY) return { status: 'disabled', data: null };
   try {
     const url = `https://api.hunter.io/v2/combined/find?email=${encodeURIComponent(email)}&api_key=${encodeURIComponent(env.HUNTER_API_KEY)}`;
-    const res = await fetch(url, { headers: { Accept: 'application/json' } });
+    const res = await callRecipient('hunter', { url, init: { headers: { Accept: 'application/json' } }, sent: ['email'] }, rctx);
     if (res.status === 404) return { status: 'not_found', data: null };
     if (!res.ok) {
       console.error('Hunter enrich failed:', res.status);
@@ -128,13 +131,13 @@ export function hubspotProps({ result, enrichment, status, now = new Date() }) {
 
 // Full pipeline for one email. Returns { props, result } ready to write to HubSpot.
 // status: 'scored' (final) | 'pending' (Hunter failed; the cron sweep retries and rescoring overwrites).
-export async function enrichAndScore(env, email, cfCountry) {
+export async function enrichAndScore(env, email, cfCountry, rctx = workerRecipientContext(env)) {
   const domain = emailDomain(email);
   if (isFreeMail(domain)) {
     const result = scoreLead({ email, enrichment: null, country: cfCountry });
     return { result, props: hubspotProps({ result, enrichment: null, status: 'scored' }) };
   }
-  const h = await hunterEnrich(env, email);
+  const h = await hunterEnrich(env, email, rctx);
   const enrichment = h.status === 'ok' ? h.data : null;
   const result = scoreLead({ email, enrichment, country: cfCountry });
   const status = h.status === 'error' ? 'pending' : 'scored';

@@ -4,12 +4,15 @@
 //   mpt_erase_chat_sender   consent state (and its routing log rows) -> the next "Y" must be given again; the wizard stops re-checking at once
 //   mpt_delete_profile_snapshots  baseline + re-check snapshots (cascades to fix-list progress and dashboard links/sessions)
 //   mpt_delete_deep_data    DEEP jobs and results (cascade)
-// Not covered here (stated honestly in the reply): the bot-wide probe logs (PROBE_MODE) and anything already sent to Telegram.
+//   mpt_delete_event_flags  MPC-8689 event flags (edits, blocked or unblocked)
+//   eraseProbeCaptures      this sender's rows in the bot-wide probe log (channel_probe_captures)
+// Not covered here: anything already sent to Telegram.
 import { scanAllowed } from "./baseline-scan";
+import { callRecipient } from "../../../shared/recipients/outbound";
 import type { Logger } from "./logger";
 import { senderIds } from "./sender-key";
-import { call, telegramSender } from "./probe-reader";
-import type { Env } from "./shared";
+import { call, eraseProbeCaptures, telegramSender } from "./probe-reader";
+import { type Env, recipientCtx } from "./shared";
 
 const TIMEOUT_MS = 5000;
 
@@ -23,16 +26,21 @@ export function isDeleteMyDataRequest(env: Env, update: unknown): boolean {
   return isDeleteCommandText((update as { message?: { text?: unknown } } | null)?.message?.text);
 }
 
-async function rpc(env: Env, fn: string, args: Record<string, string>): Promise<number | null> {
+/** missingOk: a 404 (function not deployed yet) counts as nothing to delete; used only for the newest function so STOP never fails just because a migration has not reached the database. */
+async function rpc(env: Env, fn: string, args: Record<string, string>, missingOk = false): Promise<number | null> {
   if (!env.SUPABASE_URL || !env.SUPABASE_KEY) return null;
   try {
-    const res = await fetch(`${env.SUPABASE_URL.replace(/\/+$/, "")}/rest/v1/rpc/${fn}`, {
-      method: "POST",
-      headers: { apikey: env.SUPABASE_KEY, authorization: `Bearer ${env.SUPABASE_KEY}`, "Content-Type": "application/json" },
-      body: JSON.stringify(args),
-      signal: AbortSignal.timeout(TIMEOUT_MS),
-    });
-    if (!res.ok) return null;
+    const res = await callRecipient("supabase", {
+      url: `${env.SUPABASE_URL.replace(/\/+$/, "")}/rest/v1/rpc/${fn}`,
+      init: {
+        method: "POST",
+        headers: { apikey: env.SUPABASE_KEY, authorization: `Bearer ${env.SUPABASE_KEY}`, "Content-Type": "application/json" },
+        body: JSON.stringify(args),
+        signal: AbortSignal.timeout(TIMEOUT_MS),
+      },
+      sent: ["username"], // the sender key whose rows are erased
+    }, recipientCtx(env));
+    if (!res.ok) return missingOk && res.status === 404 ? 0 : null;
     const n = Number(await res.json().catch(() => 0));
     return Number.isFinite(n) ? n : 0;
   } catch {
@@ -45,24 +53,35 @@ const DONE = (n: number) => n > 0
   : "Nothing was stored about you, so there is nothing to delete. I will not re-check your profile.";
 const FAILED = "I could not finish deleting everything just now, so please do not assume it is gone. Nothing new will be checked. Send STOP again in a few minutes; if it still fails, contact us at the address on our privacy page.";
 
-/** Never throws; never logs ids, payloads or the token. Consent is erased first so re-checks stop immediately. */
+export interface EraseResult { failed: boolean; total: number }
+
+/** Deletes everything this Worker's scan features hold for the sender. Consent is erased first so re-checks stop immediately. Never throws; never logs ids, payloads or the token. */
+export async function eraseSender(env: Env, plainId: string, log: Logger): Promise<EraseResult> {
+  // Gate 3: scan rows may sit under the plain id (older) and/or the HMAC key. Delete under every key; a misconfigured key still deletes the plain id but reports failure.
+  let keys = [plainId];
+  let keyOk = true;
+  try { keys = (await senderIds(env, plainId)).read; } catch { keyOk = false; }
+  const state = await rpc(env, "mpt_erase_chat_sender", { p_channel: "telegram", p_sender_id: plainId });   // core-brain's table keeps the plain id
+  const snapCounts: (number | null)[] = [];
+  for (const k of keys) snapCounts.push(await rpc(env, "mpt_delete_profile_snapshots", { p_sender_id: k }));
+  const flagCounts: (number | null)[] = [];
+  for (const k of keys) flagCounts.push(await rpc(env, "mpt_delete_event_flags", { p_sender_id: k }, true));
+  const deep = await rpc(env, "mpt_delete_deep_data", { p_sender_id: plainId });                          // DEEP stays plain-id keyed
+  const probe = await eraseProbeCaptures(env, plainId);                                                      // probe rows are plain-id keyed
+  const failed = !keyOk || state === null || deep === null || probe === null || snapCounts.some((n) => n === null) || flagCounts.some((n) => n === null);
+  const snaps = snapCounts.reduce<number>((a, n) => a + (n ?? 0), 0) + flagCounts.reduce<number>((a, n) => a + (n ?? 0), 0);
+  log.info("delete_my_data", { failed, state: state ?? -1, snapshots: snaps, deep: deep ?? -1, probe: probe ?? -1 });
+  return { failed, total: (state ?? 0) + snaps + (deep ?? 0) + (probe ?? 0) };
+}
+
+export const deleteReply = (r: EraseResult): string => (r.failed ? FAILED : DONE(r.total));
+
 export async function handleDeleteMyData(env: Env, update: unknown, log: Logger): Promise<void> {
   const s = telegramSender(update);
   if (!s || !env.TELEGRAM_BOT_TOKEN) return;
   try {
-    // Gate 3: scan rows may sit under the plain id (older) and/or the HMAC key. Delete under every key; a misconfigured key still deletes the plain id but reports failure.
-    let keys = [s.id];
-    let keyOk = true;
-    try { keys = (await senderIds(env, s.id)).read; } catch { keyOk = false; }
-    const state = await rpc(env, "mpt_erase_chat_sender", { p_channel: "telegram", p_sender_id: s.id });   // core-brain's table keeps the plain id
-    const snapCounts: (number | null)[] = [];
-    for (const k of keys) snapCounts.push(await rpc(env, "mpt_delete_profile_snapshots", { p_sender_id: k }));
-    const deep = await rpc(env, "mpt_delete_deep_data", { p_sender_id: s.id });                          // DEEP stays plain-id keyed
-    const failed = !keyOk || state === null || deep === null || snapCounts.some((n) => n === null);
-    const snaps = snapCounts.reduce<number>((a, n) => a + (n ?? 0), 0);
-    log.info("delete_my_data", { failed, state: state ?? -1, snapshots: snaps, deep: deep ?? -1 });
-    const total = (state ?? 0) + snaps + (deep ?? 0);
-    await call(env, "sendMessage", { chat_id: s.chatId, text: failed ? FAILED : DONE(total) });
+    const r = await eraseSender(env, s.id, log);
+    await call(env, "sendMessage", { chat_id: s.chatId, text: deleteReply(r) });
   } catch (err) {
     log.warn("delete_my_data_failed", { error: err instanceof Error ? err.name : "unknown" });
   }

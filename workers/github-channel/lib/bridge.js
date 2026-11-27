@@ -150,7 +150,7 @@ async function runBridge(rawRecords, buildPapit) {
 
 /** Full pipeline for the GitHub channel. */
 export function bridgeGithub(raw, { now = new Date() } = {}) {
-  return runBridge(githubRecords(raw), (records) => githubToPapit(toRaw(records), { now }));
+  return runBridge(githubRecords(raw), (records) => githubToPapit(toRaw(records), { now, coverage: raw?.coverage ?? null }));
 }
 
 /**

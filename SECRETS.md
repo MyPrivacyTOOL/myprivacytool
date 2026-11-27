@@ -84,7 +84,7 @@ itself off while it is unset. See `docs/SECRETS-AUDIT.md`.
 | social-listeners | `SUPABASE_URL`, `SUPABASE_KEY`, `TWILIO_SID`, `TWILIO_AUTH_TOKEN`, `META_APP_SECRET`, `X_CONSUMER_SECRET`, `LINKEDIN_CLIENT_SECRET`, `TELEGRAM_WEBHOOK_SECRET`, `CORE_BRAIN_TOKEN`, `TELEGRAM_BOT_TOKEN` |
 | github-channel | `GITHUB_CLIENT_SECRET`, `STATE_SIGNING_KEY`, `ENCRYPTION_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `REDDIT_CLIENT_SECRET` † |
 | mpt-leads | `HUBSPOT_API_KEY`, `HUBSPOT_TOKEN`, `NOTION_TOKEN`, `RESEND_API_KEY`, `SLACK_BOT_TOKEN`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `TURNSTILE_SECRET_KEY`, `HUNTER_API_KEY` † (non-secret config: `LEADS_DB_ID`, `SLACK_CHANNEL_ID`, `SUPABASE_URL`) |
-| mpt-metrics-collector | `SUPABASE_SERVICE_ROLE_KEY`, `COLLECTOR_TRIGGER_TOKEN`, `CLOUDFLARE_ANALYTICS_TOKEN`, `YOUTUBE_API_KEY`, `GA4_SERVICE_ACCOUNT_JSON`, `NOTION_TOKEN`, `SLACK_BOT_TOKEN` (MPC-7383 Monday digest, `chat:write` only), `HUBSPOT_READONLY_TOKEN` (read-only HubSpot private-app token for portal 246502821; deliberately not the write-capable `HUBSPOT_TOKEN` / `HUBSPOT_API_KEY`) (non-secret config: `SUPABASE_URL`, `CLOUDFLARE_ZONE_ID`, `MPTSLACK_CHANNEL_ID` (set as a secret so `wrangler deploy` does not replace it)) |
+| mpt-metrics-collector | `SUPABASE_SERVICE_ROLE_KEY`, `COLLECTOR_TRIGGER_TOKEN`, `CLOUDFLARE_ANALYTICS_TOKEN`, `YOUTUBE_API_KEY`, `GA4_SERVICE_ACCOUNT_JSON`, `NOTION_TOKEN`, `SLACK_BOT_TOKEN` (MPC-7383 Monday digest, `chat:write` only), `HUBSPOT_READONLY_TOKEN` (read-only HubSpot private-app token for portal 246502821; deliberately not the write-capable `HUBSPOT_TOKEN` / `HUBSPOT_API_KEY`), `META_ADS_KEY` † (Meta system user `claude-MPTads`, the SAME token as the Composio Meta Ads connection, generated with broader permissions than `ads_read` (owner-accepted 2026-11-07), so this Worker must stay GET-only (pinned by `meta-ads.test.mjs`); rotate before it expires; unset = the collector stores a configured=false row; leave out of `EXPECTED_SECRETS.txt` until required) (non-secret config, optional: `META_AD_ACCOUNT_ID` overrides the built-in ad account `act_266295748910383`, `META_GRAPH_VERSION`) (non-secret config: `SUPABASE_URL`, `CLOUDFLARE_ZONE_ID`, `MPTSLACK_CHANNEL_ID` (set as a secret so `wrangler deploy` does not replace it)) |
 | oauth-poc | `GOOGLE_CLIENT_SECRET`, `STATE_SIGNING_KEY`, `SUPABASE_SERVICE_ROLE_KEY` † |
 | scan-report | `SUPABASE_SERVICE_ROLE_KEY`, `RESEND_API_KEY`, `HIBP_API_KEY`, `HUBSPOT_TOKEN`, `UNSUBSCRIBE_SECRET` † |
 | webhook-receiver | `EMAIL_WEBHOOK_SECRET`, `FIRESTORE_SA_TOKEN`, `HUBSPOT_API_KEY`, `META_APP_SECRET`, `META_PAGE_ACCESS_KEY`, `META_VERIFY_KEY`, `META_WHATSAPP_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `TELEGRAM_BOT_KEY`, `TELEGRAM_WEBHOOK_SECRET`, `TWILIO_AUTH_TOKEN`, `BREACH_API_KEY`, `DEEP_DIVE_SECRET`, `RAPIDAPI_KEY`, `SPAM_API_KEY` |
@@ -97,6 +97,23 @@ itself off while it is unset. See `docs/SECRETS-AUDIT.md`.
 GitHub Actions also holds: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `SUPABASE_PROJECT_ID`,
 `SUPABASE_DB_PASSWORD`, `SUPABASE_ACCESS_TOKEN`, `SCAN_REPORT_SUPABASE_SERVICE_ROLE_KEY`,
 `SCAN_REPORT_RESEND_API_KEY`, `SCAN_REPORT_HUBSPOT_TOKEN`, `SCAN_REPORT_HIBP_API_KEY`.
+
+### Optional and feature-gated names (added 2026-11-23, MPC-10736 R3)
+
+Read in Worker code but deliberately left out of `EXPECTED_SECRETS.txt` (a missing name fails several deploy
+workflows); each feature switches itself off while its name is unset. Names only. Enforced by
+`scripts/ci/check-secret-inventory.mjs`: a new secret name in Worker code must be added here or to that Worker's
+`EXPECTED_SECRETS.txt`, or CI fails.
+
+| Worker | Names |
+|---|---|
+| social-listeners | `DISCORD_BOT_TOKEN`, `DISCORD_PUBLIC_KEY`, `GITHUB_WEBHOOK_SECRET`, `KAKAO_SKILL_SECRET`, `LINE_CHANNEL_ACCESS_TOKEN`, `LINE_CHANNEL_SECRET`, `QQ_BOT_SECRET`, `TELEGRAM_ID_HMAC_KEY`, `VIBER_AUTH_TOKEN`, `WECHAT_ACCESS_TOKEN`, `WECHAT_TOKEN`, `YOUTUBE_EXTRAS_SECRET`, `ZALO_OA_ACCESS_TOKEN`, `ZALO_WEBHOOK_SECRET` |
+| scan-report | `DEEP_RESEARCH_HMAC_KEY`, `GITHUB_SEARCH_TOKEN`, `SUPABASE_PUBLISHABLE_KEY` (public by design, not a secret), `EMAIL_GUESS_KEY` (MPC-11111, optional: the key that seals and opens the magic-guess token; the SAME value must be set on scan-report and social-listeners; 32 or more random characters; created by Chris only; with it missing the feature is off and nothing is issued) |
+| mpt-leads | `SUPABASE_PUBLISHABLE_KEY` (public by design, not a secret) |
+| mpt-metrics-collector | `FACEBOOK_PAGE_TOKEN` |
+| mpt-cairn-blackboard | `CAIRN_TOKEN` |
+| mpt-content-approval | `MAKE_API_KEY`, `DEFAULT_IMAGE_KEY` (an object key, not a secret) |
+| shared `workers/lib`, `shared/ga4-server-events.ts` | `GA4_API_SECRET` (read by Workers that pass their env in; MPC-11111 server-side GA4 events in scan-report, core-brain and social-listeners (the X bot's DMs never reach core-brain, so social-listeners sends dm_received for them), off unless `GA4_SERVER_EVENTS_ENABLED` is `true`, the registry entry `ga4-measurement-protocol` is enabled, and the secret is set; created by Chris only) |
 
 ## 5. Rotation checklist
 

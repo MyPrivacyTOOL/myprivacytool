@@ -1,6 +1,6 @@
 import { useState, type CSSProperties } from 'react';
 import type { Hexagon } from '@/types/hexagon';
-import { getHexagonVisuals, getHexPaint, effectiveTile } from '@/utils/hexagonStyles';
+import { getHexagonVisuals, getHexPaint, effectiveTile, tileShowsValue, isWaiting } from '@/utils/hexagonStyles';
 import { TILE_COPY } from '@/lib/hexagonTile';
 import { BAND_FILL_OPACITY, BAND_WORD } from '@/lib/guessBands';
 import { canConfirm, canDispute } from '@/lib/identityConfirmation';
@@ -20,7 +20,6 @@ import {
 const EXPOSED_TOOLTIP = 'Exposure confirmed. Open to see the next step.';
 // Pointy-top hexagon in a 100 x 115.47 box, inset so the stroke is not clipped.
 const POINTS = '50,2 98,28.7 98,86.8 50,113.5 2,86.8 2,28.7';
-const WAITING = new Set<Hexagon['status']>(['not_checked', 'false_positive']);
 
 interface Props {
   hexagon: Hexagon;
@@ -59,8 +58,8 @@ export const InteractiveHexagonTile = ({ hexagon, onConfirm, onDispute, onKeep, 
   const reopensPlan = (exposed || needsFix) && !!onSelect;
   const interactive = requiresConfirmation || allowsDispute || reopensPlan;
   const secured = !tile && !exposed && (hexagon.status === 'checked' || hexagon.status === 'confirmed');
-  const emoji = WAITING.has(hexagon.status) ? '🔍' : getHexagon(hexagon.id)?.artwork.emoji ?? visuals.icon;
-  const showValue = !compact && !!hexagon.data && !WAITING.has(hexagon.status) && (!tile || tile.showValue);
+  const emoji = isWaiting(hexagon.status) ? '🔍' : getHexagon(hexagon.id)?.artwork.emoji ?? visuals.icon;
+  const showValue = tileShowsValue(hexagon, fixed, compact);
   // A guess keeps its instruction ("Tap to confirm"): it is the one tile that asks the visitor to answer.
   const tip = tile && hexagon.status !== 'guess' ? `${hexagon.label}: ${tile.line}.` : exposed ? EXPOSED_TOOLTIP : visuals.tooltip;
 

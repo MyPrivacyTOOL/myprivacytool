@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import FeatureStatus from "@/components/FeatureStatus";
 import { Home, Phone, Users, MapPin, Mail, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,19 +7,29 @@ import Seo from "@/components/Seo";
 import pageMeta from "@/data/pageMeta.json";
 import { submitHubSpotForm, consentFields } from "@/lib/hubspot";
 import ConsentCheckbox from "@/components/ConsentCheckbox";
+import { REPORT_CONSENT_LABEL } from "@/lib/consentWording";
 import SaveScanConsentCheckbox from "@/components/SaveScanConsentCheckbox";
 import RecogniseConsentCheckbox from "@/components/RecogniseConsentCheckbox";
 import ScanSavingNotice from "@/components/ScanSavingNotice";
 import TurnstileBox from "@/components/TurnstileBox";
-import { SCAN_TURNSTILE_SITE_KEY } from "@/lib/turnstile";
+import { SCAN_TURNSTILE_SITE_KEY, loadTurnstile } from "@/lib/turnstile";
+import ScanConsentText from "@/components/ScanConsentText";
+import ListingCoverageNote from "@/components/ListingCoverageNote";
+import { ConsentError, giveScanConsent, hasScanConsent } from "@/lib/scanConsent";
+import { setChoice } from "@/lib/cookieConsent";
 import LiveScanPanel from "@/components/LiveScanPanel";
 import ShareButtons from "@/components/ShareButtons";
 import ScanNumberNotice from "@/components/ScanNumberNotice";
-import { trackStartSignup, trackReportRequested, trackReportFailed } from "@/lib/analytics";
+import ScanRecipientsPanel from "@/components/ScanRecipientsPanel";   // MPC-9893
+import { trackStartSignup, trackReportRequested, trackReportFailed, trackEmailGuessShown, trackMagicGuessSubmitted, trackScanStart } from "@/lib/analytics";
+import EmailGuessCard from "@/components/EmailGuessCard";   // MPC-11111: the magic guess, off unless VITE_EMAIL_GUESS_ENABLED is "true"
+import { emailGuessEnabled, fetchEmailGuess, takeGuessToken } from "@/lib/emailGuess";
 import { canOfferScanSave, recognitionEnabled, reportStep } from "@/lib/webScan";
 import { referralsEnabled, rememberReferralCode } from "@/lib/referral";
 import { ReportRequestError, BAD_EMAIL_MESSAGE, REPORT_FAILED_MESSAGE, REPORT_WAIT_MESSAGE, requestScanReport } from "@/lib/scanReport";
 import { suggestEmail } from "@/lib/emailTypo";
+import ListingCheckFields from "@/components/ListingCheckFields";
+import { emptyListingFields, hasListingFields, listingPayload, listingProblem } from "@/lib/listingFields";
 
 // Same HubSpot "Start Scan" form as /start (public form GUID, see src/pages/Start.tsx).
 const FORM_ID =
@@ -47,12 +58,18 @@ const Scan = () => {
   const [tsToken, setTsToken] = useState("");
   const [tsReset, setTsReset] = useState(0);
   const tsWidgets = useRef(0);
+  // MPC-9888: Cloudflare's script loads at the button click, not on page load (design 8.2). Armed once the click has been made.
+  const [tsArmed, setTsArmed] = useState(() => hasScanConsent());
   // MPC-8453: the address we already asked "did you mean ...?" about; pressing the button again with the same address sends it.
   const typoAsked = useRef("");
   // The visitor pressed the button before Cloudflare finished: the request is sent by itself the moment the token arrives (no "try again" round trip).
   const [waitingForToken, setWaitingForToken] = useState(false);
   // MPC-8452: key for the live results shown under the thank-you (memory only: a refresh starts again)
   const [liveToken, setLiveToken] = useState("");
+  // MPC-9813: the optional "show us your listing" details. Kept with the saved scan, so they travel only with the save consent.
+  const [listingFields, setListingFields] = useState(emptyListingFields);
+  // MPC-11111: the address a bot's bridge link offered back ("Is this your main email?"). Memory only; null = nothing to offer (the usual case).
+  const [guessedEmail, setGuessedEmail] = useState<string | null>(null);
 
   // MPC-7493: the contact step was opened. Under D12 (MPC-7470) a scan is saved only at the contact step, so this sends nothing unless this visit
   // already saved a scan; the drop-off before it is read from the GA4 events.
@@ -62,7 +79,25 @@ const Scan = () => {
     if (referralsEnabled()) rememberReferralCode(new URLSearchParams(window.location.search).get("ref"));
   }, []);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // MPC-11111: when the visit arrived on a bot's bridge link that carries a sealed guess, ask the Worker to open it. Any failure just means no card.
+  useEffect(() => {
+    if (!emailGuessEnabled()) return;
+    const token = takeGuessToken();
+    if (!token) return;
+    let live = true;
+    void fetchEmailGuess(token).then((g) => {
+      if (live && g) { setGuessedEmail(g.email); trackEmailGuessShown(); }
+    });
+    return () => { live = false; };
+  }, []);
+  // Yes only fills the box: the consent line, the button and the click-to-confirm email all still apply.
+  const answerGuess = (yes: boolean) => {
+    if (yes && guessedEmail) setEmail(guessedEmail);
+    setGuessedEmail(null);
+    trackMagicGuessSubmitted(yes ? "yes" : "no");
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     // The save box is optional: unticked = the report is still requested, the scan is just not saved.
     if (!email.trim() || !consent || submitting || waitingForToken) return;
@@ -72,10 +107,30 @@ const Scan = () => {
       setErrorMsg(`Did you mean ${suggestion}? If ${email.trim()} is right, press the button again.`);
       return;
     }
-    if (tsWidgets.current > 0 && !tsToken) {
-      setErrorMsg("");
-      setWaitingForToken(true);
+    if (hasListingFields(listingFields)) {
+      const problem = listingProblem(listingFields) || (offerSave && saveConsent ? "" : "To check a page you show us, tick \"save my scan\" too: the details are kept with your saved scan and deleted with it. Or clear those fields to go on without them.");
+      if (problem) { setErrorMsg(problem); return; }
+    }
+    // MPC-9888: pressing the button is the agreement shown above it. Record it first; nothing else starts if it cannot be recorded.
+    setSubmitting(true);
+    try {
+      await giveScanConsent();
+    } catch (err) {
+      setSubmitting(false);
+      setErrorMsg(err instanceof ConsentError && err.kind === "stale" ? "This page is out of date. Please reload it and try again." : "We could not record your agreement just now, so nothing has been sent. Please press the button to try again.");
       return;
+    }
+    setChoice(true);   // pressing the button also counts as the analytics choice for a visitor who never scanned (design 8.1)
+    trackScanStart("scan_page");   // CK-11491
+    setSubmitting(false);
+    if (!tsToken) {
+      const ts = await Promise.race([loadTurnstile(), new Promise<undefined>((r) => setTimeout(() => r(undefined), 4000))]);   // the script loads now, at the click; a blocked or slow script never holds the form
+      if (ts) {
+        setTsArmed(true);
+        setErrorMsg("");
+        setWaitingForToken(true);   // the effect below sends the report the moment the token arrives
+        return;
+      }
     }
     void sendReport(tsToken);
   };
@@ -94,13 +149,13 @@ const Scan = () => {
       }
       let sent: { liveToken?: string } = {};
       try {
-        sent = await requestScanReport(email.trim(), offerSave && saveConsent, offerSave && saveConsent && offerRecognise && recogniseConsent, token);
+        sent = await requestScanReport(email.trim(), offerSave && saveConsent, offerSave && saveConsent && offerRecognise && recogniseConsent, token, { listing: listingPayload(listingFields) });
       } catch (reportErr) {
         const kind = reportErr instanceof ReportRequestError ? reportErr.kind : "network";
         const status = reportErr instanceof ReportRequestError ? reportErr.status : 0;
         console.error("Scan report request failed", kind, status);
         trackReportFailed("scan_page", kind, status);
-        setErrorMsg(kind === "rate_limited" ? REPORT_WAIT_MESSAGE : kind === "bad_email" ? BAD_EMAIL_MESSAGE : REPORT_FAILED_MESSAGE); // no thank-you screen: the email stays in the box for a retry
+        setErrorMsg(reportErr instanceof ReportRequestError && reportErr.kind === "allowance" && reportErr.detail ? reportErr.detail : kind === "rate_limited" ? REPORT_WAIT_MESSAGE : kind === "bad_email" ? BAD_EMAIL_MESSAGE : REPORT_FAILED_MESSAGE); // no thank-you screen: the email stays in the box for a retry
         setTsToken(""); // a Turnstile token is single use: get a fresh one for the retry
         setTsReset((n) => n + 1);
         return;
@@ -136,6 +191,7 @@ const Scan = () => {
         required
         className="h-12 text-base"
       />
+      <ScanConsentText className="w-full" />
       <Button
         type="submit"
         disabled={submitting || waitingForToken}
@@ -148,8 +204,10 @@ const Scan = () => {
         onToken={setTsToken}
         onRendered={(on) => { tsWidgets.current += on ? 1 : -1; }}
         resetSignal={tsReset}
+        armed={tsArmed}
       />
-      <ConsentCheckbox id={`scan-consent-${idSuffix}`} checked={consent} onChange={setConsent} disabled={submitting} />
+      <ConsentCheckbox id={`scan-consent-${idSuffix}`} checked={consent} onChange={setConsent} disabled={submitting} label={REPORT_CONSENT_LABEL} />
+      {offerSave && <ListingCheckFields idSuffix={idSuffix} value={listingFields} onChange={setListingFields} disabled={submitting} />}
       {offerSave && (
         <>
           <SaveScanConsentCheckbox id={`scan-save-consent-${idSuffix}`} checked={saveConsent} onChange={onSaveChange} disabled={submitting} />
@@ -170,6 +228,7 @@ const Scan = () => {
         We'll email <span className="text-foreground">{email}</span> with your next steps.
       </p>
       <ScanNumberNotice />
+      <ScanRecipientsPanel />
       {liveToken && <LiveScanPanel token={liveToken} />}
     </div>
   );
@@ -186,16 +245,23 @@ const Scan = () => {
         <h1 className="text-4xl md:text-6xl font-bold leading-tight mb-6 tracking-tight">
           Find Out What the<br />
           <span className="text-brand">Internet Knows About You</span>
+          <FeatureStatus feature="F1" className="align-middle text-sm" />
         </h1>
 
         <p className="text-muted-foreground text-lg md:text-xl mb-4 max-w-2xl mx-auto leading-relaxed">
           Data brokers and people-search sites can list your name, address and phone number without you knowing.
         </p>
         <p className="text-muted-foreground text-base mb-12 max-w-xl mx-auto">
-          Check your exposure to see where your information may be listed, then follow our step-by-step guides to remove it.
+          We do not search broker sites for you yet. If you show us a page that lists you, we check it, and our step-by-step guides show how to have it removed.<FeatureStatus feature="F1" />
         </p>
 
-        {!submitted ? renderForm("top") : thanks}
+        {!submitted && <ListingCoverageNote className="max-w-md mx-auto mb-6" />}
+        {!submitted ? (
+          <>
+            {guessedEmail && <EmailGuessCard email={guessedEmail} onYes={() => answerGuess(true)} onNo={() => answerGuess(false)} />}
+            {renderForm("top")}
+          </>
+        ) : thanks}
         {waitingForToken && <p role="status" className="text-muted-foreground text-sm mt-3 text-left">Verifying you are human, this takes a moment. Your request is sent automatically as soon as it is done. If a box appears, please tick it.</p>}
         {errorMsg && <p role="alert" className="text-foreground text-sm mt-3 border-l-4 border-destructive pl-3 text-left">{errorMsg}</p>}
 
@@ -234,7 +300,7 @@ const Scan = () => {
       {/* Bottom CTA */}
       <section className="bg-muted/40 border-t border-border py-16 text-center px-6">
         <h2 className="text-2xl md:text-3xl font-bold mb-4">
-          Find out where you are listed.
+          Find out where you are listed.<FeatureStatus feature="F1" />
         </h2>
         <p className="text-muted-foreground mb-8 max-w-md mx-auto">
           Check your exposure, then use our opt-out guides to take your details down.
