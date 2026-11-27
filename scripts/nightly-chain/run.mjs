@@ -163,14 +163,17 @@ export async function runChain(env, { fetchImpl = fetch, sleep = (ms) => new Pro
     },
     async links_resolve() {
       const urls = linksToResolve(ctx.html);
-      const blocked = [];
-      const bad = await resolveLinks(urls, fetchImpl, { blocked });
+      const blocked = []; const unverified = [];
+      const bad = await resolveLinks(urls, fetchImpl, { blocked, unverified });
       result.facts.links_checked = urls.length;
       result.facts.links_check_blocked = blocked.length;
+      result.facts.links_blocked_unverified = unverified.length;
       if (bad.length) result.facts.links_failed = bad;   // every failing link, not only the first three the step detail has room for
       if (bad.length) throw new Error(`${bad.length} of ${urls.length} links do not resolve: ${bad.slice(0, 3).join('; ')}`);
-      if (!blocked.length) return `${urls.length} links resolve`;
-      return `${urls.length - blocked.length} links resolve; ${blocked.length} automated check blocked (browser-verified host, not proven by this run): ${blocked.join(', ')}`;
+      const parts = [`${urls.length - blocked.length - unverified.length} links resolve`];
+      if (unverified.length) parts.push(`${unverified.length} blocked, NOT verified (nobody has seen the page; accepted by decision): ${unverified.join(', ')}`);   // named first: the part a reader must not miss
+      if (blocked.length) parts.push(`${blocked.length} automated check blocked (browser-verified host, not proven by this run): ${blocked.join(', ')}`);
+      return parts.join('; ');
     },
     // MPC-7556: proves the Resend webhook is delivering events every night. The report email (sent through the real provider to the test mailbox) must come back as a
     // stored 'delivered' event on its per-send row (email_sends, written by the webhook). No event in the wait = the webhook, the secret or the migration is broken.

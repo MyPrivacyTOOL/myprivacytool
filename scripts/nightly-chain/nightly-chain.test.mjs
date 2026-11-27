@@ -2,7 +2,7 @@
 // Run: node scripts/nightly-chain/nightly-chain.test.mjs
 import { createHash } from 'node:crypto';
 import { runChain, metricsRow, hkDay } from './run.mjs';
-import { fixtureScan, checkReport, scanRequestBody, consentRequestBody, consentVersion, resolveLinks, linksToResolve, BOT_BLOCKED_VERIFIED_HOSTS, CERT_CHAIN_VERIFIED_HOSTS } from './checks.mjs';
+import { fixtureScan, checkReport, scanRequestBody, consentRequestBody, consentVersion, resolveLinks, linksToResolve, BOT_BLOCKED_VERIFIED_HOSTS, CERT_CHAIN_VERIFIED_HOSTS, BLOCKED_UNVERIFIED_HOSTS } from './checks.mjs';
 import { isTestAddress, testAddress, excludeTestFilter, onlyTestFilter } from '../../shared/test-records.js';
 import { buildReportEmail } from '../../workers/scan-report/lib/email.js';
 
@@ -223,13 +223,28 @@ for (const [name, opts, step] of broken) {
   check(is(await probeTls('https://chain.invalid/help', status(403)), 1, 0), 'certificate rule: a 403 from the certificate-listed host is not covered by it');
   check(Object.keys(CERT_CHAIN_VERIFIED_HOSTS).join() === 'help.whitepages.com.au' && Object.values(CERT_CHAIN_VERIFIED_HOSTS).every((v) => v.code === 'UNABLE_TO_VERIFY_LEAF_SIGNATURE' && v.saw), 'certificate rule: one host, one error code');
   check(Object.keys(BOT_BLOCKED_VERIFIED_HOSTS).sort().join() === 'www.beenverified.com,www.intelius.com,www.mylife.com,www.truthfinder.com', '403 rule: exactly the four hosts whose opt-out page opened in a browser');
-  for (const host of ['www.whitepages.com', 'www.fastpeoplesearch.com']) { const blocked = []; check((await resolveLinks([`https://${host}/x`], status(403), { blocked })).length === 1 && !blocked.length, `403 rule: ${host} showed a block page in the browser check, so its 403 still fails`); }
+  check(Object.keys(BLOCKED_UNVERIFIED_HOSTS).sort().join() === 'www.fastpeoplesearch.com,www.whitepages.com', 'unverified rule: exactly the two hosts the owner decided on');
+  for (const host of Object.keys(BLOCKED_UNVERIFIED_HOSTS)) {
+    const one = async (impl) => { const blocked = []; const unverified = []; const bad = await resolveLinks([`https://${host}/x`], impl, { blocked, unverified }); return `${bad.length}/${blocked.length}/${unverified.length}`; };
+    check(await one(status(403)) === '0/0/1', `unverified rule: a 403 from ${host} is counted as NOT verified, never as browser-verified`);
+    for (const code of [401, 404, 410, 429, 500, 503]) check(await one(status(code)) === '1/0/0', `unverified rule: ${code} from ${host} fails`);
+    check(await one(status(403, 'https://elsewhere.invalid/x')) === '1/0/0' && await one(tls('ENOTFOUND')) === '1/0/0' && await one(tls('UNABLE_TO_VERIFY_LEAF_SIGNATURE')) === '1/0/0', `unverified rule: a 403 after a redirect elsewhere, DNS and certificate errors on ${host} fail`);
+  }
+  check(Object.keys(BLOCKED_UNVERIFIED_HOSTS).every((h) => !Object.hasOwn(BOT_BLOCKED_VERIFIED_HOSTS, h)), 'unverified rule: no host is on both lists');
   check(Object.values(BOT_BLOCKED_VERIFIED_HOSTS).every((v) => /^\d{4}-\d{2}-\d{2}$/.test(v.verified) && v.saw), '403 rule: every listed host records when it was opened in a browser and what was seen');
 }
 {
   const listed = world({ forbidden: 'www.truthfinder.com' }); const r = await run({}, listed);
   const step = r.steps.find((s) => s.step === 'links_resolve');
   check(r.ok && r.facts.links_check_blocked === 1 && /1 automated check blocked .*not proven.*www\.truthfinder\.com/.test(step.detail), `nightly: a 403 from the listed host passes, counted and named as "automated check blocked" (${step.detail})`);
+  const nv = world({ forbidden: 'www.whitepages.com/' }); const rn = await run({}, nv);
+  const nvStep = rn.steps.find((s) => s.step === 'links_resolve');
+  check(rn.ok && rn.facts.links_blocked_unverified === 1 && rn.facts.links_check_blocked === 0 && /1 blocked, NOT verified .*www\.whitepages\.com/.test(nvStep.detail), `nightly: an unverified host passes but every run names it as NOT verified (${nvStep.detail})`);
+  check(metricsRow(rn, NOW).payload.links_blocked_unverified === 1, 'metrics row: the unverified count is recorded apart from the verified one');
+  const every = world(); const orig = every.f; const refused = new RegExp([...Object.keys(BOT_BLOCKED_VERIFIED_HOSTS), ...Object.keys(BLOCKED_UNVERIFIED_HOSTS)].map((h) => `//${h.replace(/\./g, '\\.')}/`).join('|'));
+  const ra = await run({}, { f: async (u, i) => (refused.test(String(u)) ? json({}, 403) : orig(u, i)), db: every.db });
+  const allStep = ra.steps.find((s) => s.step === 'links_resolve');
+  check(ra.ok && Object.keys(BLOCKED_UNVERIFIED_HOSTS).every((h) => allStep.detail.includes(h)), `nightly: with every listed host refusing, the step detail names both unverified hosts (${ra.facts.links_check_blocked} verified, ${ra.facts.links_blocked_unverified} unverified)`);
   const unlisted = world({ forbidden: 'www.spokeo.com' }); const r2 = await run({}, unlisted);
   check(r2.failedStep === 'links_resolve' && r2.facts.links_check_blocked === 0 && r2.facts.links_failed.length === 1 && /spokeo.*HTTP 403/.test(r2.facts.links_failed[0]), 'nightly: a 403 from an unlisted host fails the run, and the failing link is recorded');
   check(metricsRow(r2, NOW).payload.links_failed.length === 1 && !/@/.test(JSON.stringify(metricsRow(r2, NOW))), 'metrics row: failing links recorded, still no email address');
