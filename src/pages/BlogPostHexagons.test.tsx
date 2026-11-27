@@ -17,7 +17,7 @@ describe("blog: how-exposed-are-you lists the registry's hexagons", () => {
     expect(HEXAGON_COUNT).toBe(54);
     labels.forEach((l) => expect(items.filter((t) => t === l).length).toBeGreaterThanOrEqual(1));
     const text = container.textContent ?? "";
-    expect(text).toContain("54 run in the scan, 368 in the catalogue");
+    expect(text).toContain("54 run in the scan");
     expect(text).not.toMatch(/\b46\b/);
     const headingCounts = [...container.querySelectorAll("h3")].map((h) => /\((\d+)\)$/.exec(h.textContent ?? "")?.[1]).filter(Boolean).map(Number);
     expect(headingCounts.reduce((a, b) => a + b, 0)).toBe(54);
@@ -28,10 +28,10 @@ import ScoreMethod from "./ScoreMethod";
 import { countSentence } from "@/lib/scanCopy";
 
 describe("one count sentence (MPC-9832)", () => {
-  it("is exactly '54 run in the scan, 368 in the catalogue' and appears on the score page", () => {
-    expect(countSentence()).toBe("54 run in the scan, 368 in the catalogue");
+  it("is exactly '54 run in the scan' and appears on the score page", () => {
+    expect(countSentence()).toBe("54 run in the scan");
     const { container } = render(<MemoryRouter><ScoreMethod /></MemoryRouter>);
-    expect(container.textContent).toContain("54 run in the scan, 368 in the catalogue");
+    expect(container.textContent).toContain("54 run in the scan");
     expect(container.textContent).not.toMatch(/\b46\b/);
   });
 });

@@ -1,0 +1,252 @@
+{
+  "generated_at": "2026-11-27T05:50:00.000Z",
+  "timezone": "Asia/Hong_Kong",
+  "headline_note": "The locked KPI (10,000 free scans / 1,000 paid / $120k ARR by 2027-08-01) is the headline and is not changed or computed here. These four are secondary.",
+  "period": {
+    "current_week_of": "2026-11-23",
+    "last_complete_week_of": "2026-11-16",
+    "current_month": "2026-11-01"
+  },
+  "m1_activated_scans_per_week": {
+    "definition": "Completed web scans with at least one found result, per Hong Kong (ISO) week; test mailbox left out.",
+    "current_week": {
+      "week_of": "2026-11-23",
+      "activated_scans": 0,
+      "completed_scans": 0,
+      "test_scans_excluded": 6,
+      "value": 0,
+      "week_complete": false,
+      "status": "no_stored_scans",
+      "reason": "No stored non-test scan for this week, so 0 here is a lower bound, not a measurement: deleted scans cannot be dated to the week they were made (see coverage)."
+    },
+    "last_complete_week": {
+      "week_of": "2026-11-16",
+      "activated_scans": 0,
+      "completed_scans": 0,
+      "test_scans_excluded": 2,
+      "value": 0,
+      "week_complete": true,
+      "status": "no_stored_scans",
+      "reason": "No stored non-test scan for this week, so 0 here is a lower bound, not a measurement: deleted scans cannot be dated to the week they were made (see coverage)."
+    },
+    "trailing": [
+      {
+        "week_of": "2026-10-26",
+        "activated_scans": 8,
+        "completed_scans": 8,
+        "test_scans_excluded": 0,
+        "week_complete": true
+      },
+      {
+        "week_of": "2026-11-02",
+        "activated_scans": 1,
+        "completed_scans": 1,
+        "test_scans_excluded": 0,
+        "week_complete": true
+      },
+      {
+        "week_of": "2026-11-09",
+        "activated_scans": 0,
+        "completed_scans": 0,
+        "test_scans_excluded": 0,
+        "week_complete": true
+      },
+      {
+        "week_of": "2026-11-16",
+        "activated_scans": 0,
+        "completed_scans": 0,
+        "test_scans_excluded": 2,
+        "week_complete": true
+      },
+      {
+        "week_of": "2026-11-23",
+        "activated_scans": 0,
+        "completed_scans": 0,
+        "test_scans_excluded": 6,
+        "week_complete": false
+      }
+    ],
+    "caveats": [
+      "Counts the web scans still stored. A deleted scan leaves only an undated counter, so any week is a lower bound (see coverage).",
+      "Test-mailbox scans are left out, but only while the linked scans row still exists to prove it."
+    ]
+  },
+  "m2_verified_facts_per_completed_scan": {
+    "definition": "Median, per completed web scan, of hexagons found or checked-and-clear (distinct registry hexagons), per Hong Kong week; scans with none count as 0; test mailbox left out.",
+    "current_week": {
+      "week_of": "2026-11-23",
+      "median_verified_facts": null,
+      "completed_scans": 0,
+      "value": null,
+      "week_complete": false,
+      "status": "no_scans",
+      "reason": "No stored completed scan in this week, so there is no median (not 0)."
+    },
+    "last_complete_week": {
+      "week_of": "2026-11-16",
+      "median_verified_facts": null,
+      "completed_scans": 0,
+      "value": null,
+      "week_complete": true,
+      "status": "no_scans",
+      "reason": "No stored completed scan in this week, so there is no median (not 0)."
+    },
+    "trailing": [
+      {
+        "week_of": "2026-10-26",
+        "median_verified_facts": 7,
+        "completed_scans": 8,
+        "week_complete": true
+      },
+      {
+        "week_of": "2026-11-02",
+        "median_verified_facts": 32,
+        "completed_scans": 1,
+        "week_complete": true
+      },
+      {
+        "week_of": "2026-11-09",
+        "median_verified_facts": null,
+        "completed_scans": 0,
+        "week_complete": true
+      },
+      {
+        "week_of": "2026-11-16",
+        "median_verified_facts": null,
+        "completed_scans": 0,
+        "week_complete": true
+      },
+      {
+        "week_of": "2026-11-23",
+        "median_verified_facts": null,
+        "completed_scans": 0,
+        "week_complete": false
+      }
+    ],
+    "caveats": [
+      "Counts the web scans still stored. A deleted scan leaves only an undated counter, so any week is a lower bound (see coverage).",
+      "Test-mailbox scans are left out, but only while the linked scans row still exists to prove it."
+    ]
+  },
+  "m3_calibrated_tiles_per_month": {
+    "definition": "Tiles whose confidence_config value was changed and then validated by 30+ follow-up responders (95% Wilson interval contains the new value), per Hong Kong month, counted in the month the 30th responder arrived.",
+    "current_month": {
+      "month_of": "2026-11-01",
+      "value": 0
+    },
+    "previous_month": {
+      "month_of": "2026-10-01",
+      "value": 0
+    },
+    "months_with_calibrated_tiles": [],
+    "evidence": {
+      "config_versions_above_0": 0,
+      "answers_recorded_ever": 0
+    },
+    "status": "dormant",
+    "reason": "Zero is the expected value: only confidence_config version 0 (the registry numbers) exists, so no tile has been recalibrated. The learning loop is dormant; this is reported, not worked around.",
+    "note": "No tile answer (yes, not me, disputed, kept) has been recorded either: the browser sends no person key since MPC-9892 and public.mpt_hexagon_events is empty, so a version bump alone could not be validated yet."
+  },
+  "g_dispute_rate_on_high_confidence": {
+    "definition": "Disputes on high-confidence tiles (confidence in force above 0.8) / high-confidence tiles shown with a dispute prompt, per Hong Kong week. answered_dispute_rate divides by responders instead. NULL, never 0%, when nobody has answered.",
+    "current_week": {
+      "week_of": "2026-11-23",
+      "high_confidence_shown": 319,
+      "high_confidence_disputed": 0,
+      "high_confidence_kept": 0,
+      "answers_all_tiles": 0,
+      "dispute_rate": null,
+      "answered_dispute_rate": null,
+      "value": null,
+      "week_complete": false,
+      "status": "not_computable",
+      "reason": "No tile answer was recorded this week, so there is nothing to divide: no dispute rate (not 0%)."
+    },
+    "last_complete_week": {
+      "week_of": "2026-11-16",
+      "high_confidence_shown": 58,
+      "high_confidence_disputed": 0,
+      "high_confidence_kept": 0,
+      "answers_all_tiles": 0,
+      "dispute_rate": null,
+      "answered_dispute_rate": null,
+      "value": null,
+      "week_complete": true,
+      "status": "not_computable",
+      "reason": "No tile answer was recorded this week, so there is nothing to divide: no dispute rate (not 0%)."
+    },
+    "trailing": [
+      {
+        "week_of": "2026-10-26",
+        "high_confidence_shown": 0,
+        "high_confidence_disputed": 0,
+        "high_confidence_kept": 0,
+        "answers_all_tiles": 0,
+        "dispute_rate": null,
+        "answered_dispute_rate": null,
+        "week_complete": true
+      },
+      {
+        "week_of": "2026-11-02",
+        "high_confidence_shown": 0,
+        "high_confidence_disputed": 0,
+        "high_confidence_kept": 0,
+        "answers_all_tiles": 0,
+        "dispute_rate": null,
+        "answered_dispute_rate": null,
+        "week_complete": true
+      },
+      {
+        "week_of": "2026-11-09",
+        "high_confidence_shown": 195,
+        "high_confidence_disputed": 0,
+        "high_confidence_kept": 0,
+        "answers_all_tiles": 0,
+        "dispute_rate": null,
+        "answered_dispute_rate": null,
+        "week_complete": true
+      },
+      {
+        "week_of": "2026-11-16",
+        "high_confidence_shown": 58,
+        "high_confidence_disputed": 0,
+        "high_confidence_kept": 0,
+        "answers_all_tiles": 0,
+        "dispute_rate": null,
+        "answered_dispute_rate": null,
+        "week_complete": true
+      },
+      {
+        "week_of": "2026-11-23",
+        "high_confidence_shown": 319,
+        "high_confidence_disputed": 0,
+        "high_confidence_kept": 0,
+        "answers_all_tiles": 0,
+        "dispute_rate": null,
+        "answered_dispute_rate": null,
+        "week_complete": false
+      }
+    ],
+    "caveats": [
+      "High confidence is the confidence in force today (active confidence_config, else the registry); the counters carry neither the confidence nor the config version.",
+      "Shown counts tiles offered an answer, not every finding; with silence common, read the rate beside response_rate."
+    ]
+  },
+  "coverage": {
+    "note": "Scans already deleted are not in M1/M2 and cannot be dated to the week they were made. They are listed by week of deletion; test scans are not separated.",
+    "deleted_scans_by_week_of_deletion": [
+      {
+        "week_of_deletion": "2026-11-09",
+        "deleted_scans": 12
+      },
+      {
+        "week_of_deletion": "2026-11-16",
+        "deleted_scans": 23
+      },
+      {
+        "week_of_deletion": "2026-11-23",
+        "deleted_scans": 19
+      }
+    ]
+  }
+}

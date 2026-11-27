@@ -152,7 +152,7 @@ export async function readFunnel(env, weekOf) {
     read(`mpt_raw_metrics?source=eq.ga4&report=eq.daily_events&status=eq.ok&period_start=gte.${from}&period_start=lt.${to}&order=captured_at.asc&select=period_start,payload`),
     read(`email_sends?email_type=eq.report&is_test=is.false&sent_at=gte.${from}&sent_at=lt.${to}&select=id`),
     read(`learning_aggregate_daily?dimension=eq.funnel_step&key=eq.report_viewed&day=gte.${weekOf}&day=lt.${addDays(weekOf, 7)}&select=n`),
-    read('scans?select=report_viewed_at&limit=1'),   // fails while migration 20261127070000 is not applied: no view can be recorded then, so the count is blank, not 0
+    read('scans?select=report_viewed_at&limit=1'),   // fails while migration 20261127071500 is not applied: no view can be recorded then, so the count is blank, not 0
   ]);
   return {
     ga4: ga4Rows ? funnelCounts(ga4Rows) : null,

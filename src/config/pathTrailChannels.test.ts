@@ -18,14 +18,15 @@ describe('channel groups use exactly the catalogue members', () => {
   }
   for (const key of ['email', 'whatsapp', 'messenger']) {
     it(`${key}: every catalogue tile is there, none invented, in arrival order`, () => {
-      const real = cat.filter((h) => h.channel === key);
+      const prefix = { email: /^email[.-]/, whatsapp: /^wa\./, messenger: /^fb\./ }[key as 'email'];
+      const real = cat.filter((h) => prefix.test(h.id)).sort((x, y) => x.arrival.localeCompare(y.arrival));
       expect(channelTiles(key).map((t) => t.id)).toEqual(real.map((h) => h.id));
       const arrivals = real.map((h) => h.arrival);
       expect([...arrivals].sort()).toEqual(arrivals);
     });
   }
-  it('has 21 email, 22 WhatsApp and 8 Messenger tiles, as the catalogue says', () => {
-    expect(channelTiles('email')).toHaveLength(21);
+  it('has 19 email, 22 WhatsApp and 8 Messenger tiles, as the catalogue says (email lost the two 2026-10-29 drops, wkd and signature block)', () => {
+    expect(channelTiles('email')).toHaveLength(19);
     expect(channelTiles('whatsapp')).toHaveLength(22);
     expect(channelTiles('messenger')).toHaveLength(8);
   });
@@ -52,6 +53,6 @@ describe('captions tell the truth about each tile today', () => {
   });
   it('shows exactly the live email tiles as held today', () => {
     const held = channelTiles('email').filter((t) => t.today === 'held').map((t) => t.id);
-    expect(held.sort()).toEqual(cat.filter((h) => h.channel === 'email' && h.status === 'defined').map((h) => h.id).sort());
+    expect(held.sort()).toEqual(cat.filter((h) => /^email[.-]/.test(h.id) && h.status === 'defined').map((h) => h.id).sort());
   });
 });
