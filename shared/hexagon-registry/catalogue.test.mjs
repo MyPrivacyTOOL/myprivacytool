@@ -17,6 +17,12 @@ assert.deepEqual(rawSource.registry.excluded.map((e) => e.registry_id), [78, 90,
 assert.ok(rawSource.registry.excluded.every((e) => /Decision = Dropped/.test(e.reason)));
 assert.equal(HEXAGON_CATALOGUE.length, rawSource.registry.data_point_rows - rawSource.registry.excluded.length);
 assert.equal(HEXAGON_CATALOGUE.length, 650);
+// THE ASSERTION THAT PROTECTS THE SITE (MPC-11541): the JSON that /footprint/ actually serves holds exactly the registry rows with Row Type empty or Data point, minus every Decision = Dropped row,
+// and the same ids as the catalogue. A stale public file or a Dropped row slipping back in fails CI here.
+const publicDataset = JSON.parse(readFileSync(new URL('../../public/footprint/hexagons-366.json', import.meta.url), 'utf8'));
+assert.equal(publicDataset.length, rawSource.registry.data_point_rows - rawSource.registry.excluded.length, '/footprint/ dataset = registry data points minus Dropped');
+assert.equal(rawSource.items.length, HEXAGON_CATALOGUE.length, 'the source file, catalogue.js and the dataset all hold the same rows');
+assert.deepEqual(publicDataset.map((i) => i.id).sort(), HEXAGON_CATALOGUE.map((i) => i.id).sort(), '/footprint/ dataset ids = catalogue ids');
 assert.equal(HEXAGON_CATALOGUE.filter(legacy).length, 363);
 assert.deepEqual(HEXAGON_CATALOGUE.filter((i) => [97, 174].includes(i.registry_id)).map((i) => i.id).sort(), ['email.subdomains', 'tg.join_request_bio'], 'Held rows stay published');
 assert.equal(new Set(HEXAGON_CATALOGUE.map((i) => i.registry_id)).size, 650, 'every item is one registry row');
