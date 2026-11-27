@@ -1,6 +1,7 @@
 # The magic guess: "Is this your main email?" (MPC-11111)
 
-Status: BUILT AND TESTED, SWITCHED OFF. Chris decided on 2026-11-24 to build it ("YES lets build it"). Nothing in production changes until the gates below are opened.
+Status: BUILT, TESTED AND DEPLOYED. The registry entries and the Worker switches were turned ON by PR 909 (released by Chris on 2026-11-27); to switch everything off again, revert PR 909 and delete the Pages variable. Before PR 909 the feature was SWITCHED OFF.
+Chris decided on 2026-11-24 to build it ("YES lets build it"). Even with PR 909 merged nothing is sent or shown until the secrets (EMAIL_GUESS_KEY, GA4_API_SECRET) and the site variable (VITE_EMAIL_GUESS_ENABLED, then a site rebuild) are also set, which only Chris does; keep them uncreated until the DebugView run is booked. Steps: the Runbook on the MPC-11112 Notion page.
 Source of the idea: Notion "Channel OSINT Workflow Strategy", Step 3 ("The Web Transition and the Magic Guess"). Rule from that page, kept: below 80 percent confidence, do not guess;
 the page asks for the email as it always did.
 

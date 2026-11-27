@@ -17,12 +17,18 @@ class Settings:
     service_mode: str = "audit"           # "audit" (default) or "ingest": the ingest service only accepts log rows
     ingest_token: str = ""                # bearer token for POST /ingest/{agent}; separate from api_token
     ingest_agents: tuple = ()             # agent ids allowed to be ingested; empty means none
+    queue_endpoint: str = ""              # MPC-8644: producer Worker URL that feeds mpt-shadow-audit-queue
+    queue_secret: str = ""                # bearer secret for that endpoint (Secret Manager)
 
     @property
     def slack_enabled(self) -> bool:
         """True only for a real Slack incoming-webhook URL. A placeholder secret (e.g. before the owner
         creates the webhook) must not cause a failing call and an error line on every audit."""
         return self.slack_webhook_url.startswith("https://hooks.slack.com/")
+
+    @property
+    def queue_enabled(self) -> bool:
+        return self.queue_endpoint.startswith("https://") and bool(self.queue_secret)
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -41,4 +47,5 @@ class Settings:
                    allowed_regions=tuple(r.strip().lower() for r in g("ALLOWED_REGIONS", "eu").split(",") if r.strip()),
                    min_coverage=int(g("MIN_COVERAGE", "5")),
                    service_mode=mode, ingest_token=g("INGEST_TOKEN", ""),
-                   ingest_agents=tuple(a.strip() for a in g("INGEST_AGENTS", "").split(",") if a.strip()))
+                   ingest_agents=tuple(a.strip() for a in g("INGEST_AGENTS", "").split(",") if a.strip()),
+                   queue_endpoint=g("QUEUE_ENDPOINT", ""), queue_secret=g("QUEUE_SECRET", ""))

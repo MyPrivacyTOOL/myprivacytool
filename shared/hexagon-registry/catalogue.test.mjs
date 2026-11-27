@@ -94,6 +94,10 @@ const decided = Object.fromEntries(raw.filter((i) => i.decision).map((i) => [i.i
 // The four 2026-10-29 drops (web.reverse_dns, email.wkd, tg.reactions_polls, email.inbound_signature) are no longer published (Decision = Dropped); the two holds stay.
 assert.deepEqual(decided, { 'email.subdomains': 'held', 'tg.join_request_bio': 'held' });
 assert.ok(raw.filter((i) => i.decision).every((i) => i.decision_reason && i.decided === '2026-10-29' && i.status === 'new'));
+// MPC-11541: the four 2026-10-29 drops are Decision = Dropped now, so they are not published; their record (decision, reason, date) is kept in registry.excluded[].was, not deleted.
+const keptDrops = Object.fromEntries(rawSource.registry.excluded.filter((e) => e.was).map((e) => [e.was.id, e.was.decision]));
+assert.deepEqual(keptDrops, { 'web.reverse_dns': 'dropped', 'email.wkd': 'dropped', 'tg.reactions_polls': 'dropped', 'email.inbound_signature': 'dropped' });
+assert.ok(rawSource.registry.excluded.filter((e) => e.was).every((e) => e.was.decision_reason && e.was.decided === '2026-10-29'), 'each dropped item keeps its reason and date');
 assert.equal(channelOfHexagon('tg.username'), 'TG');
 console.log('catalogue.test.mjs ok');
 

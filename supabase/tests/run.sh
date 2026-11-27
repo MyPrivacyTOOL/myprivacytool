@@ -179,6 +179,9 @@ echo "== test-mailbox scans stay out of the KPIs; raw counts and access unchange
 # so apply this one again before testing it (it is idempotent).
 psql_ "$TEST_URL" -f supabase/migrations_archive/20261127060000_exclude_test_scans_from_kpi.sql
 psql_ "$TEST_URL" -At -f supabase/tests/exclude-test-scans.test.sql
+echo "== scorecard daily table: no stand-in zero, one row per measure per day, no public access (MPC-11567)"
+psql_ "$TEST_URL" -At -f supabase/tests/mpc-11567-metrics-daily.test.sql
+
 echo "== hexagon scorecard views: M1, M2, M3, G on fixtures (MPC-11547)"
 # The MPC-8659 stage re-ran an older counting function but does not touch the scorecard views, which only read tables.
 psql_ "$TEST_URL" -At -f supabase/tests/mpc-11547-scorecard.test.sql
@@ -311,7 +314,7 @@ psql_ "$TEST_URL" -At -f supabase/tests/mpc-8689-brokers-rows.test.sql
 
 # MPC-11541: hexagon_catalogue is marked DEPRECATED by comment only. Applied by the loop above; applied again here to prove it is idempotent. Row count is the 368 left by MPC-8689.
 echo "== hexagon_catalogue marked deprecated (MPC-11541)"
-psql_ "$TEST_URL" -f supabase/migrations/20261127080000_mpc_11541_hexagon_catalogue_deprecated.sql
+psql_ "$TEST_URL" -f supabase/migrations/20261127120000_mpc_11541_hexagon_catalogue_deprecated.sql
 psql_ "$TEST_URL" -At -f supabase/tests/hexagon-catalogue-deprecated.test.sql
 
 # MPC-9817: accounts and sign-in. The migration is applied by the loop above; applied again here to prove it is idempotent, then the assertions (RLS, no IP column, consent carry, link/claim, 7-day exit, can(), real delete).

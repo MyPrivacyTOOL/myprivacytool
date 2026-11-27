@@ -9,10 +9,10 @@ import FeatureStatus from "@/components/FeatureStatus";
 import { TILE_LABEL, tileState } from "../../shared/hexagon-registry/tileState.js";
 import { HEXAGON_CATALOGUE } from "../../shared/hexagon-registry/catalogue.js";
 import { HEXAGONS } from "../../shared/hexagon-registry/registry.js";
-import { LIVE_EMAIL_IDS_V2 } from "../../shared/hexagon-registry/score-v2.js";
+import { EMAIL_SCORED_IDS } from "../../shared/hexagon-registry/scoreV2.js";
 
 const page = readFileSync("public/footprint/index.html", "utf8");
-const dataset = JSON.parse(readFileSync("public/footprint/hexagons-366.json", "utf8")) as { id: string; tile: string; slug: string }[];
+const dataset = JSON.parse(readFileSync("public/footprint/hexagons-366.json", "utf8")) as { id: string; tile: string; slug: string; val: string }[];
 
 describe("/footprint/ status badges", () => {
   it("uses the same words as the site status marker", () => {
@@ -28,12 +28,18 @@ describe("/footprint/ status badges", () => {
     for (const d of dataset) expect(d.tile).toBe(tileState(HEXAGON_CATALOGUE.find((i) => i.id === d.id)!));
   });
 
-  it("Live is exactly the 54 web scan checks plus the 6 email checks that run (MPC-11569): the page never shows anything else as Live", () => {
-    expect(dataset.filter((d) => d.tile === "live").map((d) => d.id).sort()).toEqual([...HEXAGONS.map((h) => h.id), ...LIVE_EMAIL_IDS_V2].sort());
-    expect(page).toContain("t==='live'&&!WEB_IDS.has(id)&&!LIVE_EXTRA_IDS.has(id)?'planned'"); // a dataset can not make any other item Live
-    const listed = [...(page.match(/const LIVE_EXTRA_IDS=new Set\(\[([^\]]*)\]\)/)?.[1] ?? "").matchAll(/'([^']+)'/g)].map((m) => m[1]);
-    expect(listed.sort()).toEqual([...LIVE_EMAIL_IDS_V2].sort()); // the page's copy of the list cannot drift from the code
-    expect(dataset.find((d) => d.id === "email-breaches")!.tile).toBe("in_build");
+  it("Live is exactly the 54 web scan checks + the 6 built email checks: the page never shows anything else as Live", () => {
+    expect(dataset.filter((d) => d.tile === "live").map((d) => d.id).sort()).toEqual([...HEXAGONS.map((h) => h.id), ...EMAIL_SCORED_IDS].sort());
+    expect(dataset.filter((d) => d.tile === "live")).toHaveLength(60);
+    expect(page).toContain("t==='live'&&!LIVE_IDS.has(id)?'planned'"); // a dataset can not make any other item Live
+    for (const id of EMAIL_SCORED_IDS) expect(page).toContain(`'${id}'`);
+    expect(page).not.toContain("'email-breaches'"); // not built: never on the page's Live list
+  });
+
+  it("email-breaches is In build with the reason, never Live", () => {
+    const d = dataset.find((x) => x.id === "email-breaches")!;
+    expect(d.tile).toBe("in_build");
+    expect(d.val).toBe("Not built yet: the breach source's commercial-use terms are unconfirmed.");
   });
 });
 

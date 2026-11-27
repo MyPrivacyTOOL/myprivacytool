@@ -1,4 +1,4 @@
--- MPC-11541: public.hexagon_catalogue is marked DEPRECATED by comment only. supabase/tests/run.sh has already applied migration 20261127080000 (twice) to the THROWAWAY database.
+-- MPC-11541: public.hexagon_catalogue is marked DEPRECATED by comment only. supabase/tests/run.sh has already applied migration 20261127120000 (twice) to the THROWAWAY database.
 \set ON_ERROR_STOP on
 begin;
 create or replace function pg_temp.assert(ok boolean, msg text) returns void language plpgsql as $$ begin if ok is not true then raise exception 'FAIL: %', msg; end if; end $$;

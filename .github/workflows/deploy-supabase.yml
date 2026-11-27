@@ -10,6 +10,11 @@ name: Deploy Supabase migrations
 # CK-006 (FLEET-TASK-V4.2): `supabase db push` against the live MyPrivacyTOOL (MPT)
 # Supabase project, so supabase/migrations/*.sql is the single source of schema truth.
 #
+# MPC-9896 (2026-11-27 19:56 HKT): the first dry run failed with the CLI's own message "--password only applies to a linked project ...
+# To use the linked project instead, pass --remote", and `supabase link` says it ignores --password. The database password is read from the
+# SUPABASE_DB_PASSWORD environment variable this job already sets, so --password is gone and db push now says --remote. If a later CLI release
+# changes these flags again, the dry run fails at its own step before anything is applied; fix the flags here, do not pass --password again.
+#
 # Repo secrets required (Settings -> Secrets and variables -> Actions); values are never printed:
 #   SUPABASE_ACCESS_TOKEN  personal access token (supabase.com/dashboard/account/tokens)
 #   SUPABASE_DB_PASSWORD   the project's database password
@@ -86,12 +91,12 @@ jobs:
 
       - name: Link project
         if: steps.secrets.outputs.ready == 'true'
-        run: supabase link --project-ref "$SUPABASE_PROJECT_ID" --password "$SUPABASE_DB_PASSWORD"
+        run: supabase link --project-ref "$SUPABASE_PROJECT_ID"
 
       - name: Pending migrations (dry run)
         if: steps.secrets.outputs.ready == 'true'
-        run: supabase db push --dry-run --password "$SUPABASE_DB_PASSWORD"
+        run: supabase db push --dry-run --remote
 
       - name: Apply migrations
         if: steps.secrets.outputs.ready == 'true' && inputs.dry_run != 'true'
-        run: supabase db push --password "$SUPABASE_DB_PASSWORD"
+        run: supabase db push --remote

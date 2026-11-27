@@ -2,7 +2,7 @@ import { test, expect } from "./fixtures";
 
 // MPC-8689 / MPC-11541: the complete footprint. /footprint/ loads every published data point of the Hexagon Registry export (Row Type = Data point, less every row with Decision = Dropped),
 // each tile carries a Live / In build / Planned badge, and no headline total appears in the copy. Every hexagon has its own risk page.
-test("/footprint/ dataset: every registry data point, one badge each, Live = the 54 web checks + the 6 email checks that run", async ({ page }) => {
+test("/footprint/ dataset: every registry data point, one badge each, Live = the 54 web checks + the 6 built email checks", async ({ page }) => {
   await page.goto("/footprint/");
   const data = await page.evaluate(async () => {
     const d = await (await fetch("/footprint/hexagons-366.json")).json();

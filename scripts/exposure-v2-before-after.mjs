@@ -1,19 +1,99 @@
-// MPC-11569: prints the before/after table for the 7 email hexagons (same fixture input, exposure-v1 vs exposure-v2).
-//   node scripts/exposure-v2-before-after.mjs            observed statuses (what production returned)
-//   node scripts/exposure-v2-before-after.mjs --if-found every email check found something
-import { beforeAfterRows, EMAIL_OBSERVED, EMAIL_IF_FOUND } from '../shared/hexagon-registry/score-v2.fixtures.mjs';
+// MPC-11569: the before/after evidence for exposure-v2. ONE fixture, run through the real exposure-v1 and exposure-v2 code, one row per hexagon.
+// Run: node scripts/exposure-v2-before-after.mjs          writes docs/exposure-v2-mpc-11569-before-after.md
+//      node scripts/exposure-v2-before-after.mjs --check  exits 1 if the committed file is out of date (used by scripts/exposure-v2-before-after.test.mjs)
+// Nothing here reads a network, a database or a person's data: the web part is the synthetic replay scan of src/lib/exposureScore.replay.test.tsx,
+// the email part is the status pattern production returned for the 6 built checks (counts only, 2026-11-07 to 2026-11-27).
+import { readFileSync, writeFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import path from 'node:path';
+import { HEXAGONS, EMAIL_HEXAGONS } from '../shared/hexagon-registry/registry.js';
+import { computeExposure, CATEGORY_WEIGHTS, CATEGORY_OF, SEVERITY_OF_SENSITIVITY } from '../shared/hexagon-registry/score.js';
+import { computeExposureV2, CATEGORY_WEIGHTS_V2, EMAIL_SCORED_IDS, EMAIL_NOT_SCORED, HEXAGON_COUNT_V2 } from '../shared/hexagon-registry/scoreV2.js';
 
-const ifFound = process.argv.includes('--if-found');
-const rows = beforeAfterRows(ifFound ? EMAIL_IF_FOUND : EMAIL_OBSERVED);
-const why = (r) => {
-  if (r.id === 'no email result') return 'no email check ran: same score; coverage falls because Z is 61, not 54';
-  if (r.id === 'ALL 7 together') return 'v1 ignores all seven; v2 scores six of them, breaches is never checked';
-  if (r.id === 'email-breaches') return 'v1: unknown id, ignored. v2: in the 61 but never checked (not built), so score is unchanged and only Z grows';
-  const d = r.v2.score - r.v1.score;
-  return `v1: unknown id, ignored. v2: counted in the email category (${r.status}); score ${d > 0 ? '+' : ''}${d} because the email category joins the weighted mean`;
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+export const OUT = path.join(ROOT, 'docs/exposure-v2-mpc-11569-before-after.md');
+
+export const WEB_FIXTURE = {
+  location: 'found', 'canvas-fingerprint': 'found', 'webrtc-leak': 'found', 'timezone-locale': 'found', 'screen-fingerprint': 'found',
+  'cookies-status': 'clear', 'localstorage-status': 'clear', 'mixed-content': 'clear', 'https-status': 'clear',
+  'font-detection': 'not_checked', 'google-services': 'not_checked', 'dns-leak': 'not_checked',
 };
-console.log(`| Fixture | Email check (status) | v1 score / band / coverage | v2 score / band / coverage | Why it differs |`);
-console.log(`|---|---|---|---|---|`);
-for (const r of rows) {
-  console.log(`| ${r.fixture} | ${r.id}${r.status && r.status !== '-' && r.status !== 'all' ? ` (${r.status})` : ''} | ${r.v1.score} / ${r.v1.band} / ${r.v1.coverage} | ${r.v2.score} / ${r.v2.band} / ${r.v2.coverage} | ${why(r)} |`);
+export const EMAIL_FIXTURE = {
+  'email-name': 'clear', 'email-provider': 'found', 'email-profile': 'clear', 'email-libravatar': 'clear', 'email-domain-record': 'clear', 'email-github-commits': 'clear',
+  'email-breaches': 'not_checked',
+};
+
+const webItems = HEXAGONS.map((h) => ({ id: h.id, status: WEB_FIXTURE[h.id] ?? 'not_checked' }));
+const emailItems = EMAIL_HEXAGONS.map((h) => ({ id: h.id, status: EMAIL_FIXTURE[h.id] ?? 'not_checked' }));
+const all = [...webItems, ...emailItems];
+
+// v1 never sees email items (it rejects them as unknown ids), exactly as in the shipped report: it scores the web part only.
+const v1 = computeExposure(webItems, { final: true });
+const v2 = computeExposureV2(all, { final: true });
+const v2WebOnly = computeExposureV2(webItems, { final: true });
+export const HEADLINE = { v1, v2, v2WebOnly };
+
+const activeW1 = Object.entries(v1.categories).filter(([, c]) => c.severity_checked > 0).reduce((a, [, c]) => a + c.weight, 0);
+const activeW2 = Object.entries(v2.categories).filter(([, c]) => c.severity_checked > 0).reduce((a, [, c]) => a + c.weight, 0);
+const solo = (fn, item) => { const r = fn([item], { final: true }); return r.score === null ? 'no score' : String(r.score); };
+const catOf = (r, cat) => (r.categories[cat]?.exposure ?? null);
+const showCat = (x) => (x === null ? 'n/a' : String(x));
+const WEB_CAT = Object.fromEntries(HEXAGONS.map((h) => [h.id, CATEGORY_OF[h.category]]));
+
+function row(n, h, channel) {
+  const item = all.find((i) => i.id === h.id);
+  const status = item.status;
+  const inV2 = channel === 'web' || EMAIL_SCORED_IDS.includes(h.id);
+  const a = solo(computeExposure, item);
+  const b = solo(computeExposureV2, item);
+  const cat = channel === 'web' ? WEB_CAT[h.id] : 'email';
+  const catCell = `${cat}: ${channel === 'web' ? showCat(catOf(v1, cat)) : 'n/a'} to ${inV2 ? showCat(catOf(v2, cat)) : 'n/a'}`;
+  let why;
+  if (!inV2) why = `Not scored in v2: ${EMAIL_NOT_SCORED[h.id]}. Stays In build; not Live.`;
+  else if (channel === 'email') why = `New in v2 (category email, severity ${SEVERITY_OF_SENSITIVITY[h.truth.sensitivity]}). v1 rejects it as an unknown id, so it has no v1 score. ${status === 'found' ? 'Found: raises the email category.' : 'Clear: lowers the email category.'}`;
+  else if (status === 'not_checked') why = 'Not checked in the fixture: no score in either version, no effect on the whole scan. Only the coverage denominator grows.';
+  else why = 'Identical in v1 and v2: same category, weight and severity, and the same category exposure in the whole scan. The whole-scan score moves only through the weight mix (see the table above).';
+  return `| ${n} | \`${h.id}\` | ${channel} | ${status} | ${a} | ${b} | ${catCell} | ${why} |`;
+}
+
+export function render() {
+  const rows = [...HEXAGONS.map((h, i) => row(i + 1, h, 'web')), ...EMAIL_HEXAGONS.map((h, i) => row(HEXAGONS.length + i + 1, h, 'email'))];
+  const cov = (r) => `${r.coverage.checked} of ${r.coverage.total} = ${r.coverage.percent}%`;
+  return `# exposure-v2 before / after (MPC-11569)
+
+GENERATED by \`node scripts/exposure-v2-before-after.mjs\`. Do not edit by hand. Same fixture through the real exposure-v1 (\`score.js\`) and exposure-v2 (\`scoreV2.js\`) code.
+
+**Fixture.** Web: the synthetic replay scan of \`src/lib/exposureScore.replay.test.tsx\` (5 found, 4 clear, 3 not checked; the other 42 web hexagons are not in the scan). Email: the status pattern production returned for the built checks between 2026-11-07 and 2026-11-27 (\`email-provider\` found, the other five clear; counts only, no addresses); \`email-breaches\` not checked because it is not built.
+
+## Whole scan
+
+| | exposure-v1 | exposure-v2 | exposure-v2, web checks only (no email checks run) |
+|---|---|---|---|
+| Scored set (Z) | ${v1.coverage.total} | ${HEXAGON_COUNT_V2} | ${HEXAGON_COUNT_V2} |
+| Score | ${v1.score} | ${v2.score} | ${v2WebOnly.score} |
+| Band | ${v1.band} | ${v2.band} | ${v2WebOnly.band} |
+| Coverage | ${cov(v1)} | ${cov(v2)} | ${cov(v2WebOnly)} |
+| Email category exposure | not scored | ${v2.categories.email.exposure} | not checked |
+
+Reading it: a scan that runs no email check scores **exactly** what v1 scores (${v1.score} = ${v2WebOnly.score}); only the coverage denominator grows. When email checks are included the score moves because more checks are in the mix. Here it **falls** (${v1.score} to ${v2.score}) because five of six email checks came back clear. It can also rise. Neither direction means the person became more or less exposed: we now check more, you did not become more exposed.
+
+## One row per hexagon
+
+"v1 score" and "v2 score" = the score of a scan that contains only that hexagon, with its fixture status, run through each version (\`no score\` = nothing checked, so no score, never 0). "Category exposure" = that hexagon's category in the whole fixture scan, v1 to v2. Whole-scan v1 = ${v1.score}; whole-scan v2 = ${v2.score}. Active weights in the whole scan: v1 ${activeW1}, v2 ${activeW2} (the nine v1 weights unchanged, plus email ${CATEGORY_WEIGHTS_V2.email}, PROPOSED and awaiting approval; v1 weights sum ${Object.values(CATEGORY_WEIGHTS).reduce((a, b) => a + b, 0)}).
+
+| # | Hexagon | Channel | Fixture status | v1 score (alone) | v2 score (alone) | Category exposure, v1 to v2 | Why it differs |
+|---|---|---|---|---|---|---|---|
+${rows.join('\n')}
+
+Scored hexagons: v1 ${HEXAGONS.length}, v2 ${HEXAGON_COUNT_V2} (the web ${HEXAGONS.length} + ${EMAIL_SCORED_IDS.length} built email checks). \`email-breaches\` is not scored.
+`;
+}
+
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  const out = render();
+  if (process.argv.includes('--check')) {
+    const cur = readFileSync(OUT, 'utf8');
+    if (cur !== out) { console.error('docs/exposure-v2-mpc-11569-before-after.md is out of date: run node scripts/exposure-v2-before-after.mjs'); process.exit(1); }
+    console.log('before/after table is up to date');
+  } else { writeFileSync(OUT, out); console.log(`wrote ${path.relative(ROOT, OUT)} (${out.split('\n').length} lines)`); }
 }
