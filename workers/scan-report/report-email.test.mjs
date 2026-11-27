@@ -1,7 +1,7 @@
 // MPC-7468: two-part report email. Size limit, honest status, escaping, JSON attachment, no saved web scan.
 // Run: node workers/scan-report/report-email.test.mjs   (set REPORT_RENDER_DIR=<dir> to also write the rendered HTML/text/JSON for review)
 import { writeFileSync, mkdirSync } from 'node:fs';
-import { buildReportEmail, BRIDGE } from './lib/email.js';
+import { buildReportEmail, BRIDGE, ATTACHMENT_WARNING } from './lib/email.js';
 import { computeScore } from './lib/score.js';
 import { WEB_HEXAGONS, EMAIL_HEXAGONS, reportAttachment, MAX_VALUE } from './lib/reportHex.js';
 import { loadWebScan } from './lib/webScanLoader.js';
@@ -73,8 +73,14 @@ const withNo = buildReportEmail({ scan, breaches: [], breachStatus: 'checked', b
 check(withNo.text.includes(`Your scan number: ${SN}. Quote this number if you want this scan deleted.`) && withNo.html.includes(`Your scan number: ${SN}. Quote this number if you want this scan deleted.`), 'scan number and what it is for are in the email text and HTML');
 check(withNo.report.web_scan.id === SN && Buffer.from(reportAttachment(withNo.report).content, 'base64').toString('utf8').includes(SN), 'scan number is in the JSON attachment');
 check(!/Your scan number/.test(none.text) && !/Your scan number/.test(none.html), 'no saved scan: no scan number line');
-check(!/PEOPLE-SEARCH SITES/.test(none.text) && none.text.includes('/opt-out') && !none.html.includes('Open the official opt-out page'), 'people-search guides move to a link when no finding makes them relevant');
-check(/PEOPLE-SEARCH SITES/.test(worst.text) && worst.html.includes('Open the official opt-out page'), 'people-search guides appear when a finding makes them relevant');
+// MPC-9814: the broker section is in EVERY report (no hiding behind a finding), all 9 shortlist brokers in registry order, each with a guide; nothing implies a search was run
+for (const r of [none, worst, real]) {
+  const order = ['Spokeo', 'Whitepages (US)', 'BeenVerified', 'TruthFinder', 'FastPeopleSearch', 'MyLife', 'Intelius', 'White Pages Australia', 'Truecaller'].map((n) => r.text.indexOf(`\n${n}`));
+  check(/BROKER SITES/.test(r.text) && /Broker sites/.test(r.html) && order.every((i, k) => i > 0 && (k === 0 || i > order[k - 1])), 'broker section is present for every scan, 9 sites in registry order');
+  check((r.text.match(/Not checked\. We don't search broker sites for you\./g) || []).length >= 8 && !/PEOPLE-SEARCH SITES|have not searched these sites/i.test(r.text + r.html), 'no pasted page: each site reads "Not checked", and no sentence implies a search');
+  check((r.text.match(/How to remove it:/g) || []).length === 9, 'every one of the 9 sites carries its guide');
+}
+check(!/Hong Kong|Singapore/.test(none.text) && /Paid coverage .* is coming\. It is not live yet/.test(none.text), 'no HK/SG region line (MPC-10827); the paid-coverage note is present');
 check(/Alice/.test(real.html) && real.html.includes('/email/alice/alice-peek.gif'), 'Alice is kept');
 
 // text in step with HTML
@@ -151,6 +157,10 @@ check(bytes(worstRated.html) < HARD_LIMIT, `MPC-7487: worst case with saved stat
   check(!/203\.0\.113\.7|2001:db8/.test(ipMail.html + ipMail.text) && ipMail.html.includes('IP address hidden here') && ipMail.text.includes('IP address hidden here'), 'IP addresses never appear in the email body (HTML or text)');
   check(/203\.0\.113\.7/.test(leak.value) && /2001:db8::1/.test(leak.value), 'the full IP values stay in the attached JSON');
 }
+
+// MPC-9793 (PRIVACY-020): the email that announces the JSON attachment warns, in both parts, that it is the full record and not to forward it.
+check(real.text.includes(ATTACHMENT_WARNING) && real.html.includes('not a redacted copy') && /do not forward it/i.test(real.html), 'the attachment is announced with a warning: full record, not redacted, do not forward (text and html)');
+check(real.text.indexOf(ATTACHMENT_WARNING) > real.text.indexOf('attached as a JSON file'), 'the warning sits right after the line that announces the attachment');
 
 if (process.env.REPORT_RENDER_DIR) {
   mkdirSync(process.env.REPORT_RENDER_DIR, { recursive: true });

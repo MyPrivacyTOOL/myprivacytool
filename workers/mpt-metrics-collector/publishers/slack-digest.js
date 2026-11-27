@@ -2,9 +2,14 @@
 // pull failed, and posts at most five lines to Chris. Blank stays blank; nothing is estimated. Counts and summaries only.
 import { buildDigest, summariseAgentTasks } from '../lib/digest.js';
 import { notion, NOTION_VERSION, DEFAULT_WEEKLY_DS } from './notion.js';
+import { callRecipient } from '../../../shared/recipients/outbound.ts';
+import { recipientCtx } from '../lib/recipient-ctx.js';
 
 export { NOTION_VERSION };
-export const DIGEST_CRON = '0 1 * * 1'; // 01:00 UTC Monday = 09:00 Hong Kong (UTC+8, no DST)
+// 01:00 UTC Monday = 09:00 Hong Kong (UTC+8, no DST). Cloudflare numbers the day of week 1-7 with 1 = SUNDAY
+// (not 0-6 with 1 = Monday), so Monday is 2. '0 1 * * 1' fired on Sunday 09:00 HKT, a day early (seen 2026-11-01).
+// wrangler.toml must carry this exact string: the worker matches event.cron against it.
+export const DIGEST_CRON = '0 1 * * 2';
 export const digestConfigured = (env) => Boolean(env.NOTION_TOKEN && env.SUPABASE_URL && env.SUPABASE_SERVICE_ROLE_KEY && env.SLACK_BOT_TOKEN && env.MPTSLACK_CHANNEL_ID);
 
 const numProp = (p) => {
@@ -34,6 +39,8 @@ export function rowFromPage(page) {
     xThreads: numProp(pr['X Threads Posted']),
     agentPlan: grab('Plan'),
     decisions: grab('Decision'),
+    adCostPerScan: Number.parseFloat(grab('Ad cost per scan') ?? '') || null, // MPC-9972: only present when > 0
+    cac: Number.parseFloat(grab('CAC') ?? '') || null,
   };
 }
 
@@ -70,9 +77,9 @@ export async function agentStats(env) {
 /** Sources whose latest pull in the last 48h has status=error (latest per source+report). */
 export async function failedSources(env, now = new Date()) {
   const since = new Date(now.getTime() - 48 * 3600000).toISOString();
-  const res = await fetch(`${env.SUPABASE_URL}/rest/v1/mpt_raw_metrics?captured_at=gte.${since}&order=captured_at.desc&select=source,report,status`, {
+  const res = await callRecipient('supabase', { url: `${env.SUPABASE_URL}/rest/v1/mpt_raw_metrics?captured_at=gte.${since}&order=captured_at.desc&select=source,report,status`, init: {
     headers: { apikey: env.SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}` },
-  });
+  }, sent: [] }, recipientCtx(env));
   if (!res.ok) throw new Error(`supabase read mpt_raw_metrics failed: HTTP ${res.status}`);
   const latest = new Map();
   for (const r of await res.json()) { const k = `${r.source}/${r.report}`; if (!latest.has(k)) latest.set(k, r); }
@@ -80,11 +87,11 @@ export async function failedSources(env, now = new Date()) {
 }
 
 export async function slack(env, method, params) {
-  const res = await fetch(`https://slack.com/api/${method}`, {
+  const res = await callRecipient('slack', { url: `https://slack.com/api/${method}`, init: {
     method: 'POST',
     headers: { Authorization: `Bearer ${env.SLACK_BOT_TOKEN}`, 'Content-Type': 'application/json; charset=utf-8' },
     body: JSON.stringify(params),
-  });
+  }, sent: [] }, recipientCtx(env));
   const body = await res.json();
   if (!body.ok) throw new Error(`slack ${method} failed: ${body.error || res.status}`);
   return body;

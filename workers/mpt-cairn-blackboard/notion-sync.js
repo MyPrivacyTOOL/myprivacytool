@@ -5,6 +5,9 @@
 // Privacy: the seed email is masked (j***@example.com) and never sent to Notion. Fact values are copied exactly as stored, so hashed
 // values stay hashed. Notion has no retention of its own, so reconcile() archives the Notion rows of any session Supabase has purged
 // (72 h). Archived pages stay in Notion's trash for 30 days; empty the trash to remove them sooner.
+import { callRecipient } from '../../shared/recipients/outbound.ts';
+import { workerRecipientContext } from '../../shared/recipients/worker-ctx.ts';
+
 const NOTION_VERSION = '2022-06-28';
 const MAX_WRITES = 35; // Notion writes per call; Workers allow 50 subrequests per invocation on the Free plan (3 Supabase reads + queries + writes)
 const MAX_TEXT = 1900; // Notion rich text segments hold 2000 characters
@@ -12,12 +15,17 @@ const SOFT_LOCK_MS = 3000;
 
 export const notionConfigured = (env) => Boolean(env.NOTION_TOKEN && env.NOTION_CAIRN_SESSIONS_DB && env.NOTION_CAIRN_FACTS_DB && env.NOTION_CAIRN_INTENTS_DB);
 
-async function notion(env, path, method, body) {
-  const res = await fetch(`https://api.notion.com/v1/${path}`, {
-    method,
-    headers: { Authorization: `Bearer ${env.NOTION_TOKEN}`, 'Notion-Version': NOTION_VERSION, 'content-type': 'application/json' },
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
+// `sent` names the personal-data items in the request body (MPC-9885); queries and archive calls send none.
+async function notion(env, path, method, body, sent = []) {
+  const res = await callRecipient('notion', {
+    url: `https://api.notion.com/v1/${path}`,
+    init: {
+      method,
+      headers: { Authorization: `Bearer ${env.NOTION_TOKEN}`, 'Notion-Version': NOTION_VERSION, 'content-type': 'application/json' },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    },
+    sent,
+  }, workerRecipientContext(env));
   if (!res.ok) throw new Error(`notion ${method} ${path.replace(/[0-9a-f-]{32,36}/g, '<id>')} failed: HTTP ${res.status}`);
   return res.json();
 }
@@ -62,6 +70,17 @@ export function riskLevel(fact) {
   if (MEDIUM.has(fact.fact_type)) return 'Medium';
   return 'Low';
 }
+
+// Items a fact row carries in fact_value: an unhashed phone only when HASH_FACT_TYPES leaves phone out.
+export const factItems = (facts) => {
+  const out = new Set();
+  for (const f of facts) {
+    if (f.fact_type === 'email') out.add('email');
+    else if (f.fact_type === 'username') out.add('username');
+    else if (f.fact_type === 'phone' && !f.is_hashed) out.add('phone');
+  }
+  return [...out];
+};
 
 function sessionProps(s, facts, intents, now) {
   const m = s.metadata ?? {};
@@ -157,8 +176,8 @@ export async function syncSession(env, sb, sessionId, now = new Date()) {
   if (last && now.getTime() - Date.parse(last) < lockMs) return { synced: false, reason: 'recently_synced' };
   const props = sessionProps(s, facts, intents, now);
   const sessionPage = found
-    ? (await notion(env, `pages/${found.id}`, 'PATCH', { properties: props })).id
-    : (await notion(env, 'pages', 'POST', { parent: { database_id: env.NOTION_CAIRN_SESSIONS_DB }, properties: props })).id;
+    ? (await notion(env, `pages/${found.id}`, 'PATCH', { properties: props }, ['email'])).id
+    : (await notion(env, 'pages', 'POST', { parent: { database_id: env.NOTION_CAIRN_SESSIONS_DB }, properties: props }, ['email'])).id;
 
   let writes = 1;
   const out = { synced: true, facts_created: 0, intents_created: 0, intents_updated: 0, duplicates_archived: 0, remaining: 0 };
@@ -176,7 +195,7 @@ export async function syncSession(env, sb, sessionId, now = new Date()) {
   for (const f of facts) {
     if (factIndex.byId.has(f.fact_id)) continue;
     if (!budget()) { out.remaining++; continue; }
-    await notion(env, 'pages', 'POST', { parent: { database_id: env.NOTION_CAIRN_FACTS_DB }, properties: factProps(f, sessionPage, s.retain_until) });
+    await notion(env, 'pages', 'POST', { parent: { database_id: env.NOTION_CAIRN_FACTS_DB }, properties: factProps(f, sessionPage, s.retain_until) }, factItems([f]));
     writes++; out.facts_created++;
   }
   for (const i of intents) {

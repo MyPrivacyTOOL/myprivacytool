@@ -1,0 +1,9 @@
+# Exposure scan API (MPC-11203). Adapter + routes only.
+# openosint itself is NOT listed: it pins mcp<2, which conflicts with the mcp>=2.3 client the
+# adapter uses, so it is installed in its own venv (see docker/Dockerfile.exposure-api) and
+# spawned over stdio via OPENOSINT_MCP_COMMAND.
+mcp>=2.3.0
+fastapi>=0.110
+uvicorn>=0.29
+pydantic>=2
+email-validator>=2

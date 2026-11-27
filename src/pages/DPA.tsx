@@ -1,24 +1,10 @@
 import { Link } from "react-router-dom";
 import Seo from "@/components/Seo";
+import { DpaSubProcessors, TranslationNote } from "@/components/LegalRecipients";
 
 // MPC-6545: plain-language summary of how MyPrivacyTOOL processes personal data as a processor.
-// Sub-processors below are the services the repo actually calls (workers/, src/lib/, index.html).
-// Keep this list and Privacy.tsx section 5 in sync, and add a provider here BEFORE wiring it in.
-const SUB_PROCESSORS = [
-  { name: "Cloudflare", purpose: "Site hosting (Pages), edge Workers that receive forms and run the scan report" },
-  { name: "Supabase", purpose: "Database for lead, scan-summary and engagement records" },
-  { name: "HubSpot", purpose: "CRM for newsletter, waitlist and business enquiries; marketing email" },
-  { name: "Resend", purpose: "Transactional email (for example the scan summary you request)" },
-  { name: "Notion", purpose: "Internal task and lead log used by our team" },
-  { name: "Slack", purpose: "Internal notifications when a new lead or enquiry arrives" },
-  { name: "Telegram", purpose: "Messaging channel, only if you choose to talk to us there" },
-  { name: "Google (Analytics 4, Cloud APIs)", purpose: "Usage analytics (after consent) and Google-hosted services we use" },
-  {
-    name: "AI model providers (any provider; currently Alibaba Cloud, Qwen models)",
-    purpose:
-      "Language models used to work out what a message sent through a messaging channel is about, and to write replies to help requests made through the website HELP button, email or a messaging channel. They receive the message text and short approved help-article excerpts, with email addresses and phone numbers removed first. We may use other providers and models, open-source or closed-source, in any country, and this list is updated before a new one is used with customer personal data",
-  },
-];
+// MPC-9894: the sub-processor list is generated from shared/recipients/recipients.json (entries with dpa_listed) by scripts/render-privacy-from-registry.mjs;
+// nothing is typed here. To add or remove a sub-processor, change the registry BEFORE wiring the provider in.
 
 const DPA = () => {
   return (
@@ -95,6 +81,27 @@ const DPA = () => {
                 Much of the device scan runs in the visitor&rsquo;s own browser; what is sent to
                 our servers is described in the Privacy Policy.
               </p>
+              <h3 className="mt-6 text-xl font-semibold text-foreground">Employee privacy checks</h3>
+              <ul className="list-inside list-disc space-y-2 text-muted-foreground mt-4">
+                <li>
+                  <strong>Authorisation:</strong> your administrator invites each employee by work email, and each employee agrees for themselves before
+                  any check about them runs. A list of emails from you is not an employee&rsquo;s consent. An employee can decline, or withdraw later,
+                  and withdrawing deletes their results.
+                </li>
+                <li>
+                  <strong>What you see:</strong> totals for the employees who agreed (how many were checked and how many have a listing that may be theirs).
+                  You see an individual employee&rsquo;s results only if that employee chooses to share them with you. An employee who was invited but has
+                  not agreed has no results, and nothing about them is counted in the results totals.
+                </li>
+                <li>
+                  <strong>What the employee sees:</strong> their own results first, with a link to each page checked.
+                </li>
+                <li>
+                  <strong>Matching:</strong> a check looks only at pages the employee shows us and compares them with the name, place and phone number the
+                  employee types for that check. Those typed details are used once and not stored. A result is an exact, probable or possible match, and a
+                  possible match is a guess.
+                </li>
+              </ul>
             </section>
 
             <section className="mb-8">
@@ -104,7 +111,16 @@ const DPA = () => {
                 <li>Keep access limited to people who need it and who are bound by confidentiality</li>
                 <li>Use appropriate technical and organisational measures. Data is encrypted in transit (HTTPS); access to our systems is restricted by credentials held by our team</li>
                 <li>Help you answer data-subject requests (access, correction, deletion, objection) within a reasonable time</li>
-                <li>Tell you without undue delay, and within 72 hours where we can, after confirming a personal data breach affecting your data</li>
+                <li>
+                  We will tell you without undue delay after we confirm a personal data breach affecting your data. We aim to do so within 72 hours of confirming it. If we cannot, we will tell you why. We will email the contact named in your agreement with us, or{" "}
+                  <a
+                    href="mailto:privacy@myprivacytool.io"
+                    className="text-brand underline hover:text-foreground"
+                  >
+                    privacy@myprivacytool.io
+                  </a>{" "}
+                  if none is named.
+                </li>
                 <li>Impose data protection terms on sub-processors and stay responsible for them</li>
                 <li>Make available the information reasonably needed to show compliance, and allow reasonable audits on notice</li>
               </ul>
@@ -117,6 +133,7 @@ const DPA = () => {
                 before adding a new one that touches customer personal data, and
                 business customers on a signed DPA can object to a change.
               </p>
+              <TranslationNote />
               <div className="mt-4 overflow-x-auto">
                 <table className="w-full text-left text-sm text-muted-foreground">
                   <thead>
@@ -126,18 +143,13 @@ const DPA = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {SUB_PROCESSORS.map((sp) => (
-                      <tr key={sp.name} className="border-b border-border/60 align-top">
-                        <td className="py-2 pr-4 font-medium text-foreground">{sp.name}</td>
-                        <td className="py-2">{sp.purpose}</td>
-                      </tr>
-                    ))}
+                    <DpaSubProcessors />
                   </tbody>
                 </table>
               </div>
               <p className="mt-4 text-muted-foreground">
-                We will add a payment provider (planned: Stripe) here before paid
-                plans go live.
+                A provider switched off today (not yet open) is still listed above
+                with that status, so it is named here before it receives any data.
               </p>
             </section>
 

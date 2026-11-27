@@ -1,4 +1,6 @@
 import type { DueFollowup, FollowupStore } from "./followup-worker";
+import { recipientFetcher } from "../recipients/outbound";
+import { workerRecipientContext } from "../recipients/worker-ctx";
 
 export interface RestFollowupConfig {
   baseUrl: string;
@@ -20,7 +22,7 @@ export class RestFollowupStore implements FollowupStore {
   constructor(private c: RestFollowupConfig) {
     if (!/^https:\/\//.test(c.baseUrl) && !/^http:\/\/(localhost|127\.0\.0\.1)/.test(c.baseUrl)) throw new Error("baseUrl must be https (or localhost for tests)");
     if (!c.serviceKey) throw new Error("serviceKey required");
-    this.f = c.fetchImpl ?? fetch;
+    this.f = recipientFetcher("supabase", [], workerRecipientContext(null, { fetchImpl: c.fetchImpl })); // case ids and attempt metadata only
   }
   private async call(path: string, body?: unknown, method = body === undefined ? "GET" : "POST"): Promise<unknown> {
     const res = await this.f(`${this.c.baseUrl.replace(/\/$/, "")}${this.c.restPrefix ?? "/rest/v1"}/${path}`, {

@@ -45,11 +45,16 @@ export function scanHint(): string {
 }
 
 // Hero copy (home page) with tiles on: no "found N data points without asking", no "click the ones that are correct".
-export const HERO_TILES_LINE1 = 'See what your browser tells every website, and how we know each thing.';
-export const HERO_TILES_LINE2 = 'Tap a hexagon to see what we found.';
+// Footprints framing (owner direction, 2026-10-28, replaces 2026-10-27): the hexagon is a data point; the footprint is your data; where the footprint
+// lands on a hexagon you see your data and whether it is a risk to you; the scan is where you stand right now. Still says how we know each thing, and
+// still claims nothing beyond what the browser tells every website. "how to wipe it" is promised only where a guide exists, so line 2 says so.
+// No availability wording (paid or not) belongs here; the owner decides that wording and it lives on the pricing page.
+export const HERO_TILES_LINE1 = 'Each hexagon is a data point. Each footprint is your data. See the footprints you leave on the web, how we know each one, and whether it is a risk to you.';
+export const HERO_TILES_LINE2 = 'Tap a hexagon to see your footprint as of right now and, where we have a guide, how to wipe it.';
 // CK-8323: hero copy for the default honeycomb dashboard (owner-approved wording, 2026-10-19). "up to N": the 54 registry hexagons are 41
 // always checked plus up to 13 that depend on the browser, so the claim is "up to". N comes from the registry, never typed by hand.
 // Line 1 follows the brand name, which the page sets in its own colour.
 export const heroDashboardLine1 = (n: number): string => ` looks at up to ${n} things your browser and connection already tell every website.`;
+export { countSentence } from '../../shared/hexagon-registry/countSentence.js';
 export const HERO_DASHBOARD_LINE2 = 'Purple hexagons are our best guesses. Tap one to say if we got it right.';
 export const SUMMARY_LABELS = { clear: 'clear', fixing: 'need fixing', toldUs: 'you told us', notYet: 'not checked yet' } as const;

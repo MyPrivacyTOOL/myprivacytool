@@ -32,6 +32,13 @@ import {
   spamLogToText,
   type SpamKind,
 } from "@/lib/hkSpamLog";
+import {
+  buildWaitlistRow,
+  insertWaitlist,
+  recallWaitlist,
+  rememberWaitlist,
+  type WaitlistOutcome,
+} from "@/lib/hkShieldWaitlist";
 import { buildOptOutText, SENDER_TYPES, type OptOutChannel, type SenderType } from "@/lib/hkSpamOptOut";
 
 const SELECT_CLASS = "h-11 w-full rounded-md border border-input bg-background px-3 text-base text-foreground";
@@ -89,6 +96,12 @@ const HongKongSpamPage = () => {
   const [protectionDate, setProtectionDate] = useState<string | null>(recalled);
   const [saved, setSaved] = useState<boolean | null>(null);
   const [reminderSaved, setReminderSaved] = useState(false);
+
+  // Spam Shield waitlist (CK-11387): interest only, nothing is for sale.
+  const [waitEmail, setWaitEmail] = useState("");
+  const [waitConsent, setWaitConsent] = useState(false);
+  const [waitError, setWaitError] = useState("");
+  const [waitStatus, setWaitStatus] = useState<"idle" | "saving" | WaitlistOutcome>(() => (recallWaitlist() ? "saved" : "idle"));
 
   // Opt-out generator
   const [picked, setPicked] = useState<SenderType[]>([]);
@@ -165,6 +178,33 @@ const HongKongSpamPage = () => {
       track("hk_spam_email_submit", { platform, language: lang });
     }
     setStatus("done");
+  };
+
+  const onWaitlist = async () => {
+    if (waitStatus === "saving") return;
+    const trimmed = waitEmail.trim();
+    if (!EMAIL_RE.test(trimmed) || trimmed.length > 254) {
+      setWaitError(copy.emailInvalid);
+      return;
+    }
+    if (!waitConsent) {
+      setWaitError(copy.shieldConsentNeeded);
+      return;
+    }
+    const row = buildWaitlistRow({ platform, lang, email: trimmed, consent: waitConsent });
+    if (!row) {
+      setWaitError(copy.emailInvalid);
+      return;
+    }
+    setWaitError("");
+    setWaitStatus("saving");
+    const outcome = await insertWaitlist(row);
+    if (outcome !== "error") {
+      rememberWaitlist();
+      // Fires only after a confirmed save (or an already-on-the-list answer from the server). No email in params.
+      if (outcome === "saved") track("hk_shield_waitlist_signup", { platform, language: lang });
+    }
+    setWaitStatus(outcome);
   };
 
   const onEmailChange = (value: string) => {
@@ -435,6 +475,69 @@ const HongKongSpamPage = () => {
               </div>
             )}
           </div>
+        </section>
+
+        {/* Spam Shield waitlist (CK-11387): interest only. Nothing is for sale and no purchase link exists. */}
+        <section className="mt-8 rounded-2xl border border-border bg-card p-4" aria-labelledby="hk-shield">
+          <h2 id="hk-shield" className="mb-2 text-xl font-bold">
+            {copy.shieldTitle}
+          </h2>
+          <p className="mb-3 text-sm text-muted-foreground">{copy.shieldBody}</p>
+          {waitStatus === "saved" || waitStatus === "duplicate" ? (
+            <p role="status" className="rounded-xl bg-primary/10 p-4 text-base" data-testid="hk-shield-done">
+              {waitStatus === "duplicate" ? copy.shieldDuplicate : copy.shieldDone}
+            </p>
+          ) : (
+            <>
+              <label htmlFor="hk-shield-email" className="mb-1 block text-sm font-medium">
+                {copy.shieldEmailLabel}
+              </label>
+              <Input
+                id="hk-shield-email"
+                type="email"
+                inputMode="email"
+                autoComplete="email"
+                value={waitEmail}
+                onChange={(e) => setWaitEmail(e.target.value)}
+                aria-describedby="hk-shield-detail"
+                className="h-12 text-base"
+              />
+              <p id="hk-shield-detail" className="mb-3 mt-1 text-xs text-muted-foreground" data-testid="hk-shield-detail">
+                {copy.shieldDetail}
+                <a
+                  href={`${HK_POLICY_PATH}#${HK_POLICY_ANCHOR[lang]}`}
+                  target="_blank"
+                  rel="noopener"
+                  className="underline hover:text-foreground"
+                >
+                  {copy.consentPolicyLink}
+                </a>
+              </p>
+              <label htmlFor="hk-shield-consent" className="mb-3 flex items-start gap-2 text-sm">
+                <input
+                  id="hk-shield-consent"
+                  type="checkbox"
+                  checked={waitConsent}
+                  onChange={(e) => setWaitConsent(e.target.checked)}
+                  className="mt-1 h-4 w-4 shrink-0"
+                />
+                <span>{copy.shieldConsent}</span>
+              </label>
+              {waitError && (
+                <p role="alert" className="mb-3 border-l-4 border-destructive pl-3 text-sm">
+                  {waitError}
+                </p>
+              )}
+              {waitStatus === "error" && (
+                <p role="alert" className="mb-3 border-l-4 border-destructive pl-3 text-sm">
+                  {copy.shieldError}
+                </p>
+              )}
+              <Button type="button" onClick={onWaitlist} disabled={waitStatus === "saving"} className="h-12 w-full text-base font-bold">
+                {waitStatus === "saving" ? copy.saving : copy.shieldButton}
+              </Button>
+            </>
+          )}
         </section>
 
         {/* Secondary CTA: free privacy scan */}

@@ -55,6 +55,7 @@ export function scanCounts(items, opts = {}) {
   const duplicateIds = [];
   const producedNotApplicableIds = [];
   let found = 0; let clear = 0; let notChecked = 0; let confirmed = 0;
+  const checkedIds = [];
   for (const it of Array.isArray(items) ? items : []) {
     const id = it && typeof it.id === 'string' ? it.id : '';
     const reg = byId.get(id);
@@ -66,6 +67,7 @@ export function scanCounts(items, opts = {}) {
     // The registry has the last word, as in the report: a hexagon the site can never check, or an informational one, is never clear.
     if (reg.truth?.level === 'cannot_be_checked') status = NOT_CHECKED;
     if (status === CLEAR && !reg.status?.allowed?.includes('CHECKED_AND_CLEAR')) status = NOT_CHECKED;
+    if (status === FOUND || status === CLEAR) checkedIds.push(id);
     if (status === FOUND) found++;
     else if (status === CLEAR) clear++;
     else notChecked++;
@@ -80,6 +82,7 @@ export function scanCounts(items, opts = {}) {
   return {
     total: applicableIds.size,
     checked: found + clear,
+    checkedIds, // MPC-8689: which hexagons were checked, for the whole-footprint line (footprint.js)
     confirmed,
     found,
     clear,

@@ -8,7 +8,7 @@ Appends one row per source per run to `public.mpt_raw_metrics` (created by MPC-7
   A failing collector writes a `status=error` row and the others still run.
 - `collectors/supabase-counts.js`: row counts of scans, users, leads, subscribers, mpt_user_engagement, interaction_log (counts only, no personal data).
 - `collectors/ga4.js` (MPC-7378): GA4 Data API `runReport` for property 515216281 only, last complete Hong Kong day. One row per report, API response untouched in `payload`:
-  `daily_overview` (sessions, activeUsers, screenPageViews, eventCount by date), `daily_events` (by eventName, incl. privacy_scan_completed), `daily_source_medium`, `daily_country`, `daily_landing_page`, and on Mondays `weekly_overview` (previous Mon..Sun activeUsers).
+  `daily_overview` (sessions, activeUsers, screenPageViews, eventCount by date), `daily_events` (by eventName, incl. privacy_scan_completed), `daily_source_medium`, `daily_country`, `daily_landing_page`, `daily_landing_source_device` (landingPage x sessionSource x deviceCategory: sessions, bounceRate, averageSessionDuration), and on Mondays `weekly_overview` (previous Mon..Sun activeUsers).
   A failed call writes `status=error` with an empty payload, so `mpt_daily_metrics` cells stay blank; nothing is estimated.
   Auth: Google service account (Viewer on the property, `analytics.readonly`); its JSON key is the Worker secret `GA4_SERVICE_ACCOUNT_JSON`.
 - Secrets (names only, set in Cloudflare by a human): see `EXPECTED_SECRETS.txt`. Values never appear in the repo, logs or rows.
@@ -61,7 +61,7 @@ zone `myprivacytool.io` (requests + unique visitors, `httpRequests1dGroups`) and
 
 ## Monday Slack digest (MPC-7383, task 8/9)
 
-`publishers/slack-digest.js` + `lib/digest.js`. Second cron `0 1 * * 1` = Monday 01:00 UTC = **09:00 Hong Kong**. It reads the latest two rows of the weekly tracker (the Monday 00:15 HKT publish has just written the week that ended) and posts **at most five lines** to Chris:
+`publishers/slack-digest.js` + `lib/digest.js`. Second cron `0 1 * * 2` = Monday 01:00 UTC = **09:00 Hong Kong** (Cloudflare counts the day of week 1-7 with 1 = Sunday, so Monday is 2; `* * 1` posted on Sunday). It reads the latest two rows of the weekly tracker (the Monday 00:15 HKT publish has just written the week that ended) and posts **at most five lines** to Chris:
 scans against target, pace status, biggest mover up and down (week on week), the agent's plan, and failed sources plus anything needing his decision.
 
 - **Never an estimate.** A blank cell stays blank and is not used as a mover. Failed sources are named (`DATA GAP: ga4, hubspot failed`): any source whose latest pull per report in the last 48h is `status=error` in `mpt_raw_metrics`. If the tracker cannot be read, the message says so and shows no figures.
@@ -120,3 +120,27 @@ Channel OSINT (the X / LinkedIn / Telegram bots) tracked apart from website scan
 - **Secrets:** none new. It needs `NOTION_TOKEN` (the integration must be able to edit the MPT Dashboard page), `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`.
 - **Manual refresh:** `POST /publish-kpi` with the collector bearer token.
 - Test: `node workers/mpt-metrics-collector/kpi.test.mjs`.
+
+## Subrequest budget (MPC-9168, on top of the MPC-7557 stages)
+
+A Worker invocation may make a limited number of outbound calls: **50 on the Free plan** (every `fetch`, including retries; 1000 on Paid). Since 2026-10-27 one scheduled run made far more (about 130), so every step failed with "Too many subrequests by single Worker invocation": no rows stored, no alerts, no Notion or Slack publish.
+
+- **Stages** (`worker.js`: `COLLECTOR_GROUPS`, `STAGES`): the daily cron calls each stage as its own invocation through the `SELF` service binding (`wrangler.toml`), authenticated with `COLLECTOR_TRIGGER_TOKEN`. Each has its own 50-call limit. No cron slot and no plan change. Without the binding the stages run in-process and share one budget.
+- **Budget: 44 calls per stage** (`lib/budget.js`), 6 kept back for the database insert and the Slack alerts. The runtime guard refuses the call that would go over and the collector is stored as an `error` row naming the budget, so a runaway loop can no longer take the insert and the alerts down with it. Every stage logs `{"stage": ..., "subrequests": N, "budget": 44}`; read these in Worker observability to see the headroom.
+- **Calls dropped:** `scan-gap` used one database read per address (up to 40); it is one query now. The machine mirror page used one `DELETE` per old block (60+ on a busy day); past 25 blocks the page is replaced instead of edited. HubSpot (variable, about 22 to 36 calls) has its own stage.
+- **Test:** `node workers/mpt-metrics-collector/subrequest-budget.test.mjs` runs the scheduled handler against a fake platform that throws on call 51 of an invocation and starts a fresh count for each service-binding call, with a deliberately heavy data set. It fails if any invocation exceeds the budget, a collector is in no stage, a row fails on a subrequest error, or the old all-in-one shape stops being over the limit.
+- **Adding a collector or publisher:** put it in a stage, work out its worst-case calls, run the test. If a stage would exceed 44, give it its own stage. Do not raise the budget without confirming the plan.
+- Counts only: no address is read into a row or a log.
+
+`collectors/meta-ads.js` (Meta ads, read-only) pulls the previous full Hong Kong day of account-level insights (impressions, reach, clicks, spend, ctr, cpc) from the Marketing API with `META_ADS_KEY` (system-user token, the same one as the Composio Meta Ads connection, sent as a Bearer header, never in the URL) for the ad account `act_266295748910383` ("MyPrivacyTOOL FB Ads"; account currency is **GBP**, not HKD, so `summary.spend` is in pounds; override with the non-secret `META_AD_ACCOUNT_ID`). Until the token is set it stores an ok row with `payload.configured=false` and makes no call. `META_GRAPH_VERSION` overrides the default `v23.0` (⚠️ default unverified; Meta retires versions after about two years). The token itself is broader than `ads_read` (owner-accepted 2026-11-07), so the guarantee lives in the code: this collector only sends GET requests to the insights edge, and `meta-ads.test.mjs` fails if it sends anything else.
+
+`collectors/google-ads-daily.js` (MPC-9972, Strategy Stage D, read-only) stores one `google-ads` / `account_daily` row per run for the previous full day of customer 6271312111 in the Google Ads account's own time zone (UK, GMT+00:00; segments.date cannot be cut at Hong Kong midnight): campaign totals (impressions, clicks, cost, conversions, conversions_value, per-campaign name and status) and the conversion-action breakdown (`scan_started`, paid). It reuses the `google-ads.js` client (`searchStream` only, no mutate endpoint) and the three existing Google Ads secrets; no new OAuth path. 3 calls per run (token + 2 queries), in `collect_core`. No campaigns yet => an ok row with zeros. The weekly Notion row and the Monday digest carry `Ad cost per scan` (cost / scan_started) and `CAC` (cost / paid conversions) only when > 0.
+
+## Facebook Page collector (MPC-8904)
+
+`collectors/facebook.js` (`source=facebook, report=page_daily`, runs in `collect_core`) reads the one MyPrivacyTOOL Facebook Page, read-only, at no cost and without Make. Secrets by name only: `FACEBOOK_PAGE_ID` and `FACEBOOK_PAGE_TOKEN` (a Page access token with `pages_show_list`, `pages_read_engagement`, `read_insights` only; never a posting, messaging or ads permission). If either is missing the row is `ok` with `payload.configured=false` and the log says "not configured".
+
+- **Page guard:** `GET /me` must return `FACEBOOK_PAGE_ID` (a Page token). A business system-user token is also accepted: the Page's own token is then read from `GET /<page id>?fields=id,access_token`, kept in memory only and used for the reads (`payload.guard.via`). Anything else is a `status=error` row and nothing else is read. `facebookRead()` only does GET on `/me` or `/<page id>...`. An expired or invalid token (Meta error 190 / HTTP 401) gives an error row that says to renew the token.
+- **Stored:** `payload.summary` (followers_count, fan_count, posts that day, Page Insights `page_media_view`, `page_total_media_view_unique`, `page_post_engagements`, `page_follows`, `page_daily_follows_unique`, `page_views_total` for the previous Hong Kong day) and every untouched response in `payload.raw` (page fields, insights, that day's posts with per-post insights). If Meta rejects a metric the collector retries them one by one and reports which failed.
+- Uses the existing `meta-ads-insights` recipient (host graph.facebook.com, read-only), which is switched on by `META_ADS_KEY`; Graph version `META_GRAPH_VERSION` (default v23.0).
+- Test: `node workers/mpt-metrics-collector/facebook.test.mjs`.

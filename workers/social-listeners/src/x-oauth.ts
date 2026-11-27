@@ -6,8 +6,9 @@
 //   3. refresh (stored refresh token; if X refuses it, the bootstrap secret X_REFRESH_TOKEN), then store the new pair
 //   4. the static X_USER_ACCESS_TOKEN secret (works only until it expires)
 // Logs carry event names and HTTP status only, never tokens.
+import { recipientFetcher } from "../../../shared/recipients/outbound";
 import type { Logger } from "./logger";
-import type { Env } from "./shared";
+import { type Env, recipientCtx } from "./shared";
 
 const TOKEN_URL = "https://api.x.com/2/oauth2/token";
 const ROW_ID = "mirror";
@@ -33,11 +34,11 @@ const supa = (env: Env) =>
     ? { base: `${env.SUPABASE_URL.replace(/\/+$/, "")}/rest/v1/mpt_x_oauth_tokens`, key: env.SUPABASE_KEY }
     : null;
 
-async function timed(url: string, init: RequestInit): Promise<Response> {
+async function timed(url: string, init: RequestInit, via: typeof fetch): Promise<Response> {
   const ctl = new AbortController();
   const timer = setTimeout(() => ctl.abort(), TIMEOUT_MS);
   try {
-    return await fetch(url, { ...init, signal: ctl.signal });
+    return await via(url, { ...init, signal: ctl.signal });
   } finally {
     clearTimeout(timer);
   }
@@ -51,7 +52,7 @@ async function readRow(env: Env): Promise<Row | null | typeof STORE_DOWN> {
   try {
     const res = await timed(`${s.base}?id=eq.${ROW_ID}&select=access_token,refresh_token,expires_at`, {
       headers: { apikey: s.key, authorization: `Bearer ${s.key}` },
-    });
+    }, recipientFetcher("supabase", [], recipientCtx(env))); // our own OAuth token row: no personal data
     if (!res.ok) return STORE_DOWN;
     const rows = (await res.json()) as Row[];
     return rows[0] ?? null;
@@ -73,7 +74,7 @@ async function writeRow(env: Env, row: Row): Promise<boolean> {
         Prefer: "resolution=merge-duplicates,return=minimal",
       },
       body: JSON.stringify({ id: ROW_ID, ...row, updated_at: new Date().toISOString() }),
-    });
+    }, recipientFetcher("supabase", [], recipientCtx(env)));
     return res.ok;
   } catch {
     return false;
@@ -91,7 +92,7 @@ async function refresh(env: Env, refreshToken: string, log: Logger): Promise<Row
         "Content-Type": "application/x-www-form-urlencoded",
       },
       body: new URLSearchParams({ grant_type: "refresh_token", refresh_token: refreshToken, client_id: env.X_CLIENT_ID }).toString(),
-    });
+    }, recipientFetcher("x-api", [], recipientCtx(env))); // the app's own token pair: no personal data
     if (!res.ok) {
       log.warn("x_token_refresh_rejected", { status: res.status });
       return null;

@@ -16,10 +16,10 @@ workers_dev = true
 
 # Channel probe reader (docs/channel-probe.md): plain vars, NOT secrets. PROBE_MODE unset (or anything but "on"/"all") = off.
 #   PROBE_MODE="on"  + PROBE_TELEGRAM_IDS="<our test account ids>": allow-listed test accounts only (7 day expiry).
-#   PROBE_MODE="all": EVERY non-bot sender is captured, with wider public lookups. Stores real-user PII (PROBE_RETENTION_DAYS, default 90,
+#   PROBE_MODE="all": EVERY non-bot sender is captured, with wider public lookups. Stores real-user PII (PROBE_RETENTION_DAYS unset = kept until the person asks for deletion;
 #   clamp 1-365; PROBE_LOOKUP_HOURS, default 24, throttles repeat lookups). Do not enable until the stored-data rules and privacy wording are aligned.
 # Full event log (docs/channel-probe.md): only with PROBE_MODE="on", for senders in PROBE_TELEGRAM_IDS or PROBE_LOG_OPTIN_IDS (comma-separated numeric
-#   ids). Saves inbound updates, outbound Bot API calls and the core-brain answer to telegram_event_log. PROBE_LOG_RETENTION_DAYS: default 90,
+#   ids). Saves inbound updates, outbound Bot API calls and the core-brain answer to telegram_event_log. PROBE_LOG_RETENTION_DAYS: unset = kept until the person asks for deletion,
 #   clamp 1-365, or "forever" (no expiry). Mode "all" never writes to it.
 # Set them in the Cloudflare dashboard (Worker > Settings > Variables) or `wrangler deploy --var PROBE_MODE:on`; never commit real ids.
 # Rollback: unset PROBE_MODE.
@@ -43,15 +43,32 @@ service = "core-brain"
 # MPC-7892: Telegram DEEP username check. Plain var kept here because every deploy replaces plain-text vars set outside this file
 # (the flag set through the Cloudflare API was wiped by the next deploy). Inert for everyone except the allow-listed test accounts
 # in the PROBE_TELEGRAM_IDS secret, and the Worker also needs the deep_jobs tables. Rollback: set "off" (or delete this block) and deploy.
-# TELEGRAM_BASELINE_SCAN (MPC-7891) is managed separately.
+# TELEGRAM_BASELINE_SCAN (MPC-7891): see the line below; it used to be managed only by the flags workflow, which every later deploy wiped.
 [vars]
+# Channel probe reader: OFF (MPC-9907, option A, approved 2026-11-26). Mode "all" (decision D-A, on from 2026-11-03) saved every sender's raw
+# update and public profile lookups before anyone had answered the 19-or-over question, which /privacy says does not happen. Capture after the Y
+# (TELEGRAM_CAPTURE_HEXAGONS) is separate and stays on. STOP removes the sender's earlier probe rows. Do not set "all" again unless /privacy and
+# the bot wording change first (workers/social-listeners/probe-erase.vitest.ts fails if this line changes).
+PROBE_MODE = "off"
 TELEGRAM_DEEP_SCAN = "on"
+# MPC-11111 (the magic guess, built OFF): "the Mirror seals an email found in the person's own X bio into the bridge link". Needs ALL FOUR: the registry entry email-guess-service enabled, this switch exactly "true", the Worker secret EMAIL_GUESS_KEY (the SAME value on mpt-scan-report and
+# social-listeners; only Chris creates it), and the site flag VITE_EMAIL_GUESS_ENABLED. Anything but the exact string "true" is off. Wording is DRAFT until Chris approves it.
+# See docs/email-guess-mpc-11111.md. Rollback: set "false" and deploy (tokens already sent simply stop opening).
+EMAIL_GUESS_ENABLED = "false"
+# MPC-7891 baseline scan (the first risk number): moved here on 2026-10-29 at the owner's instruction so a deploy does not wipe it (the flags workflow value is dropped
+# by the next deploy). Only acts for senders in PROBE_TELEGRAM_IDS (allow-listed test accounts) unless TELEGRAM_SCAN_SCOPE="all" (NOT set; do not set it before the
+# rehearsal and wording approval, see docs/core-brain-game-flow.md). Rollback: set "off" (or delete this line) and deploy.
+TELEGRAM_BASELINE_SCAN = "on"
 # MPC-7893: kept here so a deploy does not wipe it (the flags workflow sets it, the next deploy dropped other workflow-set flags). Only acts for senders in
 # PROBE_TELEGRAM_IDS, and the link only works while the Pages variable DASHBOARD_ENABLED=1. Rollback: set "off" (or delete this line) and deploy.
 TELEGRAM_DASHBOARD_LINKS = "on"
 # MPC-7894: /fix wizard, kept here so a deploy does not wipe it (the flags workflow value was dropped by the next deploy, so /fix fell through to the normal bot).
 # Only acts for senders in PROBE_TELEGRAM_IDS (allow-listed test accounts) whose stored consent is confirmed; needs the fix_wizard_items table. Rollback: set "off" (or delete this line) and deploy.
 TELEGRAM_FIX_WIZARD = "on"
+# CK-8502 (owner decision D1, 2026-10-28; legal/wording/retention approved by the owner; migration 20261028110000 applied): records the Telegram hexagon values of every
+# private, non-bot message (name, @username, language, time, message text) as one social_events row, adds the approved disclosure sentence to replies, and lets STOP erase
+# for ANY private sender. Kept here so a deploy does not wipe it. Rollback: set "off" (or delete this line) and deploy; stored rows go with the contact (STOP, or mpt_erase_social_contact).
+TELEGRAM_CAPTURE_HEXAGONS = "on"
 
 # MPC-7628: Mirror bot limits (every scan spends X API credits). Same syntax as core-brain/mpt-leads: the deploy action's wrangler 3.90.0
 # ignores the newer [[ratelimits]] table, so this must be [[unsafe.bindings]] type = "ratelimit" (a test pins it). Per sender: 3

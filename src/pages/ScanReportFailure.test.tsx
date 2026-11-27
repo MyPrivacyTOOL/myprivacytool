@@ -10,7 +10,7 @@ import { REPORT_FAILED_MESSAGE, REPORT_WAIT_MESSAGE } from "@/lib/scanReport";
 beforeEach(() => { window.scrollTo = vi.fn() as unknown as typeof window.scrollTo; sessionStorage.clear(); localStorage.clear(); });
 afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
 
-const MARKETING = /email me my results and occasional privacy tips/i;
+const MARKETING = /email me my results and follow-ups about them/i;
 const EMAIL = "mpc7535+unit@example.com";
 
 type Worker = () => Response | Promise<Response>;

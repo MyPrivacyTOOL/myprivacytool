@@ -4,10 +4,12 @@
 // The untouched API responses are stored in payload.raw; payload.summary is the derived view.
 export const DEFAULT_CHANNEL_ID = 'UC-chigimJFz4Rs8ulbDUeFQ';
 import { previousDay } from './cloudflare-analytics.js';
+import { callRecipient } from '../../../shared/recipients/outbound.ts';
+import { recipientCtx } from '../lib/recipient-ctx.js';
 const API = 'https://www.googleapis.com/youtube/v3';
 
 async function yt(env, path, params, { allow404 = false } = {}) {
-  const res = await fetch(`${API}/${path}?${new URLSearchParams(params)}`, { headers: { 'x-goog-api-key': env.YOUTUBE_API_KEY } });
+  const res = await callRecipient('youtube-data-api', { url: `${API}/${path}?${new URLSearchParams(params)}`, init: { headers: { 'x-goog-api-key': env.YOUTUBE_API_KEY } }, sent: [] }, recipientCtx(env));
   if (allow404 && res.status === 404) return { items: [] };
   if (!res.ok) throw new Error(`youtube ${path}: HTTP ${res.status}`);
   return res.json();

@@ -4,8 +4,9 @@
 // Rows go to public.channel_probe_captures (service_role only; 7 day expiry in "on", PROBE_RETENTION_DAYS in "all").
 // PROBE_MODE defaults to off; any other value counts as off.
 import type { EventLog } from "./event-log";
+import { callRecipient } from "../../../shared/recipients/outbound";
 import type { Logger } from "./logger";
-import type { Env } from "./shared";
+import { type Env, recipientCtx } from "./shared";
 
 const TELEGRAM_API = "https://api.telegram.org";
 const TIMEOUT_MS = 5000;
@@ -17,7 +18,6 @@ export const probeMode = (env: Env): ProbeMode => (env.PROBE_MODE === "on" || en
 const DAY_MS = 86_400_000;
 const HOUR_MS = 3_600_000;
 const DEFAULT_LOOKUP_HOURS = 24;
-const DEFAULT_RETENTION_DAYS = 90;
 const MAX_FILE_LOOKUPS = 5;
 
 /** PROBE_TELEGRAM_IDS: comma-separated numeric Telegram user ids of our own test accounts. */
@@ -78,17 +78,46 @@ export function isProbeIdRequest(update: unknown): boolean {
   return typeof text === "string" && /^\/probeid(@\w+)?$/i.test(text.trim());
 }
 
-interface Row { platform: string; sender_id: string; kind: string; payload: unknown; expires_at?: string }
+/**
+ * STOP: removes this sender's rows from the bot-wide probe log (MPC-9907, option A, 2026-11-26). Works in every PROBE_MODE, so rows logged while
+ * mode "all" was on can still be removed after the logger is switched off. Returns how many rows went, or null when that cannot be confirmed.
+ * Only a numeric Telegram id is accepted, so the request is always limited to one sender. Never throws.
+ */
+export async function eraseProbeCaptures(env: Env, senderId: string): Promise<number | null> {
+  if (!env.SUPABASE_URL || !env.SUPABASE_KEY || !/^\d{1,20}$/.test(senderId)) return null;
+  try {
+    const res = await callRecipient("supabase", {
+      url: `${env.SUPABASE_URL.replace(/\/+$/, "")}/rest/v1/channel_probe_captures?platform=eq.telegram&sender_id=eq.${senderId}&select=id`,
+      init: {
+        method: "DELETE",
+        headers: { apikey: env.SUPABASE_KEY, authorization: `Bearer ${env.SUPABASE_KEY}`, Prefer: "return=representation" },
+        signal: AbortSignal.timeout(TIMEOUT_MS),
+      },
+      sent: ["username"], // sender id in the filter
+    }, recipientCtx(env));
+    if (!res.ok) return null;
+    const rows: unknown = await res.json().catch(() => null);
+    return Array.isArray(rows) ? rows.length : 0;
+  } catch {
+    return null;
+  }
+}
+
+interface Row { platform: string; sender_id: string; kind: string; payload: unknown; expires_at?: string | null }
 
 async function save(env: Env, rows: Row[], log: Logger): Promise<void> {
   if (!env.SUPABASE_URL || !env.SUPABASE_KEY) return log.warn("probe_storage_unconfigured");
   try {
-    const res = await fetch(`${env.SUPABASE_URL.replace(/\/+$/, "")}/rest/v1/channel_probe_captures`, {
-      method: "POST",
-      headers: { apikey: env.SUPABASE_KEY, authorization: `Bearer ${env.SUPABASE_KEY}`, "Content-Type": "application/json", Prefer: "return=minimal" },
-      body: JSON.stringify(rows),
-      signal: AbortSignal.timeout(TIMEOUT_MS),
-    });
+    const res = await callRecipient("supabase", {
+      url: `${env.SUPABASE_URL.replace(/\/+$/, "")}/rest/v1/channel_probe_captures`,
+      init: {
+        method: "POST",
+        headers: { apikey: env.SUPABASE_KEY, authorization: `Bearer ${env.SUPABASE_KEY}`, "Content-Type": "application/json", Prefer: "return=minimal" },
+        body: JSON.stringify(rows),
+        signal: AbortSignal.timeout(TIMEOUT_MS),
+      },
+      sent: ["username", "name", "message_text"], // the raw update and the Bot API lookups
+    }, recipientCtx(env));
     if (!res.ok) log.warn("probe_save_failed", { status: res.status });
   } catch (err) {
     log.warn("probe_save_failed", { error: err instanceof Error ? err.name : "unknown" });
@@ -104,12 +133,16 @@ async function telegram(env: Env, method: string, body: Record<string, unknown>,
 
 export async function call(env: Env, method: string, body: Record<string, unknown>): Promise<{ status: number; response: unknown }> {
   try {
-    const res = await fetch(`${TELEGRAM_API}/bot${env.TELEGRAM_BOT_TOKEN}/${method}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-      signal: AbortSignal.timeout(TIMEOUT_MS),
-    });
+    const res = await callRecipient("telegram", {
+      url: `${TELEGRAM_API}/bot${env.TELEGRAM_BOT_TOKEN}/${method}`,
+      init: {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(TIMEOUT_MS),
+      },
+      sent: ["message_text", "username"], // sendMessage text, or the chat / user id of a lookup
+    }, recipientCtx(env));
     let response: unknown = null;
     try { response = await res.json(); } catch { /* non-JSON answer: keep null */ }
     return { status: res.status, response };
@@ -118,10 +151,10 @@ export async function call(env: Env, method: string, body: Record<string, unknow
   }
 }
 
-/** Retention for mode "all" rows: PROBE_RETENTION_DAYS, default 90, clamped to 1-365. */
-export function retentionDays(env: Env): number {
+/** Retention for mode "all" rows: kept until the person asks for deletion (null = no expiry) unless PROBE_RETENTION_DAYS is a number, clamped to 1-365. */
+export function retentionDays(env: Env): number | null {
   const n = Number.parseInt(env.PROBE_RETENTION_DAYS ?? "", 10);
-  return Number.isFinite(n) ? Math.min(365, Math.max(1, n)) : DEFAULT_RETENTION_DAYS;
+  return Number.isFinite(n) ? Math.min(365, Math.max(1, n)) : null;
 }
 
 /** Lookup throttle window for mode "all": PROBE_LOOKUP_HOURS, default 24 (a non-positive or non-numeric value falls back to the default). */
@@ -136,10 +169,14 @@ async function recentlyLooked(env: Env, senderId: string): Promise<boolean> {
   try {
     const since = new Date(Date.now() - lookupHours(env) * HOUR_MS).toISOString();
     const q = `platform=eq.telegram&sender_id=eq.${encodeURIComponent(senderId)}&kind=eq.${encodeURIComponent("lookup:getChat")}&created_at=gte.${encodeURIComponent(since)}&select=id&limit=1`;
-    const res = await fetch(`${env.SUPABASE_URL.replace(/\/+$/, "")}/rest/v1/channel_probe_captures?${q}`, {
-      headers: { apikey: env.SUPABASE_KEY, authorization: `Bearer ${env.SUPABASE_KEY}` },
-      signal: AbortSignal.timeout(TIMEOUT_MS),
-    });
+    const res = await callRecipient("supabase", {
+      url: `${env.SUPABASE_URL.replace(/\/+$/, "")}/rest/v1/channel_probe_captures?${q}`,
+      init: {
+        headers: { apikey: env.SUPABASE_KEY, authorization: `Bearer ${env.SUPABASE_KEY}` },
+        signal: AbortSignal.timeout(TIMEOUT_MS),
+      },
+      sent: ["username"], // sender id in the filter
+    }, recipientCtx(env));
     if (!res.ok) return false;
     const found = await res.json();
     return Array.isArray(found) && found.length > 0;
@@ -167,7 +204,8 @@ function largestPhotoFileIds(photos: { response: unknown }): string[] {
 async function captureAll(env: Env, update: unknown, log: Logger): Promise<void> {
   const actor = updateActor(update);
   if (!actor) return;
-  const expires_at = new Date(Date.now() + retentionDays(env) * DAY_MS).toISOString();
+  const days = retentionDays(env);
+  const expires_at = days === null ? null : new Date(Date.now() + days * DAY_MS).toISOString();
   const row = (kind: string, payload: unknown): Row => ({ platform: "telegram", sender_id: actor.id, kind, payload, expires_at });
   const rows: Row[] = [row("update", update)];
   if (!env.TELEGRAM_BOT_TOKEN) {

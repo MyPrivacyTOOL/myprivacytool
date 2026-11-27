@@ -2,13 +2,13 @@
 // scan; its POST /api/scan goes to the REAL Worker code (workers/scan-report/index.js) running in this test process with an in-memory Supabase/Resend/HubSpot
 // behind it. Nothing leaves the machine: every outbound URL the Worker calls is answered here, and the test fails if it calls an unexpected host.
 // Synthetic users only (example.com). The assertions read the PERSISTED rows and the captured email bodies, not what the page says.
-import { test, expect } from "./fixtures";
+import { test, expect, e2eConsentRows } from "./fixtures";
 import type { Page } from "@playwright/test";
 import worker from "../workers/scan-report/index.js";
 
 const ORIGIN = "https://myprivacytool.io";   // the Worker only accepts the production origins
 const SCAN_NUMBER_RE = /[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/i;
-const KNOWN_HOSTS = ["stub.supabase.test", "api.resend.com", "api.hubapi.com", "cloudflare-dns.com", "haveibeenpwned.com", "gravatar.com", "libravatar.org", "rdap.org"];
+const KNOWN_HOSTS = ["stub.supabase.co", "api.resend.com", "api.hubapi.com", "cloudflare-dns.com", "haveibeenpwned.com", "gravatar.com", "libravatar.org", "rdap.org"];
 
 type Row = Record<string, unknown>;
 function backends() {
@@ -19,9 +19,23 @@ function backends() {
   const res = (status: number, body?: unknown) => ({ ok: status < 400, status, headers: { get: () => null }, text: async () => (body === undefined ? "" : JSON.stringify(body)), json: async () => body });
   const fetchImpl = async (input: unknown, init: RequestInit = {}) => {
     const url = String(input);
+    const consentRes = e2eConsentRows(url); if (consentRes) return consentRes;   // MPC-9888
     const host = new URL(url).host;
     if (!KNOWN_HOSTS.some((h) => host.endsWith(h))) { stray.push(host); return res(500, "blocked"); }
     if (host === "api.resend.com") { mails.push(JSON.parse(String(init.body))); return res(200, { id: `msg_${++n}` }); }
+    const rpc = url.match(/rest\/v1\/rpc\/(\w+)/);
+    if (rpc) {   // CK-8503: the Worker asks the database to create the report request atomically (public.mpt_request_scan); same rules as the SQL function
+      if (rpc[1] !== "mpt_request_scan") return res(404, { code: "PGRST202" });   // any other function: like PostgREST, "not found"
+      const a = JSON.parse(String(init.body)) as { p_user_id: string; p_email: string; p_request_id?: string | null };
+      const scans = (tables.scans ??= []);
+      const since = Date.now() - 24 * 3600 * 1000;
+      const hit = scans.find((r) => r.user_id === a.p_user_id && Date.parse(String(r.created_at)) >= since);
+      if (hit) return res(200, [{ scan_id: hit.id, duplicate: true, request_id: hit.request_id ?? null }]);
+      if (a.p_request_id && scans.some((r) => r.request_id === a.p_request_id)) return res(409, { code: "23505" });   // unique index scans_request_id_key (MPC-7471-F3)
+      const row: Row = { id: crypto.randomUUID(), created_at: new Date().toISOString(), user_id: a.p_user_id, email_scanned: a.p_email, source: "web_scan", report_status: "pending", report_attempts: 0, ...(a.p_request_id ? { request_id: a.p_request_id } : {}) };
+      scans.push(row);
+      return res(200, [{ scan_id: row.id, duplicate: false, request_id: a.p_request_id ?? null }]);
+    }
     const m = url.match(/rest\/v1\/(\w+)(\?.*)?$/);
     if (!m) return res(200, host.includes("cloudflare-dns") ? { Status: 0, Answer: [] } : {});
     const [, table, qs] = m;
@@ -66,7 +80,7 @@ async function wireWorker(page: Page, opts: { loseFirstAnswer?: boolean; refuseF
     globalThis.fetch = be.fetchImpl as unknown as typeof fetch;
     try {
       const workerReq = new Request("https://mpt-scan-report.example.workers.dev/api/scan", { method: "POST", headers: { "Content-Type": "application/json", Origin: ORIGIN }, body: req.postData() ?? "" });
-      const env = { SUPABASE_URL: "https://stub.supabase.test", SUPABASE_SERVICE_ROLE_KEY: "stub", RESEND_API_KEY: "stub", HUBSPOT_TOKEN: "stub", UNSUBSCRIBE_SECRET: "stub-secret", WEB_SCAN_SAVE_ENABLED: "true", REPORT_REQUEST_ID_ENABLED: "true", RECIPIENT_ALLOWLIST: "", EMAIL_DOMAIN_CHECK: "false" };
+      const env = { SUPABASE_URL: "https://stub.supabase.co", SUPABASE_SERVICE_ROLE_KEY: "stub", RESEND_API_KEY: "stub", HUBSPOT_TOKEN: "stub", UNSUBSCRIBE_SECRET: "stub-secret", WEB_SCAN_SAVE_ENABLED: "true", REPORT_REQUEST_ID_ENABLED: "true", RECIPIENT_ALLOWLIST: "", EMAIL_DOMAIN_CHECK: "false" };
       const out = await worker.fetch(workerReq, env, { waitUntil: (p: Promise<unknown>) => { pending.push(p); } });
       await Promise.all(pending);
       const text = await out.text();
@@ -97,8 +111,8 @@ async function finishScan(page: Page) {
 
 const fill = async (page: Page, email: string, { save }: { save: boolean }) => {
   await page.getByPlaceholder("your@email.com").fill(email);
-  await page.getByLabel(/email me my results and occasional privacy tips/i).check();
-  const saveBox = page.getByLabel(/save my scan result with my email/i);
+  await page.getByLabel(/email me my results and follow-ups about them/i).check();
+  const saveBox = page.getByLabel(/(save my scan result with my email|keep my scan and create my free account)/i);   // MPC-9817: the production build carries the one-step wording while VITE_ACCOUNTS_ENABLED is on
   await expect(saveBox).not.toBeChecked();                     // unticked by default
   if (save) await saveBox.check();
 };
@@ -124,7 +138,7 @@ test.describe("post-scan popup -> report pipeline (stubbed API, real Worker code
     const t = be.tables;
     expect([t.users.length, t.leads.length, t.scans.length, t.web_scans.length, t.web_scan_contacts.length]).toEqual([1, 1, 1, 1, 1]);
     expect(t.web_scan_contacts[0]).toMatchObject({ channel: "email", contact_id: t.scans[0].id, web_scan_id: t.web_scans[0].id });
-    expect(t.web_scan_contacts[0].save_consent_version).toBe("2026-10-12-v1");
+    expect(t.web_scan_contacts[0].save_consent_version).toBe("2026-11-08-v1")   // MPC-9817: the one-step wording version (the build in this test has the accounts flag on);
     expect(t.scans[0].request_id).toBe(seen[0].sent.request_id);
     expect(shown).toBe(t.web_scans[0].id);                     // the popup shows the stored scan's id, not one made in the browser
     expect(be.mails).toHaveLength(1);

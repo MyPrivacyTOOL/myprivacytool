@@ -3,7 +3,7 @@ import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import ScoreMethod from "./ScoreMethod";
-import { CATEGORY_WEIGHTS, BANDS, SCORE_VERSION, WEIGHT_TOTAL } from "../../shared/hexagon-registry/score.js";
+import { CATEGORY_WEIGHTS, BANDS, SCORE_VERSION, WEIGHT_TOTAL, WEIGHTS_LABEL } from "../../shared/hexagon-registry/score.js";
 
 const renderPage = () => render(<MemoryRouter><ScoreMethod /></MemoryRouter>);
 
@@ -31,5 +31,25 @@ describe("How we calculate your score", () => {
     expect(screen.getByText(/provisional/)).toBeInTheDocument();
     expect(screen.getByText(/cannot be compared/)).toBeInTheDocument();
     expect(screen.getByText(/Not checked/)).toBeInTheDocument();
+  });
+});
+
+describe("MPC-9792: weights version label and open score questions", () => {
+  it("labels the weights as v1 interim and shows the weight actually used", () => {
+    const { container } = renderPage();
+    const text = container.textContent ?? "";
+    expect(text).toContain(WEIGHTS_LABEL);
+    expect(text).toContain("version 1, interim");
+    expect(text).toContain("Weight used today");
+    // social is all cannot_be_checked: 0% used, the other 80% rescaled (e.g. fingerprint 25/80 = 31.25%)
+    expect(text).toContain("31.25%");
+    expect(text).toContain("0%");
+  });
+
+  it("explains overlapping checks, browser features, the three distinctions and channel/geographic coverage", () => {
+    renderPage();
+    expect(screen.getByRole("heading", { name: /Overlapping checks/ })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Three things the score is not" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /channels and places/ })).toBeInTheDocument();
   });
 });

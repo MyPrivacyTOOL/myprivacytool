@@ -60,7 +60,7 @@ for (let w = 0; w < WEEKS; w++) {
   });
 }
 // Week 1 anchors on the pillar post
-rows[1][3] = 'How Exposed Are You? The 46 Things Tracking You Online (pillar)';
+rows[1][3] = 'How Exposed Are You? The 54 Things Tracking You Online (pillar)';
 rows[1][5] = utm('/blog/how-exposed-are-you', 'blog', 'mpc-7033-w01');
 if (process.argv.includes('--linkedin')) {
   // MPC-7504-A1: one Thursday post per week, taken from the posts that exist in src/data/blogPosts.json (never repeated,

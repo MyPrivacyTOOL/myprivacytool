@@ -224,11 +224,12 @@ describe("funnel steps (MPC-7493, under D12)", () => {
     expect("previous_scan_number" in scanSaveFields()).toBe(false);
   });
 
-  it("reports results viewed, contact step opened and results time against this visit's saved scan number", () => {
+  it("reports results viewed, contact step opened and results time against this visit's saved scan number", async () => {
     vi.stubEnv("VITE_SAVE_WEB_SCANS", "true");
     sessionStorage.setItem(KEY, "aaaaaaaa-2222-4333-8444-555555555551");
     const f = vi.fn(async (..._args: unknown[]) => ok({})); vi.stubGlobal("fetch", f);
     reportStep("results_viewed"); reportStep("results_viewed"); reportStep("contact_step_opened"); reportStep("results_time", 12.6); reportStep("results_time", 99999);
+    await new Promise((r) => setTimeout(r, 0)); // the wrapper (MPC-9886) calls fetch a few microtasks later
     const calls = stepCalls(f);
     expect(calls.map((c) => c.step)).toEqual(["results_viewed", "contact_step_opened", "results_time", "results_time"]); // a repeat step is sent once
     expect(calls.every((c) => c.scan_number === "aaaaaaaa-2222-4333-8444-555555555551")).toBe(true);
@@ -254,7 +255,7 @@ describe("funnel steps (MPC-7493, under D12)", () => {
     expect(f).not.toHaveBeenCalled();
   });
 
-  it("trackResults sends nothing before a scan is saved, then reports results viewed and the time when the page is left", () => {
+  it("trackResults sends nothing before a scan is saved, then reports results viewed and the time when the page is left", async () => {
     vi.stubEnv("VITE_SAVE_WEB_SCANS", "true");
     const f = vi.fn(async (..._args: unknown[]) => ok({})); vi.stubGlobal("fetch", f);
     vi.useFakeTimers();
@@ -266,6 +267,7 @@ describe("funnel steps (MPC-7493, under D12)", () => {
     window.dispatchEvent(new Event("pagehide"));
     stop();
     vi.useRealTimers();
+    await new Promise((r) => setTimeout(r, 0)); // the wrapper (MPC-9886) calls fetch a few microtasks later
     const calls = stepCalls(f);
     expect(calls[0]).toMatchObject({ step: "results_viewed", scan_number: "aaaaaaaa-2222-4333-8444-555555555553" });
     expect(calls.find((c) => c.step === "results_time")?.seconds).toBe(7);
@@ -276,5 +278,21 @@ describe("funnel steps (MPC-7493, under D12)", () => {
     sessionStorage.setItem(KEY, "aaaaaaaa-2222-4333-8444-555555555554");
     vi.stubGlobal("fetch", vi.fn(async () => { throw new Error("offline"); }));
     expect(() => reportStep("results_viewed")).not.toThrow();
+  });
+});
+
+describe("writeFootprintScan (MPC-9898: the visitor's values for /footprint/)", () => {
+  beforeEach(() => localStorage.clear());
+  const hx = (id: string, value: string, confidence = 80) => ({ id, label: id, value, icon: "x", confidence, risk: "low" }) as unknown as HexagonData;
+  it("writes real values only, keyed by hexagon id", async () => {
+    const { writeFootprintScan, FOOTPRINT_SCAN_KEY } = await import("./webScan");
+    writeFootprintScan([hx("location", "Wan Chai, Hong Kong", 88), hx("browser", "Unknown browser"), hx("os", "")]);
+    expect(JSON.parse(localStorage.getItem(FOOTPRINT_SCAN_KEY)!)).toEqual({ values: { location: { ex: "Wan Chai, Hong Kong", conf: 88 } } });
+  });
+  it("leaves the key absent when nothing is real", async () => {
+    const { writeFootprintScan, FOOTPRINT_SCAN_KEY } = await import("./webScan");
+    localStorage.setItem(FOOTPRINT_SCAN_KEY, "{}");
+    writeFootprintScan([hx("os", "")]);
+    expect(localStorage.getItem(FOOTPRINT_SCAN_KEY)).toBeNull();
   });
 });

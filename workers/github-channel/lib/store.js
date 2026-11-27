@@ -2,10 +2,13 @@
  * Encrypted token storage over Supabase PostgREST (service role only; RLS blocks everyone else).
  * Plaintext tokens exist only in memory; every column written here is ciphertext.
  */
+import { callRecipient } from '../../../shared/recipients/outbound.ts';
+import { workerRecipientContext } from '../../../shared/recipients/worker-ctx.ts';
 import { encryptToken, decryptToken, keyForVersion } from './encryption.js';
 
 async function sb(env, method, path, body, fetchFn, extra = {}) {
-  const res = await fetchFn(`${env.SUPABASE_URL}/rest/v1/${path}`, {
+  // MPC-9885: rows are keyed by the provider's user id (username); the tokens are ciphertext.
+  const res = await callRecipient('supabase', { url: `${env.SUPABASE_URL}/rest/v1/${path}`, sent: ['username'], init: {
     method,
     headers: {
       apikey: env.SUPABASE_SERVICE_ROLE_KEY,
@@ -14,18 +17,21 @@ async function sb(env, method, path, body, fetchFn, extra = {}) {
       ...extra,
     },
     body: body === undefined ? undefined : JSON.stringify(body),
-  });
+  } }, workerRecipientContext(env, { fetchImpl: fetchFn }));
   if (!res.ok) throw new Error(`supabase ${method} ${path.split('?')[0]} ${res.status}`);
   return res.status === 204 ? null : res.json().catch(() => null);
 }
 
 // Table shape (shared with the existing public.channel_tokens): user_id = the provider's stable user id
-// (text), provider = 'github' | 'reddit'. See supabase/migrations/20261006120000_channel_tokens_worker_columns.sql.
+// (text), provider = 'github' | 'reddit'. See supabase/migrations_archive/20261006120000_channel_tokens_worker_columns.sql.
 const PROVIDER = 'github';
 // AAD binds a ciphertext to its provider, account and column, so a row copied to another account/provider fails to decrypt.
 const aad = (subjectId, column, provider = PROVIDER) => `${provider}:${subjectId}:${column}`;
 
-export async function saveToken(env, { subjectId, accessToken, refreshToken, scope, expiresIn, provider = PROVIDER }, fetchFn = fetch) {
+// MPC-10833: `consentedAt` (ISO string) is passed ONLY when the person has just gone through the consent screen (OAuth callback).
+// A token refresh leaves it out: the column is then absent from the upsert, so merge-duplicates keeps the stored date and a refresh
+// can never renew consent.
+export async function saveToken(env, { subjectId, accessToken, refreshToken, scope, expiresIn, consentedAt, provider = PROVIDER }, fetchFn = undefined) {
   const version = Number(env.ENCRYPTION_KEY_VERSION || 1);
   const key = keyForVersion(env, version);
   const row = {
@@ -40,14 +46,15 @@ export async function saveToken(env, { subjectId, accessToken, refreshToken, sco
     expires_at: expiresIn ? new Date(Date.now() + Number(expiresIn) * 1000).toISOString() : null,
     updated_at: new Date().toISOString(),
   };
+  if (consentedAt) row.consented_at = consentedAt;
   await sb(env, 'POST', 'channel_tokens?on_conflict=user_id,provider', row, fetchFn,
     { Prefer: 'resolution=merge-duplicates,return=minimal' });
 }
 
-/** @returns {Promise<{accessToken: string, refreshToken: string|null}|null>} */
-export async function loadTokens(env, subjectId, fetchFn = fetch, provider = PROVIDER) {
+/** @returns {Promise<{accessToken: string, refreshToken: string|null, consentedAt: string|null}|null>} consentedAt falls back to created_at for a row without it */
+export async function loadTokens(env, subjectId, fetchFn = undefined, provider = PROVIDER) {
   const rows = await sb(env, 'GET',
-    `channel_tokens?provider=eq.${provider}&user_id=eq.${encodeURIComponent(String(subjectId))}&select=access_token_enc,refresh_token_enc,key_version&limit=1`,
+    `channel_tokens?provider=eq.${provider}&user_id=eq.${encodeURIComponent(String(subjectId))}&select=access_token_enc,refresh_token_enc,key_version,consented_at,created_at&limit=1`,
     undefined, fetchFn);
   if (!rows?.length) return null;
   const key = keyForVersion(env, rows[0].key_version);
@@ -56,14 +63,15 @@ export async function loadTokens(env, subjectId, fetchFn = fetch, provider = PRO
     refreshToken: rows[0].refresh_token_enc
       ? await decryptToken(rows[0].refresh_token_enc, key, { aad: aad(subjectId, 'refresh', provider) })
       : null,
+    consentedAt: rows[0].consented_at ?? rows[0].created_at ?? null,
   };
 }
 
-export async function loadAccessToken(env, subjectId, fetchFn = fetch, provider = PROVIDER) {
+export async function loadAccessToken(env, subjectId, fetchFn = undefined, provider = PROVIDER) {
   return (await loadTokens(env, subjectId, fetchFn, provider))?.accessToken ?? null;
 }
 
-export function deleteToken(env, subjectId, fetchFn = fetch, provider = PROVIDER) {
+export function deleteToken(env, subjectId, fetchFn = undefined, provider = PROVIDER) {
   return sb(env, 'DELETE', `channel_tokens?provider=eq.${provider}&user_id=eq.${encodeURIComponent(String(subjectId))}`,
     undefined, fetchFn, { Prefer: 'return=minimal' });
 }

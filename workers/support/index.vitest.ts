@@ -6,7 +6,7 @@ import { MemoryCaseStore } from "../../shared/support/memory-store";
 import { buildTools, DEFAULT_POLICY, type SupportDeps, type Model, type Notifier } from "../../shared/support";
 
 const TOKEN = "t-test-token";
-const env = (o: Partial<Env> = {}): Env => ({ SUPPORT_AI_ENABLED: "1", SUPPORT_INTAKE_TOKEN: TOKEN, SUPABASE_URL: "https://x.test", SUPABASE_SERVICE_ROLE_KEY: "k", RATE_LIMITER: { limit: async () => ({ success: true }) }, ...o });
+const env = (o: Partial<Env> = {}): Env => ({ SUPPORT_AI_ENABLED: "1", SUPPORT_INTAKE_TOKEN: TOKEN, SUPABASE_URL: "https://x.supabase.co", SUPABASE_SERVICE_ROLE_KEY: "k", RATE_LIMITER: { limit: async () => ({ success: true }) }, ...o });
 const body = (o: Record<string, unknown> = {}) => ({ channel: "web", providerEventId: `e-${Math.random()}`, text: "I can't find my report", senderHandle: "v1", ...o });
 const post = (b: unknown, headers: Record<string, string> = { Authorization: `Bearer ${TOKEN}` }, path = "/intake") =>
   new Request(`https://w.test${path}`, { method: "POST", headers: { "Content-Type": "application/json", ...headers }, body: typeof b === "string" ? b : JSON.stringify(b) });
@@ -79,7 +79,7 @@ describe("request validation", () => {
     expect((await t.handler(new Request("https://w.test/other"), env())).status).toBe(404);
     const h = await (await t.handler(new Request("https://w.test/health"), env({ SUPPORT_AI_ENABLED: "0" }))).json();
     expect(h).toMatchObject({ ok: true, enabled: false, configured: true });
-    expect(JSON.stringify(h)).not.toContain(TOKEN); expect(JSON.stringify(h)).not.toContain("x.test"); // booleans only
+    expect(JSON.stringify(h)).not.toContain(TOKEN); expect(JSON.stringify(h)).not.toContain("x.supabase.co"); // booleans only
   });
 });
 

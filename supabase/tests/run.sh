@@ -32,7 +32,21 @@ psql_ "$TEST_URL" -f supabase/tests/bootstrap.sql
 psql_ "$TEST_URL" -f supabase/sql/mpt-operational-rls.sql
 psql_ "$TEST_URL" -f supabase/sql/mpt-score-baselines.sql
 # mpt-purge-expired-scan-results.sql needs pg_cron (not available in plain Postgres); it is documentation of the live job.
-for f in $(ls supabase/migrations/*.sql | sort); do echo "   migration $(basename "$f")"; psql_ "$TEST_URL" -f "$f"; done
+# MPC-8671 is applied below, after the KPI view chain it replaces (supabase/sql/*, which production got through the SQL editor/MCP, not through migrations).
+# MPC-8737: the ledger migration has its own stage further down (fingerprint before / after, rollback, re-apply), so it is excluded here too.
+for f in $(ls supabase/migrations_archive/*.sql | grep -v -e mpc_8671_kpi_views_hourly_counter -e mpc_8737_data_point_ledger_v1 -e mpc_8753_ledger_risk_axis -e mpc_8737_m3_ledger_erase_parity -e mpc_8689_brokers_rows -e exclude_test_scans_from_kpi -e mpc_11547_hexagon_scorecard_views | sort); do echo "   migration $(basename "$f")"; psql_ "$TEST_URL" -f "$f"; done
+# MPC-9896: migrations added after the baseline (supabase/migrations/, version above 20261127060000) are part of the chain too.
+for f in $(ls supabase/migrations/*.sql | awk -F/ '{v=$NF; sub(/_.*/,"",v); if (v+0 > 20261127060000) print $0}' | grep -v -e mpc_11547_hexagon_scorecard_views | sort); do echo "   migration $(basename "$f")"; psql_ "$TEST_URL" -f "$f"; done
+echo "   KPI view chain (supabase/sql), in the order production received it"
+for f in mpt-raw-metrics mpt-youtube-daily-metrics mpt-youtube-daily-join mpt-hk-days mpt-hubspot-daily mpt-cloudflare-daily-metrics mpt-cloudflare-daily-join; do echo "   sql $f.sql"; psql_ "$TEST_URL" -f "supabase/sql/$f.sql"; done
+echo "   migration 20261028120001_mpc_8671_kpi_views_hourly_counter.sql"
+psql_ "$TEST_URL" -f supabase/migrations_archive/20261028120001_mpc_8671_kpi_views_hourly_counter.sql
+# Test scans out of the KPIs: redefines the two views above, so it has to come after them.
+echo "   migration 20261127060000_exclude_test_scans_from_kpi.sql"
+psql_ "$TEST_URL" -f supabase/migrations_archive/20261127060000_exclude_test_scans_from_kpi.sql
+# MPC-11547: the scorecard views call mpt_is_test_address (above), so they come after it.
+echo "   migration 20261127070000_mpc_11547_hexagon_scorecard_views.sql"
+psql_ "$TEST_URL" -f supabase/migrations/20261127070000_mpc_11547_hexagon_scorecard_views.sql
 # CK-8493: migrations proposed but not yet released (not read by deploy-supabase.yml). Tested here against the throwaway database only.
 # MPC-7471-F4 is excluded here: it drops mpt_score_baselines_email_hash_key, which schema.test.sql still needs, and it has its own stage further down.
 for f in $(ls supabase/proposed/*.sql 2>/dev/null | grep -v mpc_7471_f4_baseline_score_version | sort); do echo "   proposed $(basename "$f")"; psql_ "$TEST_URL" -f "$f"; done
@@ -54,8 +68,60 @@ echo "== schema assertions"
 psql_ "$TEST_URL" -At -f supabase/tests/schema.test.sql
 
 
+echo "== visit log, country policy and purge (MPC-9889)"
+psql_ "$TEST_URL" -At -f supabase/tests/visit-log.test.sql
+
+echo "== anonymised learning aggregate: schema, hooks, vocabularies (MPC-9892)"
+psql_ "$TEST_URL" -At -f supabase/tests/mpc-9892-learning-aggregate.test.sql
+
+# MPC-9892 canary proof (design 4.5, proof 2): seed one scan with a unique email, IP, scan number and user agent, run the deletion job,
+# then grep a dump of the WHOLE database and the job log for each canary. Zero hits allowed. Step 1 commits (throwaway database only).
+echo "== canary: nothing identifying survives the deletion job (MPC-9892)"
+canary_dir=$(mktemp -d)
+psql_ "$TEST_URL" -f supabase/tests/mpc-9892-canary-seed.sql
+before=$(pg_dump "$TEST_URL" --no-owner | grep -c -e 'canary-9892-zqx7' -e '198\.51\.100\.219' -e '9892c0de-ca9a-4c4e-8a11-000000009892' -e 'CanaryAgent-9892-QZ' -e 'canary-ua-token' || true)
+[ "$before" -ge 4 ] || { echo "::error::canary seed is not visible in the dump before the job ($before hits): the test would prove nothing"; exit 1; }
+psql_ "$TEST_URL" -At -f supabase/tests/mpc-9892-canary-run.sql > "$canary_dir/job.log" 2>&1
+pg_dump "$TEST_URL" --no-owner > "$canary_dir/db.sql"
+for c in 'canary-9892-zqx7' '198\.51\.100\.219' '9892c0de-ca9a-4c4e-8a11-000000009892' 'CanaryAgent-9892-QZ' 'canary-ua-token' 'example\.invalid'; do
+  hits=$(cat "$canary_dir/db.sql" "$canary_dir/job.log" | grep -c -e "$c" || true)
+  [ "$hits" -eq 0 ] || { echo "::error::canary '$c' survived the deletion job: $hits hit(s) in the database dump or job log"; exit 1; }
+  echo "   canary $c: 0 hits in whole-database dump + job log"
+done
+grep -q 'ai:claudebot' "$canary_dir/job.log" && grep -q 'location:found' "$canary_dir/job.log" || { echo "::error::the job did not count the canary rows (no counters in the log)"; exit 1; }
+echo "   counters written, identity gone (seed visible before: $before hits)"
+rm -rf "$canary_dir"
+
 echo "== dashboard links and sessions (MPC-7893)"
 psql_ "$TEST_URL" -At -f supabase/tests/dashboard-links.test.sql
+
+echo "== hexagon catalogue and footprint handoff scope (MPC-8689)"
+psql_ "$TEST_URL" -At -f supabase/tests/footprint-handoff.test.sql
+
+echo "== Telegram event flags (MPC-8689)"
+psql_ "$TEST_URL" -At -f supabase/tests/telegram-event-flags.test.sql
+
+echo "== Deep Research findings and verification gate (MPC-9549)"
+psql_ "$TEST_URL" -At -f supabase/tests/deep-research.test.sql
+psql_ "$TEST_URL" -At -f supabase/tests/mpc-9887-scan-consents.test.sql
+echo "== purge of channel tokens unused for 90 days: dry run by default, guards, grants (MPC-11258)"
+psql_ "$TEST_URL" -At -f supabase/tests/mpc-11258-purge-stale-channel-tokens.test.sql
+echo "== daily schedule for the 90-day token purge: applies twice, one job (MPC-11258)"
+SCHEDULE=supabase/migrations/20261127074149_mpc_11258_schedule_stale_channel_token_purge.sql
+psql_ "$TEST_URL" -f "$SCHEDULE"   # as written (the loop above applied it once already)
+sched_file="$SCHEDULE"
+if [ "$(psql_ "$TEST_URL" -At -c "select count(*) from pg_extension where extname = 'pg_cron'")" = 0 ]; then
+  # pg_cron is absent, so the file above does nothing here. Force only its guard open and let the test supply a stand-in cron schema.
+  sched_file="${TMPDIR:-/tmp}/mpc-11258-schedule-guard-open.sql"
+  sed "s/if exists (select 1 from pg_extension where extname = 'pg_cron') then/if true then/" "$SCHEDULE" > "$sched_file"
+  grep -q 'if true then' "$sched_file" || { echo "::error::the pg_cron guard in $SCHEDULE was not found"; exit 1; }
+fi
+psql_ "$TEST_URL" -At -v mig="$sched_file" -f supabase/tests/mpc-11258-schedule-stale-channel-token-purge.test.sql
+echo "== scan funnel link columns (CK-11491)"
+psql_ "$TEST_URL" -At -f supabase/tests/ck-11491-funnel-links.test.sql
+echo "== recipient log follows the scan (MPC-9893)"
+psql_ "$TEST_URL" -At -f supabase/tests/mpc-9893-recipient-log-follows-scan.test.sql
+psql_ "$TEST_URL" -At -f supabase/tests/mpc-9890-free-record-deletion.test.sql
 # Real concurrency: 8 separate connections try to redeem ONE link at the same moment. Exactly one may win.
 psql_ "$TEST_URL" -c "insert into public.profile_snapshots (id, sender_id, update_id, status, scan_version, risk_version, consent, get_chat, photos, expires_at) values ('00000000-0000-0000-0000-0000000000c1', '333', 1, 'complete', 'telegram-baseline-1', 'risk-count-1', '{}', '{}', '{}', now() + interval '90 days')" \
   -c "insert into public.dashboard_links (token_hash, sender_id, snapshot_id, expires_at) values (repeat('e',64), '333', '00000000-0000-0000-0000-0000000000c1', now() + interval '15 minutes')"
@@ -79,6 +145,14 @@ psql_ "$TEST_URL" -At -f supabase/tests/proposed-mpc-8528-support-cases.test.sql
 echo "== proposed schema: support follow-up watchdog (MPC-8529)"
 psql_ "$TEST_URL" -At -f supabase/tests/proposed-mpc-8529-support-followup.test.sql
 
+# MPC-8673: the PROPOSED Flip Point schema (supabase/migrations_archive/20261028110001_mpc_8673_flip_point_consents.sql, applied by the migrations loop above).
+echo "== proposed schema: Flip Point consents (MPC-8673)"
+psql_ "$TEST_URL" -At -f supabase/tests/proposed-mpc-8673-flip-point.test.sql
+
+# MPC-8659: the PROPOSED scans retention migration (supabase/migrations_archive/20261027150000_mpc_8659_scans_retention.sql, applied by the migrations loop above).
+echo "== proposed migration: scans retention (MPC-8659)"
+psql_ "$TEST_URL" -At -f supabase/tests/proposed-mpc-8659-scans-retention.test.sql
+
 # MPC-7471-F4: the PROPOSED baseline score_version migration (supabase/proposed/, not in supabase/migrations/) on rows saved the old way, then its own rollback.
 echo "== proposed migration: baseline score_version (MPC-7471-F4)"
 PROPOSED=supabase/proposed/20261026000000_mpc_7471_f4_baseline_score_version.sql
@@ -96,6 +170,166 @@ after=$(psql_ "$TEST_URL" -At -c "select count(*) || ':' || coalesce(sum(overall
 [ "$before" = "$after" ] || { echo "::error::rollback did not restore the legacy rows ($before vs $after)"; exit 1; }
 psql_ "$TEST_URL" -At -c "select 1 from pg_constraint where conname='mpt_score_baselines_email_hash_key'" | grep -q 1 || { echo "::error::rollback did not restore the unique(email_hash) key"; exit 1; }
 echo "   legacy rows identical before and after: $before"
+
+# MPC-8671: the KPI views count scan_hourly_counts, so a purge of public.scans must not move any KPI number.
+echo "== KPI views read the hourly counter; a purge leaves them unchanged (MPC-8671)"
+psql_ "$TEST_URL" -At -f supabase/tests/mpc-8671-kpi-views-hourly-counter.test.sql
+echo "== test-mailbox scans stay out of the KPIs; raw counts and access unchanged"
+# The MPC-8659 stage above re-runs its own migration, which puts the old counting function back. Production runs that file once, before this one,
+# so apply this one again before testing it (it is idempotent).
+psql_ "$TEST_URL" -f supabase/migrations_archive/20261127060000_exclude_test_scans_from_kpi.sql
+psql_ "$TEST_URL" -At -f supabase/tests/exclude-test-scans.test.sql
+echo "== hexagon scorecard views: M1, M2, M3, G on fixtures (MPC-11547)"
+# The MPC-8659 stage re-ran an older counting function but does not touch the scorecard views, which only read tables.
+psql_ "$TEST_URL" -At -f supabase/tests/mpc-11547-scorecard.test.sql
+
+echo "== CK-8503: simultaneous scan requests for one user create exactly one scan (real concurrent sessions)"
+psql_ "$TEST_URL" -c "insert into public.users (id, email) values ('00000000-0000-4000-8000-0000000000c1', 'ck8503-race@example.com')"
+for i in 1 2 3 4 5 6 7 8; do
+  psql_ "$TEST_URL" -At -c "select duplicate from public.mpt_request_scan('00000000-0000-4000-8000-0000000000c1', 'ck8503-race@example.com')" >> "${TMPDIR:-/tmp}/ck8503-race.$$" &
+done
+wait
+created=$(grep -c '^f$' "${TMPDIR:-/tmp}/ck8503-race.$$" || true); dups=$(grep -c '^t$' "${TMPDIR:-/tmp}/ck8503-race.$$" || true); rm -f "${TMPDIR:-/tmp}/ck8503-race.$$"
+total=$(psql_ "$TEST_URL" -At -c "select count(*) from public.scans where user_id = '00000000-0000-4000-8000-0000000000c1'")
+[ "$created" = 1 ] && [ "$dups" = 7 ] && [ "$total" = 1 ] || { echo "::error::concurrent mpt_request_scan: created=$created duplicates=$dups rows=$total (want 1, 7, 1)"; exit 1; }
+echo "   PASS 8 simultaneous requests -> 1 scan created, 7 told duplicate, 1 row"
+psql_ "$TEST_URL" -c "insert into public.users (id, email) values ('00000000-0000-4000-8000-0000000000c2', 'ck8503-race2@example.com')"
+for i in 1 2 3 4 5 6 7 8; do
+  psql_ "$TEST_URL" -At -c "select duplicate from public.mpt_request_scan('00000000-0000-4000-8000-0000000000c2', 'ck8503-race2@example.com', gen_random_uuid())" >> "${TMPDIR:-/tmp}/ck8503-race2.$$" &
+done
+wait
+created=$(grep -c '^f$' "${TMPDIR:-/tmp}/ck8503-race2.$$" || true); rm -f "${TMPDIR:-/tmp}/ck8503-race2.$$"
+total=$(psql_ "$TEST_URL" -At -c "select count(*) from public.scans where user_id = '00000000-0000-4000-8000-0000000000c2'")
+[ "$created" = 1 ] && [ "$total" = 1 ] || { echo "::error::concurrent mpt_request_scan with distinct request ids: created=$created rows=$total (want 1, 1)"; exit 1; }
+echo "   PASS 8 simultaneous requests with 8 DIFFERENT request ids -> still 1 scan"
+
+# MPC-8737: data-point ledger v1. Additive proof, constraint / guard assertions, tested rollback, re-apply.
+echo "== data-point ledger v1 (MPC-8737)"
+LEDGER=supabase/migrations_archive/20261028130000_mpc_8737_data_point_ledger_v1.sql
+fp() { pg_dump -s --no-comments -n public "$TEST_URL" | grep -v -E '^.(un)?restrict '; }
+fp > "${TMPDIR:-/tmp}/ledger-before.sql"
+psql_ "$TEST_URL" -f "$LEDGER"
+fp > "${TMPDIR:-/tmp}/ledger-after.sql"
+removed=$(diff "${TMPDIR:-/tmp}/ledger-before.sql" "${TMPDIR:-/tmp}/ledger-after.sql" | grep -c '^<' || true)
+added_objects=$(diff "${TMPDIR:-/tmp}/ledger-before.sql" "${TMPDIR:-/tmp}/ledger-after.sql" | grep '^>' | grep -c -E 'CREATE (TABLE|VIEW|TRIGGER|INDEX)|ALTER TABLE' || true)
+[ "$removed" -eq 0 ] || { echo "::error::the ledger migration changed or removed $removed existing line(s) in schema public"; exit 1; }
+[ "$added_objects" -eq 0 ] || { echo "::error::the ledger migration added tables / constraints to schema public ($added_objects); it may only add the three mpt_ledger_pop_* functions"; exit 1; }
+echo "   additive: 0 existing public lines changed; public gained only functions"
+psql_ "$TEST_URL" -At -f supabase/tests/mpc-8737-ledger.test.sql
+psql_ "$TEST_URL" -At -f supabase/tests/mpc-8737-golden.test.sql
+echo "   rollback (text taken from the migration header)"
+sed -n '/^-- ROLLBACK/,/^$/p' "$LEDGER" | sed -n 's/^--   //p' > "${TMPDIR:-/tmp}/ledger-rollback.sql"
+test -s "${TMPDIR:-/tmp}/ledger-rollback.sql" || { echo "::error::no rollback text found in $LEDGER"; exit 1; }
+psql_ "$TEST_URL" -f "${TMPDIR:-/tmp}/ledger-rollback.sql"
+[ "$(psql_ "$TEST_URL" -At -c "select count(*) from pg_namespace where nspname = 'ledger'")" = 0 ] || { echo "::error::rollback left the ledger schema behind"; exit 1; }
+[ "$(psql_ "$TEST_URL" -At -c "select count(*) from pg_proc where proname like 'mpt_ledger_pop_%'")" = 0 ] || { echo "::error::rollback left mpt_ledger_pop_* functions behind"; exit 1; }
+fp > "${TMPDIR:-/tmp}/ledger-rolled-back.sql"
+diff -q "${TMPDIR:-/tmp}/ledger-before.sql" "${TMPDIR:-/tmp}/ledger-rolled-back.sql" >/dev/null || { echo "::error::schema public after rollback differs from before the migration"; diff "${TMPDIR:-/tmp}/ledger-before.sql" "${TMPDIR:-/tmp}/ledger-rolled-back.sql" | head -20; exit 1; }
+echo "   rollback restored schema public byte-for-byte (pg_dump -s identical to the pre-migration dump)"
+psql_ "$TEST_URL" -f "$LEDGER"
+psql_ "$TEST_URL" -At -c "select 'ledger re-applied after rollback: ' || count(*) || ' tables' from information_schema.tables where table_schema = 'ledger' and table_type = 'BASE TABLE'"
+echo "   backfill (fresh ledger): dry run, apply, idempotent re-apply, hold release, exact reversal"
+legacy_counts() { psql_ "$TEST_URL" -At -c "select (select count(*) from public.signals) || ',' || (select count(*) from public.web_scans) || ',' || (select count(*) from public.users) || ',' || (select count(*) from public.leads) || ',' || (select count(*) from public.scans) || ',' || (select count(*) from public.mpt_score_baselines) || ',' || (select count(*) from public.conversation_states)"; }
+psql_ "$TEST_URL" -f supabase/tests/mpc-8737-backfill-fixtures.sql
+legacy_before=$(legacy_counts)
+psql_ "$TEST_URL" -At -F '|' -f supabase/backfill/mpc-8737-ledger-backfill-dryrun.sql > "${TMPDIR:-/tmp}/ledger-dry.txt"
+echo "   dry run (fixtures):"; sed 's/^/     /' "${TMPDIR:-/tmp}/ledger-dry.txt" | grep -E 'TOTAL|persons:' || true
+[ "$(psql_ "$TEST_URL" -At -c "select count(*) from ledger.data_point where backfill_batch_id is not null")" = 0 ] || { echo "::error::the dry run wrote data"; exit 1; }
+psql_ "$TEST_URL" -At -f supabase/backfill/mpc-8737-ledger-backfill-apply.sql | tail -1
+DRYFILE="${TMPDIR:-/tmp}/ledger-dry.txt" psql_ "$TEST_URL" -At -f supabase/tests/mpc-8737-backfill.test.sql
+n1=$(psql_ "$TEST_URL" -At -c "select count(*) from ledger.data_point")
+psql_ "$TEST_URL" -At -f supabase/backfill/mpc-8737-ledger-backfill-apply.sql | tail -1
+n2=$(psql_ "$TEST_URL" -At -c "select count(*) from ledger.data_point")
+[ "$n1" = "$n2" ] || { echo "::error::apply is not idempotent ($n1 then $n2 data points)"; exit 1; }
+echo "   idempotent: second apply added nothing ($n1 data points)"
+# approving a registry default releases exactly the held rows, and nothing else
+psql_ "$TEST_URL" -c "update ledger.data_point_type set default_check_confidence = 70 where code like 'signal.%' or code = 'score.baseline.overall'"
+psql_ "$TEST_URL" -At -f supabase/backfill/mpc-8737-ledger-backfill-apply.sql | tail -1
+held_released=$(psql_ "$TEST_URL" -At -c "select count(*) from ledger.data_point where status in ('found','clear') and confidence = 70 and provenance_extra->>'confidence_basis' = 'registry_default' and (legacy_ref like 'signals:87370000-%' or (legacy_ref like 'mpt_score_baselines:%' and value->>'score' = '61'))")
+[ "$held_released" = 3 ] || { echo "::error::releasing a default should add exactly the 2 held signals + 1 baseline, got $held_released"; exit 1; }
+echo "   releasing defaults for signals + baselines added exactly the 3 held rows"
+batches=$(psql_ "$TEST_URL" -At -c "select string_agg(backfill_batch_id::text, ',') from ledger.backfill_batch")
+for b in $(echo "$batches" | tr ',' ' '); do psql_ "$TEST_URL" -At -c "select ledger.rollback_backfill_batch('$b')" >/dev/null; done
+[ "$(psql_ "$TEST_URL" -At -c "select count(*) from ledger.data_point where backfill_batch_id is not null")" = 0 ] || { echo "::error::batch rollback left backfilled data points"; exit 1; }
+echo "   every backfilled data point reversed by batch id; legacy tables untouched"
+# the apply script refuses to run against a database that is not the throwaway one while M3 (erase parity) is missing
+psql_ "$ADMIN_URL" -c "alter database $TEST_DB rename to mpt_gate_check" >/dev/null
+GATE_URL="${base%/*}/mpt_gate_check${query}"
+if out=$(psql_ "$GATE_URL" -At -f supabase/backfill/mpc-8737-ledger-backfill-apply.sql 2>&1); then gate=ran; else gate=refused; fi
+psql_ "$ADMIN_URL" -c "alter database mpt_gate_check rename to $TEST_DB" >/dev/null
+[ "$gate" = refused ] && echo "$out" | grep -q 'M3 (erase parity) is not in place' || { echo "::error::the backfill apply script ran (or failed for another reason) on a database that is not the throwaway one, with M3 missing: $out"; exit 1; }
+[ "$(psql_ "$TEST_URL" -At -c "select count(*) from ledger.backfill_batch where created_at > now() - interval '1 minute'")" = 1 ] || true
+echo "   gate: the apply script refuses any database but the throwaway one while M3 (erase parity) is missing"
+[ "$(legacy_counts)" = "$legacy_before" ] || { echo "::error::the backfill changed a legacy table"; exit 1; }
+echo "   legacy tables unchanged by dry run, apply, re-apply and reversal ($legacy_before)"
+
+# MPC-8753: ledger risk axis + 366 registry (design MPC-7898 A3 + A3.9). Applied on top of ledger v1; additive proof, assertions, tested rollback, re-apply.
+echo "== ledger risk axis, education-before-acceptance, 366 registry (MPC-8753)"
+RISK=supabase/migrations_archive/20261028200000_mpc_8753_ledger_risk_axis.sql
+ledger_fp() { pg_dump -s --no-comments -n ledger "$TEST_URL" | grep -v -E '^.(un)?restrict '; }
+ledger_fp > "${TMPDIR:-/tmp}/risk-before.sql"
+fp > "${TMPDIR:-/tmp}/risk-public-before.sql"
+v1_rows=$(psql_ "$TEST_URL" -At -c "select count(*) from ledger.data_point_type")
+psql_ "$TEST_URL" -f "$RISK"
+fp > "${TMPDIR:-/tmp}/risk-public-after.sql"
+diff -q "${TMPDIR:-/tmp}/risk-public-before.sql" "${TMPDIR:-/tmp}/risk-public-after.sql" >/dev/null || { echo "::error::the risk-axis migration changed schema public"; exit 1; }
+echo "   additive: schema public unchanged; v1 registry had $v1_rows types before, 366 hexagon types are added on top"
+psql_ "$TEST_URL" -At -f supabase/tests/mpc-8753-risk-axis.test.sql
+echo "   rollback (text taken from the migration header)"
+# a consequence render exists by now (the assertions made some); the rollback must remove them to restore the v1 render_log kind CHECK
+sed -n '/^-- ROLLBACK/,/^$/p' "$RISK" | sed -n 's/^--   //p' > "${TMPDIR:-/tmp}/risk-rollback.sql"
+test -s "${TMPDIR:-/tmp}/risk-rollback.sql" || { echo "::error::no rollback text found in $RISK"; exit 1; }
+psql_ "$TEST_URL" -f "${TMPDIR:-/tmp}/risk-rollback.sql"
+ledger_fp > "${TMPDIR:-/tmp}/risk-rolled-back.sql"
+diff -q "${TMPDIR:-/tmp}/risk-before.sql" "${TMPDIR:-/tmp}/risk-rolled-back.sql" >/dev/null || { echo "::error::schema ledger after the risk-axis rollback differs from before it"; diff "${TMPDIR:-/tmp}/risk-before.sql" "${TMPDIR:-/tmp}/risk-rolled-back.sql" | head -40; exit 1; }
+echo "   rollback restored schema ledger byte-for-byte (pg_dump -s identical to the pre-migration dump, incl. erase_person and the render_log CHECK)"
+psql_ "$TEST_URL" -f "$RISK"
+psql_ "$TEST_URL" -At -c "select 'risk axis re-applied after rollback: ' || count(*) || ' hexagon types' from ledger.data_point_type where hexagon_id is not null"
+
+# MPC-8737 M3: erase parity. The live erase functions also erase the ledger record. Tested, then rolled back to the exact pre-M3 functions, then re-applied.
+echo "== erase parity: mpt_dsar_erase / mpt_erase_chat_sender / mpt_erase_social_contact erase the ledger too (MPC-8737 M3)"
+M3=supabase/migrations_archive/20261028210000_mpc_8737_m3_ledger_erase_parity.sql
+fnfp() { psql_ "$TEST_URL" -At -c "select md5(string_agg(pg_get_functiondef(p.oid), '|' order by p.proname)) from pg_proc p where p.pronamespace = 'public'::regnamespace and p.proname in ('mpt_dsar_erase','mpt_erase_chat_sender','mpt_erase_social_contact')"; }
+m3_before=$(fnfp)
+psql_ "$TEST_URL" -f "$M3"
+psql_ "$TEST_URL" -f "$M3"   # idempotent
+psql_ "$TEST_URL" -At -f supabase/tests/mpc-8737-m3-erase.test.sql
+echo "   rollback (text taken from the migration header)"
+sed -n '/^-- ROLLBACK/,/^$/p' "$M3" | sed -n 's/^--   //p' > "${TMPDIR:-/tmp}/m3-rollback.sql"
+test -s "${TMPDIR:-/tmp}/m3-rollback.sql" || { echo "::error::no rollback text found in $M3"; exit 1; }
+psql_ "$TEST_URL" -f "${TMPDIR:-/tmp}/m3-rollback.sql"
+psql_ "$TEST_URL" -At -c "select count(*) from pg_proc where proname = 'mpt_dsar_erase' and pronamespace = 'public'::regnamespace and prosrc ilike '%ledger.erase_person%'" | grep -qx 0 || { echo "::error::M3 rollback left ledger.erase_person in mpt_dsar_erase"; exit 1; }
+echo "   rollback restored the legacy erase functions (no ledger call); re-applying"
+psql_ "$TEST_URL" -f "$M3"
+
+# MPC-8689: the 2 records-about-a-person rows join hexagon_catalogue and the ledger registry (366 -> 368). Applied last, after MPC-8753 (which asserts exactly 366 when it runs); applied twice to prove it is idempotent.
+echo "== records-about-a-person rows: catalogue and ledger registry at 368 (MPC-8689)"
+BROKERS=supabase/migrations_archive/20261029120000_mpc_8689_brokers_rows.sql
+psql_ "$TEST_URL" -f "$BROKERS"
+psql_ "$TEST_URL" -f "$BROKERS"   # idempotent
+psql_ "$TEST_URL" -At -f supabase/tests/mpc-8689-brokers-rows.test.sql
+
+# MPC-11541: hexagon_catalogue is marked DEPRECATED by comment only. Applied by the loop above; applied again here to prove it is idempotent. Row count is the 368 left by MPC-8689.
+echo "== hexagon_catalogue marked deprecated (MPC-11541)"
+psql_ "$TEST_URL" -f supabase/migrations/20261127080000_mpc_11541_hexagon_catalogue_deprecated.sql
+psql_ "$TEST_URL" -At -f supabase/tests/hexagon-catalogue-deprecated.test.sql
+
+# MPC-9817: accounts and sign-in. The migration is applied by the loop above; applied again here to prove it is idempotent, then the assertions (RLS, no IP column, consent carry, link/claim, 7-day exit, can(), real delete).
+echo "== accounts and sign-in (MPC-9817)"
+psql_ "$TEST_URL" -f supabase/migrations_archive/20261108120000_mpc_9817_accounts_and_signin.sql
+psql_ "$TEST_URL" -At -f supabase/tests/mpc-9817-accounts.test.sql
+
+# MPC-9818: entitlements as data (20 rows) and monthly scan allowances. Applied by the loop above; applied again to prove it is idempotent, then the assertions.
+echo "== entitlements and scan allowances (MPC-9818)"
+psql_ "$TEST_URL" -f supabase/migrations_archive/20261108140000_mpc_9818_entitlements_and_scan_allowances.sql
+psql_ "$TEST_URL" -At -f supabase/tests/mpc-9818-entitlements.test.sql
+
+# MPC-9824: business teams. Applied by the loop above; the summary fix is applied again to prove it is idempotent, then the assertions (RLS closed, no IP column,
+# data-only-when-authorised, summary excludes non-authorised, revoke clears results, remove by member_id, delete team).
+echo "== business teams (MPC-9824)"
+psql_ "$TEST_URL" -f supabase/migrations_archive/20261108160000_mpc_9824_business_teams.sql
+psql_ "$TEST_URL" -f supabase/migrations_archive/20261115000000_mpc_9824_summary_member_id.sql
+psql_ "$TEST_URL" -At -f supabase/tests/mpc-9824-business-teams.test.sql
 
 psql_ "$ADMIN_URL" -c "drop database if exists $TEST_DB"
 echo "OK: Supabase integration tests passed ($rows RLS rows + schema assertions)"

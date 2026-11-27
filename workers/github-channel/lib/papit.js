@@ -10,6 +10,10 @@
 
 export const ACTIVITY_WINDOW_DAYS = 90;
 const DAY_MS = 86_400_000;
+/** MPC-10833: a profile is valid for 30 days from generated_at. Declared as privacy_boundaries.data_retention_days and enforced from expires_at. */
+export const PROFILE_VALIDITY_DAYS = 30;
+/** MPC-10833: a stored provider token needs fresh consent (a new OAuth connect) once it is this old. A token refresh does not renew it. */
+export const CONSENT_MAX_DAYS = 90;
 
 // Decision G: fixed keyword rules (no LLM, $0). Order is the tie-breaker.
 const ROLE_RULES = [
@@ -55,6 +59,9 @@ export function activityLevel(eventCount) {
   return eventCount <= 50 ? 'medium' : 'high';
 }
 
+/** ISO timestamp at which a profile generated at `generatedAt` stops being valid. */
+export const profileExpiry = (generatedAt) => new Date(new Date(generatedAt).getTime() + PROFILE_VALIDITY_DAYS * DAY_MS).toISOString();
+
 /** JSON.stringify with object keys sorted alphabetically at every depth (decision H). */
 export function canonicalJson(value) {
   const sort = (v) => {
@@ -74,7 +81,7 @@ export async function sha256Hex(text) {
  * @param {{profile:object, repos:object[], starred:object[], events:{created_at:string}[]}} raw
  * @param {{now?: Date}} opts
  */
-export async function githubToPapit(raw, { now = new Date() } = {}) {
+export async function githubToPapit(raw, { now = new Date(), coverage = null } = {}) {
   const { profile = {}, repos = [], starred = [], events = [] } = raw || {};
   const own = repos.filter((r) => !r.fork && !r.private);
 
@@ -90,6 +97,7 @@ export async function githubToPapit(raw, { now = new Date() } = {}) {
   const payload = {
     version: '1.0',
     generated_at: now.toISOString(),
+    expires_at: profileExpiry(now),
     source_channel: 'github',
     core_identity: {
       career: {
@@ -107,7 +115,14 @@ export async function githubToPapit(raw, { now = new Date() } = {}) {
       interests: topN(starTopics, 15).filter(Boolean),
       activity_level: activityLevel(recent),
     },
-    privacy_boundaries: { data_retention_days: 30, revocable: true },
+    privacy_boundaries: { data_retention_days: PROFILE_VALIDITY_DAYS, revocable: true },
+    // MPC-9795 (DEV-006): how complete the inputs were, so an empty list is never read as "nothing exists". Booleans and a state word only.
+    data_coverage: {
+      repos_sampled: coverage ? coverage.repos_capped === true : null,
+      starred_sampled: coverage ? coverage.starred_capped === true : null,
+      events_capped: coverage ? coverage.events_capped === true : null,
+      interests: starred.length === 0 ? 'no_stars' : (starTopics.size === 0 ? 'stars_without_topics' : 'found'),
+    },
   };
 
   // Receipt = SHA-256 of the canonical (sorted-key) JSON of everything above, i.e. the sanitized payload.
@@ -119,3 +134,35 @@ export async function verifyReceipt(profile) {
   const { cryptographic_receipt: receipt, ...rest } = profile;
   return receipt === (await sha256Hex(canonicalJson(rest)));
 }
+
+/**
+ * MPC-10833: is this profile still valid at `nowMs`? Pure, no network.
+ *  - 'fresh'   expires_at is in the future
+ *  - 'expired' expires_at has passed (or, for a profile issued before expires_at existed, generated_at + 30 days has passed)
+ *  - 'invalid' not an object, no usable generated_at, or expires_at is before generated_at or later than generated_at + 30 days
+ *              (so a copy cannot simply be given a longer life by editing expires_at without also editing generated_at)
+ * The receipt is an unkeyed checksum, so someone who edits both dates and recomputes it is not caught here. Signing is not built.
+ */
+export function profileStatus(profile, nowMs = Date.now()) {
+  if (!profile || typeof profile !== 'object') return { status: 'invalid' };
+  const generated = Date.parse(profile.generated_at);
+  if (!Number.isFinite(generated)) return { status: 'invalid' };
+  const latest = generated + PROFILE_VALIDITY_DAYS * DAY_MS;
+  let expires = latest; // profiles issued before MPC-10833 carry no expires_at
+  if (profile.expires_at !== undefined) {
+    expires = Date.parse(profile.expires_at);
+    if (!Number.isFinite(expires) || expires < generated || expires > latest) return { status: 'invalid' };
+  }
+  return { status: nowMs < expires ? 'fresh' : 'expired', expires_at: new Date(expires).toISOString() };
+}
+
+/** Has the stored consent aged out? A missing or unreadable date counts as aged out (fail closed). */
+export function consentExpired(consentedAt, nowMs = Date.now()) {
+  const t = Date.parse(consentedAt);
+  return !Number.isFinite(t) || nowMs >= t + CONSENT_MAX_DAYS * DAY_MS;
+}
+
+export const consentUntilMs = (consentedAt) => {
+  const t = Date.parse(consentedAt);
+  return Number.isFinite(t) ? t + CONSENT_MAX_DAYS * DAY_MS : 0;
+};

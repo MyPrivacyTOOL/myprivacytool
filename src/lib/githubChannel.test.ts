@@ -1,10 +1,12 @@
 import { describe, it, expect, vi } from "vitest";
 import {
   GITHUB_CHANNEL_URL,
+  GITHUB_REMOVE_URL,
   GITHUB_START_URL,
   disconnectGithub,
   fetchGithubProfile,
   friendlyChannelError,
+  removalNotice,
 } from "./githubChannel";
 
 const res = (status: number, body: unknown = {}) => new Response(JSON.stringify(body), { status });
@@ -12,6 +14,21 @@ const res = (status: number, body: unknown = {}) => new Response(JSON.stringify(
 describe("githubChannel client", () => {
   it("starts login with a plain link to the Worker's /oauth/github/start", () => {
     expect(GITHUB_START_URL).toBe(`${GITHUB_CHANNEL_URL}/oauth/github/start`);
+  });
+
+  // MPC-10825: removing a stored connection without a session is a plain link to the Worker's /oauth/github/remove.
+  it("removes a stored connection through a plain link to the Worker's /oauth/github/remove", () => {
+    expect(GITHUB_REMOVE_URL).toBe(`${GITHUB_CHANNEL_URL}/oauth/github/remove`);
+    expect(GITHUB_REMOVE_URL).not.toBe(GITHUB_START_URL);
+  });
+
+  it("reads the removal redirect: only channel_removed=github counts, and revoked must be exactly 1", () => {
+    expect(removalNotice("github", "1")).toEqual({ revokedAtGithub: true });
+    expect(removalNotice("github", "0")).toEqual({ revokedAtGithub: false });
+    expect(removalNotice("github", null)).toEqual({ revokedAtGithub: false });
+    expect(removalNotice(null, "1")).toBeNull();
+    expect(removalNotice("reddit", "1")).toBeNull();
+    expect(removalNotice("<script>", "1")).toBeNull();
   });
 
   it("returns the profile on 200 and sends the session cookie", async () => {
@@ -22,8 +39,29 @@ describe("githubChannel client", () => {
     expect(fetchFn).toHaveBeenCalledWith(`${GITHUB_CHANNEL_URL}/channels/github/profile`, { credentials: "include" });
   });
 
-  it.each([401, 404])("treats %i (not connected / reauthorize) as disconnected", async (code) => {
-    const fetchFn = vi.fn().mockResolvedValue(res(code, { error: "reauthorize" }));
+  // MPC-9796: each way of "not connected" is its own status.
+  it("401 unauthenticated is a session that ended, not a disconnected account", async () => {
+    const fetchFn = vi.fn().mockResolvedValue(res(401, { error: "unauthenticated" }));
+    expect(await fetchGithubProfile(fetchFn as unknown as typeof fetch)).toEqual({ status: "session_ended" });
+  });
+
+  it("401 reauthorize is a token GitHub no longer accepts", async () => {
+    const fetchFn = vi.fn().mockResolvedValue(res(401, { error: "reauthorize" }));
+    expect(await fetchGithubProfile(fetchFn as unknown as typeof fetch)).toEqual({ status: "reauthorize" });
+  });
+
+  it("401 reconsent_required (MPC-10833) is its own state: connected more than 90 days ago", async () => {
+    const fetchFn = vi.fn().mockResolvedValue(res(401, { error: "reconsent_required" }));
+    expect(await fetchGithubProfile(fetchFn as unknown as typeof fetch)).toEqual({ status: "reconsent" });
+  });
+
+  it("401 with no readable body is treated as a session that ended", async () => {
+    const fetchFn = vi.fn().mockResolvedValue({ ok: false, status: 401, json: async () => { throw new Error("no body"); } });
+    expect(await fetchGithubProfile(fetchFn as unknown as typeof fetch)).toEqual({ status: "session_ended" });
+  });
+
+  it("404 not_connected is disconnected", async () => {
+    const fetchFn = vi.fn().mockResolvedValue(res(404, { error: "not_connected" }));
     expect(await fetchGithubProfile(fetchFn as unknown as typeof fetch)).toEqual({ status: "disconnected" });
   });
 
@@ -44,6 +82,8 @@ describe("githubChannel client", () => {
     expect(friendlyChannelError(null)).toBeNull();
     expect(friendlyChannelError("access_denied")).toMatch(/cancelled/i);
     expect(friendlyChannelError("invalid_state")).toMatch(/expired/i);
+    expect(friendlyChannelError("remove_access_denied")).toMatch(/cancelled.*nothing was removed/i);
+    expect(friendlyChannelError("remove_failed")).toMatch(/couldn't remove the stored connection/i);
     const unknown = friendlyChannelError("<script>alert(1)</script>");
     expect(unknown).toMatch(/couldn't finish/i);
     expect(unknown).not.toContain("script");

@@ -8,6 +8,9 @@
  *   HUBSPOT_API_KEY — private app token from HubSpot
  */
 
+import { callRecipient } from '../../shared/recipients/outbound.ts';
+import { workerRecipientContext } from '../../shared/recipients/worker-ctx.ts';
+
 const HUBSPOT_CONTACTS_URL = 'https://api.hubapi.com/crm/v3/objects/contacts';
 
 /**
@@ -100,14 +103,21 @@ export async function createHubSpotContact(env, {
   properties.message = `First contact via MyPrivacyTOOL ${source} channel. First Hexagon sent.${scanNote}`;
 
   try {
-    const res = await fetch(HUBSPOT_CONTACTS_URL, {
+    // MPC-9885: declare exactly the items this contact carries (the scan numbers are the scan_result).
+    const sent = [];
+    if (name) sent.push('name');
+    if (email) sent.push('email');
+    if (phone) sent.push('phone');
+    if (handle || userId) sent.push('username');
+    if (riskScore !== undefined || confirmedCount !== undefined) sent.push('scan_result');
+    const res = await callRecipient('hubspot', { url: HUBSPOT_CONTACTS_URL, sent, init: {
       method: 'POST',
       headers: {
         'Content-Type':  'application/json',
         'Authorization': `Bearer ${env.HUBSPOT_API_KEY}`,
       },
       body: JSON.stringify({ properties }),
-    });
+    } }, workerRecipientContext(env));
 
     if (!res.ok) {
       const err = await res.text();

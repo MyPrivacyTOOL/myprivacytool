@@ -17,7 +17,7 @@ Price: **$4.99/month or $39.99/year** (yearly saves 33%). Success: app published
 |---|---|---|---|
 | "I registered" taps (`hk_spam_registrations`) | 500 or more | 200 to 499 | under 200 |
 | Email opt-ins (`reminder_consent`) | 100 or more | 40 to 99 | under 40 |
-| Paid-intent signal (Spam Shield waitlist signups, see MPC-7626 pricing waitlist pattern) | 50 or more | 20 to 49 | under 20 |
+| Paid-intent signal (Spam Shield waitlist signups: `select count(*) from public.hk_shield_waitlist`, form on /HongKongSpam, CK-11387; the /pricing waitlist of MPC-7626 is a different list) | 50 or more | 20 to 49 | under 20 |
 
 Go needs the first two signals at "Go". Paid intent below "Go" means rework pricing or positioning before building.
 
@@ -41,7 +41,7 @@ No phone numbers, call logs or SMS content are uploaded. Server stores only the 
 
 ## Implemented in this change
 - `src/config/hkShield.ts`: prices, plan ids, targets, `HK_SHIELD_ENABLED = false` launch switch (+ tests).
-- `supabase/migrations/20261013100000_mpc_7647_hk_shield_entitlements.sql`: service_role-only entitlements table.
+- `supabase/migrations/20261013100002_mpc_7647_hk_shield_entitlements.sql`: service_role-only entitlements table.
 
 ## Not done (needs owners)
 Android app, iOS app, store listings, accounts, billing webhook and entitlement API, pricing page copy, paid-conversion analytics events, churn dashboard.

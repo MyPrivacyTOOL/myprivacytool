@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { getPersonKey, learningEventsEnabled, recordAnswer, recordShown, resetShownForTests, PERSON_KEY_STORAGE } from './events';
+import { learningEventsEnabled, recordAnswer, recordShown, resetShownForTests } from './events';
 
 const tile = { hexagonId: 'location', tileKind: 'our_guess', confidence: 0.95 };
-const on = { enabled: true, consent: true, base: 'https://api.example', personKey: 'abcdefghijklmnop' };
+const on = { enabled: true, consent: true, base: 'https://myprivacytool-webhook-receiver.myprivacytool.workers.dev' };
 const ok = () => vi.fn(async () => new Response('{}', { status: 202 }));
 
 beforeEach(() => resetShownForTests());
@@ -19,7 +19,7 @@ describe('learningEventsEnabled', () => {
 
 describe('sending', () => {
   it('sends nothing when the switch is off, there is no API address, or the visitor has not consented', async () => {
-    for (const d of [{ ...on, enabled: false }, { ...on, base: '' }, { ...on, consent: false }, { ...on, personKey: null }]) {
+    for (const d of [{ ...on, enabled: false }, { ...on, base: '' }, { ...on, consent: false }]) {
       const f = ok();
       expect(await recordAnswer(tile, 'not_me', { ...d, fetchImpl: f })).toBe(false);
       expect(f).not.toHaveBeenCalled();
@@ -29,10 +29,11 @@ describe('sending', () => {
     const f = ok();
     expect(await recordAnswer({ ...tile, source: 'web-scan' }, 'not_me', { ...on, fetchImpl: f })).toBe(true);
     const [url, init] = f.mock.calls[0] as unknown as [string, RequestInit];
-    expect(url).toBe('https://api.example/api/learning/event');
+    expect(url).toBe('https://myprivacytool-webhook-receiver.myprivacytool.workers.dev/api/learning/event');
     const body = JSON.parse(String(init.body));
-    expect(Object.keys(body).sort()).toEqual(['answer', 'confidence_at_display', 'config_version', 'event_type', 'hexagon_id', 'person_key', 'scan_window', 'source', 'tile_kind']);
-    expect(body).toMatchObject({ event_type: 'answer', answer: 'not_me', hexagon_id: 'location', person_key: 'abcdefghijklmnop', config_version: 0, confidence_at_display: 0.95 });
+    // MPC-9892: exactly these three fields. No person key, scan window, tile look or confidence leaves the browser.
+    expect(Object.keys(body).sort()).toEqual(['answer', 'event_type', 'hexagon_id']);
+    expect(body).toEqual({ event_type: 'answer', answer: 'not_me', hexagon_id: 'location' });
   });
   it('reports a tile as shown only once per page load', async () => {
     const f = ok();
@@ -45,33 +46,18 @@ describe('sending', () => {
     expect(await recordAnswer(tile, 'yes_me', { ...on, fetchImpl: vi.fn(async () => { throw new Error('offline'); }) })).toBe(false);
     expect(await recordAnswer(tile, 'yes_me', { ...on, fetchImpl: vi.fn(async () => new Response('', { status: 400 })) })).toBe(false);
   });
-  it('clamps a confidence outside 0..1', async () => {
-    const f = ok();
-    await recordAnswer({ ...tile, confidence: 4 }, 'kept', { ...on, fetchImpl: f });
-    expect(JSON.parse(String((f.mock.calls[0] as unknown as [string, RequestInit])[1].body)).confidence_at_display).toBe(1);
-  });
-});
-
-describe('getPersonKey', () => {
-  const store = () => { const m = new Map<string, string>(); return { getItem: (k: string) => m.get(k) ?? null, setItem: (k: string, v: string) => void m.set(k, v), m }; };
-  it('makes a random id once, keeps it, and it matches what the server accepts', () => {
-    const s = store();
-    const a = getPersonKey(s);
-    expect(a).toMatch(/^[A-Za-z0-9_-]{16,64}$/);
-    expect(getPersonKey(s)).toBe(a);
-    expect(s.m.get(PERSON_KEY_STORAGE)).toBe(a);
-  });
-  it('replaces a stored value that is not a valid id, and returns null when storage is blocked', () => {
-    const s = store(); s.m.set(PERSON_KEY_STORAGE, 'bad value!');
-    expect(getPersonKey(s)).toMatch(/^[A-Za-z0-9_-]{16,64}$/);
-    expect(getPersonKey({ getItem: () => { throw new Error('blocked'); }, setItem: () => {} })).toBeNull();
-    expect(getPersonKey(null)).toBeNull();
+  it('keeps nothing identifying in this browser', async () => {
+    window.localStorage.clear();
+    await recordShown(tile, { ...on, fetchImpl: ok() });
+    await recordAnswer(tile, 'kept', { ...on, fetchImpl: ok() });
+    expect(window.localStorage.length).toBe(0);
+    expect(JSON.stringify(Object.keys(window.localStorage))).not.toMatch(/person|learning/i);
   });
 });
 
 // The real consent gate (not an injected flag): only "Accept analytics" in the cookie banner lets an event out.
 describe('consent gate wiring', () => {
-  const base = { enabled: true, base: 'https://api.example', personKey: 'abcdefghijklmnop' };
+  const base = { enabled: true, base: 'https://myprivacytool-webhook-receiver.myprivacytool.workers.dev' };
   afterEach(() => window.localStorage.clear());
   const choose = (analytics: boolean) => window.localStorage.setItem('mpt_cookie_consent', JSON.stringify({ v: 1, analytics, at: new Date().toISOString() }));
 

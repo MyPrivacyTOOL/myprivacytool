@@ -57,14 +57,14 @@ grant select on public.mpt_cloudflare_day to service_role;
 create or replace view public.mpt_daily_metrics with (security_invoker = true) as
 with bounds as (
   select least(
-           coalesce((select public.mpt_hk_date(min(created_at)) from public.scans), public.mpt_hk_date(now())),
+           coalesce((select public.mpt_hk_date(min(hour)) from public.scan_hourly_counts), public.mpt_hk_date(now())),
            coalesce((select public.mpt_hk_date(min(period_start)) from public.mpt_raw_metrics), public.mpt_hk_date(now()))
          ) as first_day
 ),
 days as (
   select d::date as day from bounds, generate_series(bounds.first_day::timestamp, public.mpt_hk_date(now())::timestamp, interval '1 day') d
 ),
-scan_n as (select public.mpt_hk_date(created_at) as day, count(*) n from public.scans group by 1),
+scan_n as (select public.mpt_hk_date(hour) as day, sum(scans_created) n from public.scan_hourly_counts group by 1),
 eng_n as (
   select public.mpt_hk_date(created_at) as day, count(*) sessions, count(*) filter (where full_scan_completed) full_scans
   from public.mpt_user_engagement group by 1
@@ -93,7 +93,7 @@ ga_events as (
 )
 select
   days.day,
-  (select count(*) from public.scans s where s.created_at < public.mpt_hk_ts(days.day + 1))::bigint as cumulative_scans,
+  (select coalesce(sum(h.scans_created), 0) from public.scan_hourly_counts h where h.hour < public.mpt_hk_ts(days.day + 1))::bigint as cumulative_scans,
   coalesce(scan_n.n, 0)::bigint as new_scans,
   coalesce(eng_n.sessions, 0)::bigint as engagement_sessions,
   coalesce(eng_n.full_scans, 0)::bigint as engagement_full_scans,

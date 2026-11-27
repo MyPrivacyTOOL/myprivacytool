@@ -55,13 +55,29 @@
     "title": "Cookie Policy | MyPrivacyTOOL",
     "description": "Learn about the cookies and tracking technologies MyPrivacyTOOL uses and how to manage your preferences."
   },
+  "/accessibility": {
+    "title": "Accessibility Statement | MyPrivacyTOOL",
+    "description": "MyPrivacyTOOL accessibility statement. Learn about our commitment to digital accessibility and WCAG 2.1 compliance."
+  },
+  "/gdpr-rights": {
+    "title": "GDPR Rights Request | MyPrivacyTOOL",
+    "description": "Exercise your GDPR rights with MyPrivacyTOOL. Access, correct, delete, or export your personal data."
+  },
   "/acceptable-use": {
     "title": "Acceptable Use Policy | MyPrivacyTOOL",
-    "description": "Rules for using MyPrivacyTOOL: what you may and may not do when scanning for data breach and dark web exposure."
+    "description": "Rules for using MyPrivacyTOOL: what you may and may not do when scanning for data breach exposure."
   },
   "/dpa": {
     "title": "Data Processing Agreement Summary | MyPrivacyTOOL",
     "description": "Plain-language summary of how MyPrivacyTOOL processes personal data on behalf of business customers: roles, sub-processors, security, transfers and deletion."
+  },
+  "/data-deletion": {
+    "title": "How to delete your data | MyPrivacyTOOL",
+    "description": "How to ask MyPrivacyTOOL to delete the personal data we hold about you: by email, in Telegram, or for a website scan. Free, any time."
+  },
+  "/what-we-see": {
+    "title": "What We See, and Who Else Does | MyPrivacyTOOL",
+    "description": "Every outside party that can receive data from MyPrivacyTOOL: what each one sees, why, for how long, on what basis, and whether it runs on page load or only after you press Scan me."
   },
   "/trust": {
     "title": "Trust & Legal | MyPrivacyTOOL",
@@ -69,7 +85,7 @@
   },
   "/pricing": {
     "title": "Pricing | MyPrivacyTOOL",
-    "description": "Free exposure scan. Planned paid plans, not open yet: Basic at $7.99/month, Pro at $14.99/month and Executive at $49.99/month, planned to remove your data from brokers. Add family members for $5/month each."
+    "description": "Free exposure scan. Paid plans to remove your data from brokers: Basic at $7.99/month, Pro at $14.99/month and Executive at $49.99/month. Add family members for $5/month each."
   },
   "/about": {
     "title": "About | MyPrivacyTOOL",
@@ -109,6 +125,16 @@
   "/scan/deep-dive": {
     "title": "Your Deep Dive",
     "description": "Confirm or dispute what we found for your number. Private link, expires after 24 hours.",
+    "noindex": true
+  },
+  "/monitoring": {
+    "title": "Monitoring",
+    "description": "Continuous monitoring for Pro plans.",
+    "noindex": true
+  },
+  "/deep-research": {
+    "title": "Deep Research",
+    "description": "Deeper checks on how exposed your identity is. Some run now, the rest are coming soon.",
     "noindex": true
   }
 }

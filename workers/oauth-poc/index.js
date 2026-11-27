@@ -29,6 +29,8 @@ import {
 } from './session.js';
 import { permissionsView, PROVIDERS } from './permissions.js';
 import { linkAuthUser } from './supabase.js';
+// MPC-9885: one recipient context per callback; every call to Google and Supabase goes through the wrapper.
+import { workerRecipientContext } from '../../shared/recipients/worker-ctx.ts';
 
 const COOKIE = 'mpt_oauth';
 const TTL_MS = 10 * 60 * 1000;
@@ -56,7 +58,7 @@ function corsHeaders(request, env) {
 }
 
 export async function handle(request, env, deps = {}) {
-  const { fetchFn = fetch, now = () => Date.now() } = deps;
+  const { fetchFn = undefined, now = () => Date.now() } = deps;
   const url = new URL(request.url);
   const cors = corsHeaders(request, env);
   const { pathname } = url;
@@ -93,7 +95,8 @@ async function start(env, url, now) {
   });
 }
 
-export async function callback(request, url, env, fetchFn = fetch, now = () => Date.now()) {
+export async function callback(request, url, env, fetchFn = undefined, now = () => Date.now()) {
+  const rctx = workerRecipientContext(env, { fetchImpl: fetchFn });   // MPC-9885: one context per callback
   const clear = `${COOKIE}=; Max-Age=0; Path=/oauth/google; HttpOnly; Secure; SameSite=Lax`;
   // Verify the state cookie first: it is the only thing that tells us whether this was a session-mode sign-in
   // (failures then go back to the site as ?oauth_error=) or the original probe (failures stay JSON, as verified live).
@@ -121,10 +124,10 @@ export async function callback(request, url, env, fetchFn = fetch, now = () => D
     const tokens = await exchangeCode({
       code, verifier: saved.verifier, clientId: env.GOOGLE_CLIENT_ID,
       clientSecret: env.GOOGLE_CLIENT_SECRET, redirectUri: env.REDIRECT_URI,
-    }, fetchFn);
+    }, fetchFn, rctx);
     accessToken = tokens.access_token;
 
-    const [info, profile] = await Promise.all([tokenInfo(accessToken, fetchFn), userInfo(accessToken, fetchFn)]);
+    const [info, profile] = await Promise.all([tokenInfo(accessToken, fetchFn, rctx), userInfo(accessToken, fetchFn, rctx)]);
     const audMatches = info.aud === env.GOOGLE_CLIENT_ID;
 
     if (!sessionMode) {
@@ -145,7 +148,7 @@ export async function callback(request, url, env, fetchFn = fetch, now = () => D
     const scopes = mptScopesFor(info.scope);
     if (!scopes.length) return sessionFailure(env, 'insufficient_provider_scope', 403, clear);
 
-    const link = await linkAuthUser(env, profile.email, fetchFn);
+    const link = await linkAuthUser(env, profile.email, fetchFn, rctx);
     const value = await issueSession({
       sub: String(profile.sub), email: profile.email, scopes, uid: link.uid, link: link.state,
     }, env.STATE_SIGNING_KEY, now());
@@ -166,7 +169,7 @@ export async function callback(request, url, env, fetchFn = fetch, now = () => D
     if (sessionMode) return sessionFailure(env, 'connect_failed', 502, clear);
     return json({ ok: false, error: e.message }, 502, { 'Set-Cookie': clear });
   } finally {
-    if (accessToken) await revoke(accessToken, fetchFn).catch(() => {});
+    if (accessToken) await revoke(accessToken, fetchFn, rctx).catch(() => {});
   }
 }
 

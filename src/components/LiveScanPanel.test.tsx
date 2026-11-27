@@ -28,7 +28,7 @@ describe("LiveScanPanel", () => {
     expect(screen.queryByText("Name in your address")).toBeNull();
     await advance(3000);
     expect(screen.getByText("Name in your address")).toBeTruthy();
-    expect(screen.getByText("Found something")).toBeTruthy();
+    expect(screen.getByText("Looks like it contains a name")).toBeTruthy();   // MPC-9835: per-row wording
     expect(screen.getByRole("status").textContent).toMatch(/found something/i);
     await advance(3000);
     expect(screen.getByText("Nothing seen in the places we looked")).toBeTruthy();
@@ -38,6 +38,56 @@ describe("LiveScanPanel", () => {
     await advance(30000);
     expect(calls.length).toBe(n);
     expect(calls[0]).toContain("/api/scan/live?t=tok.1.sig");
+  });
+
+  // MPC-9835: wording approved by Chris 2026-11-07. Exact strings, per row, for found and clear.
+  it.each([
+    ["email-name", "Looks like it contains a name", "No name spotted"],
+    ["email-profile", "A public picture exists for this address", "No public picture found"],
+    ["email-libravatar", "A public picture exists here too", "No public picture found"],
+    ["email-domain-record", "Owner details are visible in the public record", "Owner details hidden, or a shared mail domain"],
+    ["email-github-commits", "This address appears in public code changes on GitHub", "Not seen (GitHub only indexes some changes)"],
+  ])("%s shows its approved text for found and for clear", async (id, foundText, clearText) => {
+    stubFetch(snap([{ id, label: "Row", status: "found" }], true));
+    const a = render(<LiveScanPanel token="t" />);
+    await advance(1100);
+    expect(screen.getByText(foundText)).toBeTruthy();
+    expect(screen.queryByText("Found something")).toBeNull();
+    a.unmount();
+    stubFetch(snap([{ id, label: "Row", status: "clear" }], true));
+    render(<LiveScanPanel token="t" />);
+    await advance(1100);
+    expect(screen.getByText(clearText)).toBeTruthy();
+    expect(screen.queryByText("Nothing seen in the places we looked")).toBeNull();
+  });
+
+  it("the mail-provider row reads 'Provider identified', is quiet, and never counts as a finding", async () => {
+    stubFetch(snap([{ id: "email-provider", label: "Mail provider and domain", status: "found" }]), snap([{ id: "email-provider", label: "Mail provider and domain", status: "found" }], true));
+    render(<LiveScanPanel token="t" />);
+    await advance(1100);
+    const text = screen.getByText("Provider identified");
+    expect(text.className).toContain("text-muted-foreground");
+    expect(text.className).not.toContain("font-semibold");
+    expect(screen.queryByText("Found something")).toBeNull();
+    expect(screen.getByRole("status").textContent).toMatch(/having a look/);   // not "I have found something"
+    expect(screen.getByRole("status").textContent).not.toMatch(/found something/i);
+    await advance(3100);
+    expect(screen.getByRole("status").textContent).toMatch(/fuller report is on its way/);
+  });
+
+  it("a real finding next to the provider row still raises 'I have found something'", async () => {
+    stubFetch(snap([{ id: "email-provider", label: "Mail provider and domain", status: "found" }, NAME]));
+    render(<LiveScanPanel token="t" />);
+    await advance(1100);
+    expect(screen.getByRole("status").textContent).toMatch(/I have found something/);
+  });
+
+  it("unknown ids and 'not checked' keep the generic text", async () => {
+    stubFetch(snap([{ id: "email-something-new", label: "A new row", status: "found" }, { id: "email-name", label: "Name in your address", status: "not_checked" }], true));
+    render(<LiveScanPanel token="t" />);
+    await advance(1100);
+    expect(screen.getByText("Found something")).toBeTruthy();
+    expect(screen.getByText("Could not check this one")).toBeTruthy();
   });
 
   it("never takes a result away if a later read comes back shorter", async () => {

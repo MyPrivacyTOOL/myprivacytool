@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import FeatureStatus from "@/components/FeatureStatus";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,6 +8,7 @@ import EnterpriseIncludes from "@/components/EnterpriseIncludes";
 import pageMeta from "@/data/pageMeta.json";
 import { submitHubSpotForm, consentFields } from "@/lib/hubspot";
 import ConsentCheckbox from "@/components/ConsentCheckbox";
+import { ENTERPRISE_CONSENT_LABEL } from "@/lib/consentWording";
 import { trackEnterpriseLead } from "@/lib/analytics";
 
 // MPC-102: enterprise demo request. Reuses the "Business Inquiry" HubSpot form (portal 246502821);
@@ -67,7 +69,7 @@ const Enterprise = () => {
             <p className="text-muted-foreground text-lg mb-4 leading-relaxed">
               Home addresses, personal numbers and family details listed by data brokers give attackers
               material for targeted phishing and impersonation. We find that exposure across your organisation
-              and remove it.
+              and remove it.<FeatureStatus feature="F6" state="in_build" />
             </p>
             <p className="text-muted-foreground text-base mb-8">
               Built for security and risk teams who need coverage, reporting and a named contact, not a
@@ -120,7 +122,7 @@ const Enterprise = () => {
                   <option value="500-2000">500–2,000 employees</option>
                   <option value="2000+">2,000+ employees</option>
                 </select>
-                <ConsentCheckbox id="enterprise-consent" checked={consent} onChange={setConsent} disabled={status === "loading"} labelClassName="text-muted-foreground" />
+                <ConsentCheckbox id="enterprise-consent" label={ENTERPRISE_CONSENT_LABEL} checked={consent} onChange={setConsent} disabled={status === "loading"} labelClassName="text-muted-foreground" />
                 {status === "error" && (
                   <p role="alert" className="text-destructive text-xs">{errorMsg}</p>
                 )}

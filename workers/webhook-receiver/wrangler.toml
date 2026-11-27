@@ -28,6 +28,19 @@ type = "ratelimit"
 namespace_id = "7915"
 simple = { limit = 30, period = 60 }
 
+# ─── LEARNING LOOP SWITCH ────────────────────────────────────────────────────
+# MPC-7915: ON. Top level on purpose (the deploy runs `wrangler deploy` with no --env, so [env.*] vars would not apply).
+# To switch off: set to "false" (or remove) and merge; the route then answers 404 again.
+[vars]
+LEARNING_EVENTS_ENABLED = "true"
+
+# ─── MESSENGER / WHATSAPP REPLIES SWITCH ─────────────────────────────────────
+# CK-9971: ON for the ADMIN TEST ONLY (2026-11-15, Chris). While it is not exactly "true" the Worker still authenticates Meta webhooks but sends and stores nothing for Messenger and
+# WhatsApp first-contact messages (the deep-dive code paths are unaffected). The Meta app has Standard Access only, so only people with a role on the app (Chris and claude-MPTads) can reach it. To switch off: set to "false" and merge.
+# Public use also needs Meta Business verification, App Review and a Privacy Policy that covers these channels. Top level on purpose, like the
+# switch above: a value set in the dashboard would be replaced by the next `wrangler deploy`.
+MESSAGING_ENABLED = "true"
+
 # ─── OBSERVABILITY ───────────────────────────────────────────────────────────
 [observability]
 enabled = true

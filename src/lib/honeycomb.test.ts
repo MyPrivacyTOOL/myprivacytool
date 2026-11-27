@@ -33,4 +33,17 @@ describe('hiveLayout', () => {
     expect(hiveLayout(9, 0).cols).toBe(4);
     expect(hiveLayout(0, 600)).toMatchObject({ height: 0, positions: [] });
   });
+  it('readable phone layout: two bigger tiles per row, values shown, still inside the container', () => {
+    for (const w of [320, 360, 390, 400, 419]) {
+      const l = hiveLayout(9, w, { readable: true });
+      expect(l.cols).toBe(2);
+      expect(l.compact).toBe(false);
+      expect(l.hw).toBeGreaterThanOrEqual(100);
+      expect(l.width).toBeLessThanOrEqual(w);
+    }
+  });
+  it('readable changes nothing on wide containers or when left off', () => {
+    expect(hiveLayout(9, 600, { readable: true })).toEqual(hiveLayout(9, 600));
+    expect(hiveLayout(9, 390, {})).toEqual(hiveLayout(9, 390));
+  });
 });

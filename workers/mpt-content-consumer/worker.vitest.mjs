@@ -1,7 +1,8 @@
 // @vitest-environment node
 // MPC-8370: unit + integration tests for mpt-content-consumer. Anthropic, Slack, KV and D1 are all mocked; no network, no secrets.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import consumer, { PLATFORMS, taskIdFor, guardrails, topicFor, resolveTopic, buildPrompt, parseDraft, slackBlocks, generateDailyPosts } from './worker.js';
+import { createFetchSpy } from '../../shared/recipients/fetch-spy';
+import consumer, { PLATFORMS, taskIdFor, guardrails, topicFor, resolveTopic, buildPrompt, parseDraft, slackBlocks, generateDailyPosts, warnOverdueReceipts } from './worker.js';
 
 const DATE = '2026-10-20';
 const TASK = taskIdFor(DATE);
@@ -9,12 +10,12 @@ const schedule = { date: DATE, items: { x: [{ text: 'Thread: exposure', qualifie
 const brand = { sections: [{ heading: 'Voice & tone', text: 'Empowering Detective' }, { heading: 'Logo', text: 'big' }] };
 
 const goodFor = (platform) => ({
-  x: { copy: 'one\n---\ntwo' },
-  linkedin: { copy: 'pro post' },
-  instagram: { copy: 'cap', slides: ['s1', 's2'] },
-  facebook: { copy: 'fb post' },
-  pinterest: { title: 'Pin title', copy: 'pin desc' },
-  youtube: { title: 'Video title', copy: 'video desc', script: 'spoken script' },
+  x: { copy: 'one\n---\ntwo myprivacytool.io/scan' },
+  linkedin: { copy: 'pro post myprivacytool.io/scan' },
+  instagram: { copy: 'cap myprivacytool.io/scan', slides: ['s1', 's2'] },
+  facebook: { copy: 'fb post myprivacytool.io/scan' },
+  pinterest: { title: 'Pin title', copy: 'pin desc myprivacytool.io/scan' },
+  youtube: { title: 'Video title', copy: 'video desc myprivacytool.io/scan', script: 'spoken script' },
 })[platform];
 
 /** Stateful D1 stub: INSERT into agent_execution_logs, SELECT by (task_id, status). */
@@ -334,4 +335,65 @@ describe('default export: queue()', () => {
 
 describe('default export: fetch()', () => {
   it('is health-only', async () => expect(await (await consumer.fetch()).json()).toEqual({ ok: true, worker: 'mpt-content-consumer' }));
+});
+
+describe('warnOverdueReceipts', () => {
+  /** makeDb plus a publication_receipts SELECT that returns the given rows and records its bound arguments. */
+  const withReceipts = (rows, { fail = false } = {}) => {
+    const base = makeDb(); const queries = [];
+    return {
+      ...base,
+      queries,
+      prepare(sql) {
+        if (!sql.includes('publication_receipts')) return base.prepare(sql);
+        return { bind: (...a) => ({ all: async () => { queries.push({ sql, a }); if (fail) throw new Error('d1 read failed'); return { results: rows }; } }) };
+      },
+    };
+  };
+  const NOW = Date.parse('2026-11-02T22:00:00Z');
+
+  it('stays silent when nothing is overdue', async () => {
+    const db = withReceipts([]);
+    expect(await warnOverdueReceipts(makeEnv({ AGENT_LOGS: db }), '2026-11-03', NOW)).toBe(0);
+    expect(slackPosts).toHaveLength(0);
+  });
+
+  it('asks for handed_off rows 6 to 48 hours old up to the cycle date and tells the channel which platforms', async () => {
+    const db = withReceipts([{ content_id: 'daily-posts-2026-11-01', platform: 'linkedin' }, { content_id: 'daily-posts-2026-11-01', platform: 'tiktok' }]);
+    expect(await warnOverdueReceipts(makeEnv({ AGENT_LOGS: db }), '2026-11-03', NOW)).toBe(2);
+    expect(db.queries[0].a).toEqual(['2026-11-02T16:00:00.000Z', '2026-10-31T22:00:00.000Z', 'daily-posts-2026-11-03']);
+    expect(slackPosts).toHaveLength(1);
+    expect(slackPosts[0].body.channel).toBe('#mpt-content-approval');
+    expect(slackPosts[0].body.text).toContain('2026-11-01: LinkedIn, 2026-11-01: tiktok');
+    expect(slackPosts[0].body.text).toContain('do not replay');
+  });
+
+  it('throws when Slack refuses the alert', async () => {
+    slack = () => Response.json({ ok: false, error: 'channel_not_found' });
+    await expect(warnOverdueReceipts(makeEnv({ AGENT_LOGS: withReceipts([{ content_id: 'daily-posts-2026-11-01', platform: 'x' }]) }), '2026-11-03', NOW)).rejects.toThrow('channel_not_found');
+  });
+
+  it('is sent after the drafts and never blocks them: a failed read or a refused alert still ends notified', async () => {
+    const okEnv = makeEnv({ AGENT_LOGS: withReceipts([{ content_id: 'daily-posts-2026-10-19', platform: 'facebook' }]) });
+    expect(await generateDailyPosts(okEnv, DATE)).toBe('notified');
+    expect(slackPosts).toHaveLength(2);
+    expect(slackPosts[1].body.text).toContain('Receipts overdue: 2026-10-19: Facebook');
+
+    slackPosts.length = 0;
+    const failEnv = makeEnv({ AGENT_LOGS: withReceipts([], { fail: true }) });
+    expect(await generateDailyPosts(failEnv, '2026-10-21', { topic: 'T' })).toBe('notified');
+    expect(console.error).toHaveBeenCalledWith('receipt alert failed', 'Error: d1 read failed');
+    expect(statuses(failEnv, 'notified')).toHaveLength(1);
+  });
+});
+
+describe('recipient registry (MPC-9885)', () => {
+  it('a draft cycle reaches only Anthropic and Slack, both registered', async () => {
+    const inner = globalThis.fetch;
+    const spy = createFetchSpy({ respond: (u, i) => inner(u, i) });
+    vi.stubGlobal('fetch', spy.fetch);
+    await generateDailyPosts(makeEnv(), DATE);
+    spy.assertAllRegistered();
+    expect(new Set(spy.calls.map((c) => c.host))).toEqual(new Set(['api.anthropic.com', 'slack.com']));
+  });
 });

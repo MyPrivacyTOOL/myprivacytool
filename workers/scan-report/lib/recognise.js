@@ -1,6 +1,6 @@
 // MPC-7494 (inbound funnels F5): the open mirror. "Welcome back, we recognised your device without a cookie."
 //
-// MyPrivacyTOOL is a mirror, not a tracker. This module recognises a returning device in the open: the answer goes to the visitor
+// MyPrivacyTOOL is an Open Tracker: it does what trackers do, with your permission, in the open. This module recognises a returning device in the open: the answer goes to the visitor
 // who is looking at the screen, with the signals that matched, and nothing about a match is stored or used anywhere else.
 //   - It never writes: no insert, patch or delete anywhere in the recognise path (the test checks the stubbed database saw only reads).
 //   - It runs only for a browser that holds the scan number of a scan the visitor SAVED WITH THE SPECIFIC CONSENT (the "save my scan

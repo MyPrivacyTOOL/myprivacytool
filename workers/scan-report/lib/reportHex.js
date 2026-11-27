@@ -4,6 +4,8 @@
 import HEX, { EMAIL } from './hexagons.generated.js';
 // MPC-7471-F4: the one exposure score. Imported from the shared registry module, never re-implemented here.
 import { computeExposure } from '../../../shared/hexagon-registry/score.js';
+// MPC-7561: each approved hexagon has its own guide page; the rest fall back to the generic guide below.
+import { hasGuide, guidePath } from '../../../shared/hexagon-registry/guides.js';
 
 const SITE = 'https://myprivacytool.io';
 const BRAND = '#15803d';
@@ -40,7 +42,7 @@ const CHANGE = {
   behavior: 'Behaviour tracking is hard to avoid; block trackers and scripts.', email: 'Use a separate email alias for sign-ups.',
 };
 const CHANGE_BY_ID = { 'email-breaches': 'Change the password on each breached service and anywhere you reused it; turn on two-factor sign-in.' };
-const changeFor = (h) => CHANGE_BY_ID[h.id] || CHANGE[h.category] || CHANGE.device;
+export const changeFor = (h) => CHANGE_BY_ID[h.id] || CHANGE[h.category] || CHANGE.device;
 const GUIDES = { email: '/blog/remove-personal-information-from-internet' };
 
 // ---- adapter: saved scan / email checks + definitions -> uniform hexagon objects -----------------------------------------------------
@@ -93,9 +95,10 @@ export const tally = (hexes) => ({ found: hexes.filter((h) => h.status === STATU
 const PILL = {
   found: ['FOUND', '#92400e', '#fef3c7'], clear: ['CHECKED AND CLEAR', '#14532d', '#dcfce7'], not_checked: ['NOT CHECKED', '#4b5563', '#f3f4f6'],
 };
-export const guideUrl = (h, { html = false } = {}) => {
+export const guideUrl = (h, { html = false, campaign = 'scan-report' } = {}) => {
   const amp = html ? '&amp;' : '&';
-  return `${SITE}${GUIDES[h.category] || GUIDE}?utm_source=email${amp}utm_medium=email${amp}utm_campaign=scan-report${amp}utm_content=${encodeURIComponent(h.id)}`;
+  const path = hasGuide(h.id) ? guidePath(h.id) : (GUIDES[h.category] || GUIDE);
+  return `${SITE}${path}?utm_source=email${amp}utm_medium=email${amp}utm_campaign=${campaign}${amp}utm_content=${encodeURIComponent(h.id)}`;
 };
 // An IP address is the most identifying value in a scan and an email can be forwarded or screenshotted, so it never appears in the body:
 // it stays in the attached JSON (the user's own file). Matches IPv4 and IPv6 (including ::1 and IPv4-mapped forms).
@@ -115,7 +118,7 @@ export function hexRow(h) {
   const art = h.art ? `<img src="${SITE}/email/hex/${esc(h.art)}" width="32" height="32" alt="" style="display:block;border:0">` : `<span style="font-size:30px;line-height:30px;color:${on ? BRAND : '#9ca3af'}">${on ? '⬢' : '⬡'}</span>`;
   const note = h.status === 'found'
     ? `<div style="margin-top:3px;font-size:13px;line-height:19px;color:#111827">${esc(shown(h))}${h.estimate ? ' <i style="color:#6b7280">(our estimate, not measured)</i>' : ''}</div><div style="margin-top:3px;font-size:12px;line-height:18px;color:#374151"><b>Change:</b> ${esc(changeFor(h))} <a href="${guideUrl(h, { html: true })}" style="color:${BRAND}">Guide</a></div>`
-    : h.id === 'email-breaches' && h.status === 'not_checked' ? `<div style="margin-top:3px;font-size:12px;line-height:18px;color:#6b7280">We have not checked your email against known data breaches. <a href="https://haveibeenpwned.com" style="color:${BRAND}">Check it yourself, free</a>.</div>` : '';
+    : h.id === 'email-breaches' && h.status === 'not_checked' ? `<div style="margin-top:3px;font-size:12px;line-height:18px;color:#6b7280">We have not checked your email against known data breaches. Breach lookups are not available today; we plan to include them when paid plans open. <a href="https://haveibeenpwned.com" style="color:${BRAND}">Check it yourself, free here</a>.</div>` : '';
   return `<tr><td width="40" align="center" valign="top" style="padding:7px 0 7px 6px">${art}</td><td valign="top" style="padding:7px 8px;border-bottom:1px solid #f3f4f6;font-size:14px;line-height:20px;color:#111827">${esc(h.emoji)} <b>${esc(h.label)}</b> <span style="font-size:10px;font-weight:700;color:${fg};background:${bg};padding:1px 6px;border-radius:9px;white-space:nowrap">${esc(statusTag(h))}</span>${note}</td></tr>`;
 };
 
@@ -139,7 +142,7 @@ export function hexText(hexes) {
     const rows = hexes.filter((h) => h.category === c).sort((a, b) => ORDER[a.status] - ORDER[b.status]);
     return ['', `${(GROUPS[c] || c).toUpperCase()}`, ...rows.flatMap((h) => {
       const head = `${h.status === 'not_checked' ? '⬡' : '⬢'} ${h.label} [${statusTag(h)}]`;
-      if (h.status !== 'found') return [h.id === 'email-breaches' && h.status === 'not_checked' ? `${head}\n  We have not checked your email against known data breaches. Check it yourself, free: https://haveibeenpwned.com` : head];
+      if (h.status !== 'found') return [h.id === 'email-breaches' && h.status === 'not_checked' ? `${head}\n  We have not checked your email against known data breaches. Breach lookups are not available today; we plan to include them when paid plans open. Check it yourself, free here: https://haveibeenpwned.com` : head];
       return [`${head}\n  ${shown(h)}${h.estimate ? ' (our estimate, not measured)' : ''}\n  Change: ${changeFor(h)} Guide: ${guideUrl(h)}`];
     })];
   });

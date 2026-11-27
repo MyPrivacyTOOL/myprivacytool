@@ -23,6 +23,10 @@
 // Never log message text, sender ids or keys: log() fields are event metadata only.
 
 import { createLogger, errorResponse, json, MptError, missingEnv, type Logger } from "@mpt/utils";
+// MPC-9885: every outbound call goes through the recipient wrapper; one context per request (built in respond()).
+import { callRecipient } from "../../shared/recipients/outbound.ts";
+import { ga4ServerEventsOn, sendGa4ServerEvent } from "../../shared/ga4-server-events.ts";
+import { workerRecipientContext, type WorkerRecipientContext } from "../../shared/recipients/worker-ctx.ts";
 
 type Env = {
   SUPABASE_URL: string;
@@ -35,6 +39,11 @@ type Env = {
   /** Workers Rate Limiting bindings (wrangler.toml [[ratelimits]]). Optional: absent means no limit (fail open). */
   RATE_LIMITER?: RateLimiter;
   RATE_LIMITER_GLOBAL?: RateLimiter;
+  /** MPC-11111: server-side GA4 flow events. All three are off unless set (and the registry entry ga4-measurement-protocol is enabled). */
+  GA4_SERVER_EVENTS_ENABLED?: string;
+  GA4_API_SECRET?: string;
+  GA4_MEASUREMENT_ID?: string;
+  GA4_DEBUG_MODE?: string;
 };
 
 type RateLimiter = { limit(options: { key: string }): Promise<{ success: boolean }> };
@@ -52,7 +61,11 @@ const WORKER = "core-brain";
 const REQUIRED_ENV = ["SUPABASE_URL", "SUPABASE_KEY", "WEBHOOK_SECRET"];
 const MAX_BODY_BYTES = 16 * 1024;
 const MAX_TEXT_CHARS = 500;
-const QWEN_TIMEOUT_MS = 5000;
+// Cap on the Qwen call. A slower call is abandoned and the rules classifier answers instead (intent_source "rules"), so a
+// slow outside service never makes a person wait. Measured 2026-10-29: 95% of requests finish in about 2.5 ms, but the slowest
+// 1% took 2.7 to 4.2 s waiting on external calls; the old 5 s cap let those through. Trade-off: a Qwen call that would have
+// taken 2 to 5 s now gets the rules answer.
+const QWEN_TIMEOUT_MS = 2000;
 const SUPABASE_TIMEOUT_MS = 3000;
 const DEFAULT_QWEN_BASE_URL = "https://dashscope-intl.aliyuncs.com/compatible-mode/v1";
 const DEFAULT_QWEN_MODEL = "qwen-plus";
@@ -74,7 +87,8 @@ const KEYS = {
   firstHexagon: [
     "bot.first_hexagon.title", "bot.first_hexagon.name", "bot.first_hexagon.location", "bot.first_hexagon.phone",
     "bot.first_hexagon.email", "bot.first_hexagon.social", "bot.first_hexagon.brokers", "bot.first_hexagon.question",
-    "bot.first_hexagon.reply_y", "bot.first_hexagon.reply_n",
+    // Owner rule 2026-10-29: 19 or over only. Telegram cannot verify age, so this is a self-declaration made with the Y.
+    "bot.first_hexagon.age", "bot.first_hexagon.reply_y", "bot.first_hexagon.reply_n",
   ],
   confirmedYes: ["bot.confirmed_y.title", "bot.confirmed_y.generating", "bot.confirmed_y.cta", "bot.confirmed_y.duration"],
   confirmedNo: ["bot.confirmed_n.title", "bot.confirmed_n.cta", "bot.confirmed_n.duration"],
@@ -92,11 +106,11 @@ function constantTimeEqual(a: string, b: string): boolean {
   return diff === 0;
 }
 
-async function fetchWithTimeout(url: string, init: RequestInit, ms: number): Promise<Response> {
+async function fetchWithTimeout(send: (init: RequestInit) => Promise<Response>, init: RequestInit, ms: number): Promise<Response> {
   const ctl = new AbortController();
   const timer = setTimeout(() => ctl.abort(), ms);
   try {
-    return await fetch(url, { ...init, signal: ctl.signal });
+    return await send({ ...init, signal: ctl.signal });
   } finally {
     clearTimeout(timer);
   }
@@ -158,11 +172,11 @@ function ruleIntent(text: string): Intent {
   return "unknown";
 }
 
-async function qwenIntent(text: string, env: Env, log: Logger): Promise<{ intent: Intent; confidence: number } | null> {
+async function qwenIntent(text: string, env: Env, log: Logger, rctx: WorkerRecipientContext = workerRecipientContext(env)): Promise<{ intent: Intent; confidence: number } | null> {
   if (!env.QWEN_API_KEY) return null;
   const base = (env.QWEN_BASE_URL || DEFAULT_QWEN_BASE_URL).replace(/\/+$/, "");
   try {
-    const res = await fetchWithTimeout(`${base}/chat/completions`, {
+    const res = await fetchWithTimeout((i) => callRecipient("dashscope", { url: `${base}/chat/completions`, init: i, sent: ["message_text"] }, rctx), {   // text has emails and phone numbers masked by redact()
       method: "POST",
       headers: { "content-type": "application/json", authorization: `Bearer ${env.QWEN_API_KEY}` },
       body: JSON.stringify({
@@ -201,7 +215,7 @@ async function qwenIntent(text: string, env: Env, log: Logger): Promise<{ intent
 
 // The sender is matched on conversation_states.sender_id (the platform's id as text) within its channel.
 // Missing row, unsupported platform or any Supabase failure degrade to an anonymous user (trust 0), never an error.
-async function lookupState(msg: Inbound, env: Env, log: Logger): Promise<BrainState> {
+async function lookupState(msg: Inbound, env: Env, log: Logger, rctx: WorkerRecipientContext = workerRecipientContext(env)): Promise<BrainState> {
   const anonymous: BrainState = { trustLevel: 0, state: "new", source: "anonymous" };
   if (!STATE_CHANNELS.includes(msg.platform)) return anonymous;
   const qs = new URLSearchParams({
@@ -212,7 +226,7 @@ async function lookupState(msg: Inbound, env: Env, log: Logger): Promise<BrainSt
     limit: "1",
   });
   try {
-    const res = await fetchWithTimeout(`${env.SUPABASE_URL.replace(/\/+$/, "")}/rest/v1/conversation_states?${qs}`, {
+    const res = await fetchWithTimeout((i) => callRecipient("supabase", { url: `${env.SUPABASE_URL.replace(/\/+$/, "")}/rest/v1/conversation_states?${qs}`, init: i, sent: ["username"] }, rctx), {   // sender_id = the platform user id
       headers: { apikey: env.SUPABASE_KEY, authorization: `Bearer ${env.SUPABASE_KEY}` },
     }, SUPABASE_TIMEOUT_MS);
     if (!res.ok) {
@@ -258,11 +272,12 @@ function decide(intent: Intent, text: string, st: BrainState): Decision {
 // logged as a warning and never reaches the user. Sends no message text; the sender id goes to the database only.
 async function recordInteraction(
   msg: Inbound, intent: Intent, intentSource: string, responseKey: string, next: NextState, env: Env, log: Logger,
+  rctx: WorkerRecipientContext = workerRecipientContext(env),
 ): Promise<void> {
   // Platforms outside conversation_states' channel check (X) are log-only: no sender, no state change.
   const stateful = STATE_CHANNELS.includes(msg.platform);
   try {
-    const res = await fetchWithTimeout(`${env.SUPABASE_URL.replace(/\/+$/, "")}/rest/v1/rpc/mpt_brain_record`, {
+    const res = await fetchWithTimeout((i) => callRecipient("supabase", { url: `${env.SUPABASE_URL.replace(/\/+$/, "")}/rest/v1/rpc/mpt_brain_record`, init: i, sent: stateful ? ["username"] : [] }, rctx), {
       method: "POST",
       headers: { apikey: env.SUPABASE_KEY, authorization: `Bearer ${env.SUPABASE_KEY}`, "content-type": "application/json" },
       body: JSON.stringify({
@@ -335,7 +350,13 @@ async function respond(msg: Inbound, env: Env, log: Logger, ctx?: ExecutionConte
   if (await isRateLimited(msg, env, log)) {
     return json({ error: { code: "rate_limited", message: "Too many requests" } }, 429, { "retry-after": RATE_LIMIT_RETRY_AFTER_SECONDS });
   }
-  const st = await lookupState(msg, env, log);
+  const rctx = workerRecipientContext(env);
+  // MPC-11111: "a message arrived" for the GA4 flow check. Channel name only, never the sender or the text. A no-op unless switched on; never throws.
+  if (ga4ServerEventsOn(env)) {
+    const dmEvent = sendGa4ServerEvent(env, "dm_received", { params: { channel: msg.platform.toLowerCase().replace(/-/g, "_") }, rctx });
+    if (ctx?.waitUntil) ctx.waitUntil(dmEvent); else await dmEvent;
+  }
+  const st = await lookupState(msg, env, log, rctx);
 
   // A bare Y/N while a confirmation is pending needs no LLM: skip the call (latency, cost, privacy).
   let intent: Intent;
@@ -348,7 +369,7 @@ async function respond(msg: Inbound, env: Env, log: Logger, ctx?: ExecutionConte
     intent = "verify";
     intentSource = "rules";
   } else {
-    const q = await qwenIntent(msg.text, env, log);
+    const q = await qwenIntent(msg.text, env, log, rctx);
     if (q && q.confidence >= 0.4) {
       intent = q.intent;
       intentSource = "qwen";
@@ -369,7 +390,7 @@ async function respond(msg: Inbound, env: Env, log: Logger, ctx?: ExecutionConte
 
   // Write back after the decision. In production the write runs after the reply is sent (waitUntil); without an
   // ExecutionContext (tests) it is awaited so the outcome is deterministic.
-  const write = recordInteraction(msg, intent, intentSource, messageKeys[0], nextState, env, log);
+  const write = recordInteraction(msg, intent, intentSource, messageKeys[0], nextState, env, log, rctx);
   if (ctx?.waitUntil) ctx.waitUntil(write);
   else await write;
 

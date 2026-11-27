@@ -7,10 +7,14 @@
 //   ARRIVAL colour (this file): HOW the information reached MPT. A blue family on purpose: green already means "safe" and must never mean "was sent to us".
 // Colour is never the only clue: each arrival class also has a letter and a ring style (same rule as the tiles' glyphs).
 
-export const CHANNELS = {
-  telegram: { code: 'TG', label: 'Telegram' },
-  whatsapp: { code: 'WA', label: 'WhatsApp' }, // reserved: no hexagons defined yet
-};
+import { CATALOGUE_CHANNELS } from './catalogue.js';
+
+// MPC-8689: all 27 channels of the complete footprint come from catalogue.js (generated from the approved 366-item discovery plus 2 records items (368)). Telegram and WhatsApp keep
+// their short labels; every other channel keeps the label from the discovery. Only Telegram has channel hexagons built (TELEGRAM_HEXAGONS below).
+export const CHANNELS = Object.fromEntries(CATALOGUE_CHANNELS.map((c) => [c.key, { code: c.code, label: c.label }]));
+CHANNELS.telegram = { code: 'TG', label: 'Telegram' };
+CHANNELS.whatsapp = { code: 'WA', label: 'WhatsApp' }; // reserved: no hexagons defined yet
+CHANNELS.x = { code: 'X', label: 'X' }; // CK-8502 (main): X keeps its short label
 
 export const ARRIVAL = {
   A: { id: 'A', label: 'Sent with every message', colour: '#1e3a8a', ring: 'solid-thick', note: 'Always arrives; nothing the person can switch off.' },
@@ -65,11 +69,81 @@ export const TELEGRAM_HEXAGONS = [
   h('group_role', 'Group membership and role', 'D', 'getChatMember (only when the bot shares a group)', 'direct', { enabled: false, disabledReason: 'Not part of the baseline scan' }),
 ];
 
-export const CHANNEL_HEXAGONS = { TG: TELEGRAM_HEXAGONS };
+// MPC-8689 pilot: Telegram "extra" hexagons. Built and checked by the baseline scan, but NOT part of the 30 above: they stay out of the Telegram risk
+// number (risk-count-1, out of 30), the web 54 and the exposure score until the owner approves a new score version. Fields were checked against the
+// current Bot API (10.3, 2026-08-24). Each is something that only appears when the person does it (forwards, sends while away, replies to a story, uses an
+// inline bot) or sets it up (profile music), so "not returned" means "not in this message", never "protected". Not built from the discovery list:
+// reactions and poll answers and the join-request bio arrive as separate updates the baseline does not read (ChatJoinRequest.bio is in the docs, but needs a chat the bot administers); edits and blocked or unblocked are event-driven, see the two entries below.
+export const TELEGRAM_EXTRA_HEXAGONS = [
+  h('forward_origin', 'Where forwards come from', 'A', 'message.forward_origin', 'direct'),
+  h('offline_send', 'Sent while away', 'A', 'message.is_from_offline', 'direct'),
+  h('story_reply', 'Story replies', 'A', 'message.reply_to_story', 'direct'),
+  h('via_bot', 'Other bots used', 'A', 'message.via_bot', 'direct'),
+  h('profile_audio', 'Profile music', 'B', 'getChat.first_profile_audio', 'direct'),
+  h('personal_messages', 'Personal channel latest posts', 'B', 'getUserPersonalChatMessages', 'direct'),
+  // Event-driven (separate updates, not in the baseline message): the baseline reports them as "not checked". They are recorded as event flags
+  // (public.telegram_event_flags: that it happened, never content) and answered once in chat. See workers/social-listeners/src/event-extras.ts.
+  h('edits', 'Edits', 'A', 'edited_message.edit_date', 'direct'),
+  h('blocked_bot', 'Blocked or unblocked us', 'A', 'my_chat_member', 'direct'),
+];
+export const TELEGRAM_EXTRA_IDS = TELEGRAM_EXTRA_HEXAGONS.map((x) => x.id);
+// Email extras live in workers/scan-report/lib/emailExtras.js (EMAIL_EXTRA_HEXAGONS); their catalogue ids are listed here so the footprint count knows they are built.
+export const EMAIL_EXTRA_IDS = ['email.alias', 'email.address_type', 'email.saas_records', 'email.mail_protection'];
+// Web extras live in src/lib/webExtras.ts (edge data from the mpt-leads Worker /whoami-extra, plus two browser checks). Outside the 54, the exposure score and scanCounts.
+export const WEB_EXTRA_IDS = ['web.postal_area', 'web.ip_timezone', 'web.network_distance', 'web.network_owner', 'web.tls_fingerprint', 'web.http_protocol', 'web.eu_region', 'web.device_model', 'web.clock_skew'];
+// Discord extras live in workers/social-listeners/src/discord-interactions.ts (DISCORD_EXTRA_HEXAGONS). The four "Their sign-in" Discord candidates (email, linked accounts, servers, Nitro and 2FA) are not built.
+export const DISCORD_EXTRA_IDS = ['dc.user_id', 'dc.names', 'dc.avatar', 'dc.server_tag', 'dc.badges', 'dc.language', 'dc.context', 'dc.member', 'dc.purchases', 'dc.command_input', 'dc.banner'];
+// SMS (4), Viber (9) and LINE (5) extras live in workers/social-listeners/src/{sms,viber,line}-extras.ts.
+export const SMS_EXTRA_IDS = ['sms.number', 'sms.number_area', 'sms.message_time', 'sms.message_text'];
+export const VIBER_EXTRA_IDS = ['vb.user_id', 'vb.name_photo', 'vb.country', 'vb.language', 'vb.api_version', 'vb.message', 'vb.deeplink', 'vb.location', 'vb.contact', 'vb.device', 'vb.app_version', 'vb.carrier', 'vb.online'];
+export const LINE_EXTRA_IDS = ['line.user_id', 'line.message', 'line.follow_state', 'line.group', 'line.location'];
+export const GITHUB_EXTRA_IDS = ['gh.sender', 'gh.content', 'gh.profile', 'gh.account_age', 'gh.public_email', 'gh.activity_times'];
+export const YOUTUBE_EXTRA_IDS = ['yt.comment', 'yt.channel_age', 'yt.country', 'yt.channel_about', 'yt.stats', 'yt.topics'];
+export const KAKAO_EXTRA_IDS = ['kk.bot_user_key', 'kk.channel_key', 'kk.is_friend', 'kk.timezone', 'kk.lang', 'kk.message'];
+export const WECHAT_EXTRA_IDS = ['wc.openid', 'wc.message', 'wc.voice', 'wc.time', 'wc.location', 'wc.follow', 'wc.follow_scene'];
+export const ZALO_EXTRA_IDS = ['zl.sender_id', 'zl.message', 'zl.location', 'zl.business_card', 'zl.name_photo', 'zl.follower', 'zl.shared_info'];
+export const QQ_EXTRA_IDS = ['qq.openid', 'qq.friend_state'];
+// Records about a person (MPC-8689, owner decisions 2026-10-29): the two "Data brokers and news archives" hexagons, checked from a page address the person supplies. Code: workers/social-listeners/src/records-check.ts.
+export const RECORDS_EXTRA_IDS = ['brokers.people_search_listing', 'brokers.news_archive_mention'];
+export const EXTRA_HEXAGON_IDS = [...TELEGRAM_EXTRA_IDS, ...EMAIL_EXTRA_IDS, ...WEB_EXTRA_IDS, ...DISCORD_EXTRA_IDS, ...SMS_EXTRA_IDS, ...VIBER_EXTRA_IDS, ...LINE_EXTRA_IDS, ...GITHUB_EXTRA_IDS, ...YOUTUBE_EXTRA_IDS, ...KAKAO_EXTRA_IDS, ...WECHAT_EXTRA_IDS, ...ZALO_EXTRA_IDS, ...QQ_EXTRA_IDS, ...RECORDS_EXTRA_IDS];
+
+// CK-8502: X hexagons. Fields are the ones X's Account Activity documentation shows in its payload examples (docs.x.com, read 2026-10-28; the
+// user-object field list there is an EXAMPLE, not a specification, so a field may be absent). NOTE: that page says the Account Activity API is
+// being deprecated in favour of the X Activity API; re-map the sources when we move. Same arrival classes as Telegram. Stored only when the
+// Worker flag X_CAPTURE_HEXAGONS is "on" (owner decision D1, 2026-10-28: record every data point; legal sign-off and wording change still required).
+const hx = (key, label, arrival, source, observation, extra = {}) => ({
+  id: `x.${key}`, channel: 'X', label, arrival, source, observation, enabled: true, ...extra,
+});
+export const X_HEXAGONS = [
+  // A: arrives with the event
+  hx('numeric_id', 'Numeric X id', 'A', 'user.id / source.id / sender_id', 'direct'),
+  hx('name', 'Display name', 'A', 'user.name', 'direct'),
+  hx('screen_name', '@handle', 'A', 'user.screen_name', 'direct'),
+  hx('location', 'Profile location', 'A', 'user.location', 'direct'),
+  hx('description', 'Bio', 'A', 'user.description', 'direct'),
+  hx('url', 'Profile link', 'A', 'user.url', 'direct'),
+  hx('protected', 'Protected account', 'A', 'user.protected', 'direct'),
+  hx('verified', 'Verified', 'A', 'user.verified', 'direct'),
+  hx('followers_count', 'Followers', 'A', 'user.followers_count', 'direct'),
+  hx('friends_count', 'Following', 'A', 'user.friends_count', 'direct'),
+  hx('statuses_count', 'Posts', 'A', 'user.statuses_count', 'direct'),
+  hx('profile_image', 'Profile photo address', 'A', 'user.profile_image_url_https', 'direct'),
+  hx('event_time', 'Event time', 'A', 'created_timestamp / timestamp_ms', 'direct'),
+  hx('post_text', 'Text of the post that mentions or shares us', 'A', 'tweet_create_events[].text', 'direct'),
+  hx('post_language', 'Post language', 'A', 'tweet_create_events[].lang', 'direct', { note: 'Tweet field, not shown in the docs example; absent is normal.' }),
+  hx('message_text', 'What you typed (DM)', 'A', 'message_create.message_data.text', 'direct'),
+  // B: public profile lookup (needs the bearer token and spends API credits; used today only by the Mirror, not by capture)
+  hx('lookup_profile', 'Public profile lookup', 'B', 'GET /2/users/:id', 'direct', { enabled: false, disabledReason: 'Spends API credits; not part of capture' }),
+  // D: wider lookups
+  hx('timeline', 'Recent public posts', 'D', 'GET /2/users/:id/tweets', 'direct', { enabled: false, disabledReason: 'Needs a separate decision' }),
+];
+export const X_HEXAGON_COUNT = X_HEXAGONS.length;
+
+export const CHANNEL_HEXAGONS = { TG: TELEGRAM_HEXAGONS, X: X_HEXAGONS };
 export const TELEGRAM_HEXAGON_COUNT = TELEGRAM_HEXAGONS.length;
 
 export function getChannelHexagon(id) {
-  return TELEGRAM_HEXAGONS.find((x) => x.id === id) ?? null;
+  return [...TELEGRAM_HEXAGONS, ...X_HEXAGONS].find((x) => x.id === id) ?? null;
 }
 
 /** Channel code of a hexagon id ("tg.username" -> "TG"), or null when the id is not a channel hexagon. */

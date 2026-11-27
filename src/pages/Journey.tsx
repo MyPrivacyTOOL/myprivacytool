@@ -4,14 +4,14 @@ import JourneyGuide from "@/components/JourneyGuide";
 const Journey = () => (
   <>
     <Seo
-      title="Get clean before you go agentic | MyPrivacyTOOL"
+      title="See what's out there about you, and what an AI agent could find | MyPrivacyTOOL"
       description="An 8-step guide: see your footprint, erase it, then bring AI agents on board safely. Start with Check My Exposure."
       path="/journey"
     />
     <main className="container mx-auto px-4 py-10 sm:py-14">
       <header className="text-center max-w-2xl mx-auto mb-10">
         <h1 className="text-3xl sm:text-5xl font-bold text-foreground mb-4">
-          Get clean before you go agentic
+          See what&apos;s out there about you, and what an AI agent could find.
         </h1>
         <p className="text-base sm:text-lg text-muted-foreground">
           Every agent you launch inherits your footprint. Fix yours first, then extend the same

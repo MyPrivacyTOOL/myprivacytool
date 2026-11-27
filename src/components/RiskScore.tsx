@@ -4,6 +4,10 @@ import { Shield, AlertTriangle, AlertCircle, Fingerprint, Users, ShieldAlert, Ac
 import { HexagonData } from '@/lib/deviceDetection';
 import { CompositeFingerprint } from '@/lib/fingerprintDetection';
 import { scanCountsLine, type ScanCounts } from '../../shared/hexagon-registry/counts.js';
+import { footprintSummary, footprintLine, footprintChannelsLine } from '../../shared/hexagon-registry/footprint.js';
+import { useTelegramHandoff } from '@/lib/telegramHandoff';
+import { useWebExtras } from '@/hooks/useWebExtras';
+import { checkedExtraIds } from '@/lib/webExtras';
 import { computePageRisk, getPageRiskLabel } from '@/lib/scanResult';
 import { byBand } from '@/lib/exposureScore';
 
@@ -18,6 +22,10 @@ interface RiskScoreProps {
 }
 
 export default function RiskScore({ confirmed, total, counts, hexagons, fingerprint }: RiskScoreProps) {
+  const handoff = useTelegramHandoff(); // MPC-8689: Telegram's checked ids when the page was opened from the one-time link, else none
+  const webExtras = useWebExtras(); // MPC-8689 pilot: extra connection checks, off unless VITE_WEB_EXTRAS=true, never in the score or scanCounts
+  const extraIds = useMemo(() => checkedExtraIds(webExtras), [webExtras]);
+  const footprint = useMemo(() => footprintSummary([...counts.checkedIds, ...handoff.ids, ...extraIds]), [counts.checkedIds, handoff.ids, extraIds]);
   // MPC-7471-F4: the score and band come from the shared exposure contract via computePageRisk; provisional until every point is confirmed.
   const riskData = useMemo(
     () => computePageRisk({ confirmed, total, hexagons, fingerprint, scanTotal: counts.total }),
@@ -100,6 +108,23 @@ export default function RiskScore({ confirmed, total, counts, hexagons, fingerpr
           <div className="text-muted-foreground text-sm sm:text-base" data-testid="scan-counts-line">
             {scanCountsLine(counts)}
           </div>
+          {/* MPC-8689: the whole footprint, so a visitor sees how much is still to review, not only the web hexagons. Only hexagons whose check ran count as checked. */}
+          <div className="text-muted-foreground text-xs sm:text-sm mt-1" data-testid="footprint-line">
+            {footprintLine(footprint)}
+            {footprintChannelsLine(footprint) && ` (${footprintChannelsLine(footprint)})`}
+            {handoff.ids.length > 0 && (footprint.byChannel.find((c) => c.key === 'telegram')?.checked ?? 0) > 0 && ` Telegram part from your Telegram scan${handoff.scanAt ? ` on ${new Date(handoff.scanAt).toLocaleDateString()}` : ''}.`}
+            {' '}<a href="/hexagon/" className="underline">See all {footprint.total}</a>
+          </div>
+          {webExtras.length > 0 && (
+            <details className="text-muted-foreground text-xs sm:text-sm mt-1" data-testid="web-extras">
+              <summary className="cursor-pointer">Extra connection checks (not part of your score)</summary>
+              <ul className="mt-1 space-y-1">
+                {webExtras.map((x) => (
+                  <li key={x.id}><span className="font-medium">{x.label}:</span> {x.status === 'not_checked' ? `not checked (${x.reason})` : x.status === 'clear' ? 'nothing found' : x.value}</li>
+                ))}
+              </ul>
+            </details>
+          )}
 
           {/* Risk indicators row */}
           <div className="flex flex-wrap gap-2 mt-2 justify-center sm:justify-start">

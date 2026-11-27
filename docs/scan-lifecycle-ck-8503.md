@@ -68,11 +68,13 @@ Derived **only** from persisted columns by `requestLifecycle(row)` in `workers/s
 | queued | `pending`, no failed try (includes "held" by the allowlist or HIBP) | not_sent | "We have your request." The request is acknowledged only after the `scans` insert, so **received = queued** on the web path. |
 | recovering | `pending`, `report_attempts > 0`, error on the row | not_sent | "It can take a little longer." No claim of progress beyond that. |
 | running | `processing` | not_sent | Nothing more than the above. |
-| completed | `sent` and `resend_message_id` stored | **provider_accepted** | "We've sent your report." Not "delivered". |
+| completed | `sent`, `resend_message_id` stored, no provider receipt (yet) | **provider_accepted** | "We've sent your report." Not "delivered". |
+| delivered | `sent` and `delivery_status` = `delivered` (or `complained`, which implies arrival), set by the signed Resend webhook | **delivered** | "Your report was delivered" is allowed only here. |
+| delivery_failed | `sent` and `delivery_status` = `bounced` or `failed` | **undeliverable** | The person did NOT get the report; an operator must look (no automatic resend to a bounced address). |
 | failed | `failed` (5 tries used, or stuck) | not_sent | An operator must act (section 7). |
 | cancelled | `failed` with `cancelled: …` (unsubscribed) | not_sent | Nothing is sent. |
 
-Distinctions the code now respects: accepted request ≠ completed scan ≠ generated report ≠ pending delivery ≠ provider acceptance ≠ inbox receipt. **Inbox receipt is `not_observable`**: nothing in the repo receives a Resend delivery or bounce event (searched). So no state is called "delivered" and the contract function cannot return one. Clarification/verification-needed is not a web state: the only target is the email address, and the report goes only to that address; inbox ownership is proved by the emailed link, and only for the live detail.
+Distinctions the code now respects: accepted request ≠ completed scan ≠ generated report ≠ pending delivery ≠ provider acceptance ≠ provider delivery receipt ≠ owner-seen inbox receipt. **`delivered` needs a receipt.** Since part 2 (section 12) the Worker can record Resend's signed delivered / bounced / complained events (`POST /api/resend-webhook`), but that endpoint is **off (404) until `RESEND_WEBHOOK_SECRET` is set**. Without it a row stays `completed` for ever and `receipt` reads `not_observed`, which means "no receipt seen", not "not delivered". Clarification/verification-needed is not a web state: the only target is the email address, and the report goes only to that address; inbox ownership is proved by the emailed link, and only for the live detail.
 
 ## 5. Gaps found, owner, smallest change, status
 
@@ -81,10 +83,10 @@ Distinctions the code now respects: accepted request ≠ completed scan ≠ gene
 | G1 | Unsubscribing **while** a scan is running (after the queue read, before the send) still got the report; the unsubscribe page promises no more report emails. | Test failed before the fix (`withdrawn consent: unsubscribing while the scan is running…`). | scan-report (MPC-7491 / MPC-7385-F1 lineage; no active owner) | One extra read of `users.email_opt_out_at` right before the send; cancel with the existing `cancelled: unsubscribed before the report was sent` reason. 4 lines in `index.js`. | **Fixed. TESTED.** Mutation check: removing it fails that test. |
 | G2 | No STOP / consent-withdrawal / deletion on messaging channels; the WhatsApp path has no STOP handler. | Searched `webhook-receiver`, `core-brain`, `social-listeners`. | MPC-7904 (consent/STOP/DELETE), MPC-7905, MPC-7906 | none here | **PENDING (owner exists).** |
 | G3 | After 5 failed tries a scan is `failed` and is never retried, even when the fault clears. That is deliberate (bounded recovery) but needs a documented operator step. | Test `generation failure: … stays failed`. | scan-report / ops | Runbook step in section 7. No code. | **Documented.** |
-| G4 | **No delivery receipt.** `sent` means the provider accepted the email. Nothing records delivered, bounced or complained. | No Resend webhook anywhere in the repo. | New decision needed (MPC-7535 raised the same point) | Would need a signed Resend webhook endpoint, a secret and a migration for a receipt column. **Not built**: new infrastructure and a production migration need approval. | **OPEN.** Until then no copy may say "delivered" for email. |
-| G5 | Truly simultaneous requests for one address all pass the 24h check (check-then-insert, no database constraint). | `lifecycle.test.mjs` forces all reads before any write: 3 scans, 3 confirmations (`KNOWN-GAP G5` line). Each scan still gets exactly one report. | scan-report | A database guard (migration = production action). An app-level re-check would shrink but not close the window. **Not changed.** | **OPEN, low exposure.** Turnstile tokens are single-use by Cloudflare's design and enforcement is on (not re-tested here), and the per-IP limit is 5/min, so a double click is stopped earlier. Bounded impact: duplicate emails to the same address. |
+| G4 | **No delivery receipt.** `sent` only meant the provider accepted the email. | No Resend webhook existed. | scan-report | Built in part 2: signed webhook `POST /api/resend-webhook` (Svix signature, 5-minute replay window, 64 KB cap, off without a secret), `scans.delivery_status` set by `mpt_record_email_receipt()` (ranked in SQL, never moves backwards), lifecycle states `delivered` / `delivery_failed`. | **BUILT, MERGED when this PR merges, INACTIVE.** Needs the Resend webhook created and its signing secret stored as GitHub secret `SCAN_REPORT_RESEND_WEBHOOK_SECRET` (section 12). Until then no copy may say "delivered" for email. |
+| G5 | Truly simultaneous requests for one address all passed the 24h check (check-then-insert, no database constraint). | Barrier test: 3 scans, 3 confirmations; on real Postgres without the lock, 8 parallel sessions created 2 scans. | scan-report | Built in part 2: `public.mpt_request_scan()` takes a per-user advisory lock, then checks and inserts in one transaction. The Worker calls it and falls back to the old path only while the function does not exist (404). | **FIXED once the migration is applied.** Proven on real Postgres: 8 parallel sessions create exactly 1 scan. Until the migration runs, the old behaviour (bounded, low exposure) remains. |
 | G6 | Legacy `webhook-receiver` Y/N handler replies "Your full Privacy Report is being prepared. You'll receive it here within 60 seconds." No code anywhere creates a report job from that stage (searched). The promise has nothing behind it. | `handleConfirmation`, `workers/webhook-receiver/index.js:363-373`. The newer core-brain copy ("You run the scan in your browser") is truthful. | webhook-receiver channel owners, under MPC-7385 / MPC-7902 gates | Replace the copy or route to the web flow. **Not changed** (not my component, channels not live-verified). | **ROUTED. OPEN.** |
-| G7 | Channel sends do not check the provider response: `sendWhatsApp`, `sendTelegram`, `sendMessenger` ignore `res.ok` and return silently when unconfigured. So a RESULTS or reply can be "sent" in code while never accepted. | `workers/webhook-receiver/index.js:121,165,233`. | MPC-8309 (RESULTS), MPC-7902-7906 | none here | **ROUTED. OPEN.** |
+| G7 | Channel sends did not check the provider response: `sendWhatsApp`, `sendTelegram`, `sendMessenger` ignored `res.ok`, so a refused send looked like a sent one. | `workers/webhook-receiver/index.js`. | MPC-8309 (RESULTS), MPC-7902-7906 | Built in part 2: `send.js` records channel + HTTP status only (never the URL, token or message) and returns `{ok,status}`. Behaviour otherwise unchanged. | **FIXED (visibility only).** A provider "ok" still only means accepted; WhatsApp/Telegram delivery receipts are not handled. |
 | G8 | No correlation between a channel event and the `scans` row. Today a channel hands the person to the browser; there is no machine link. | core-brain keys, `/api/scan` body | **CK-8502** (the inbound contract) | Define the handoff to carry/produce `scans.id`. Waiting on CK-8502. | **BLOCKED on prerequisite.** |
 
 ## 6. Tests: expected versus actual
@@ -182,7 +184,7 @@ Record in the task: scan id (not the address), timestamps, the Resend message id
 | Legacy handler (G6) | "Your full Privacy Report is being prepared. You'll receive it here within 60 seconds." | **Untruthful**: no job exists. Do not enable those routes with this text. |
 | WhatsApp RESULTS | "Your MPT Deep Dive is complete… Tap here for your secure dashboard" / "still processing" / "link expired" | States are read from stored state, not narrative. Send success unchecked (G7). |
 
-Rule going forward: use "sent" or "on its way" for provider acceptance; "delivered" only after a receipt source exists (G4).
+Rule going forward: use "sent" or "on its way" for provider acceptance; "delivered" only for a row whose state is `delivered` (a provider receipt exists, G4).
 
 ## 10. Sprint slice versus full-task acceptance
 
@@ -196,13 +198,30 @@ Rule going forward: use "sent" or "on its way" for provider acceptance; "deliver
 
 **CK-8503 is not complete and must not be marked Done.** Status was not changed in Notion.
 
-## 11. Remaining release gates (exact)
-1. CK-8502 accepted (inbound contract) before any channel to request linkage.
-2. Chris approves the PR merge as a production deploy (G1 only), or defers it.
-3. Chris names the approved live test identity and approves the 7.2 submission.
-4. Decision on G4: build a signed delivery-receipt webhook (secret + migration), or accept "provider accepted" as the stated level.
-5. Decision on G5: database guard (migration) or accept the bounded risk.
-6. G6/G7 routed to the channel owners; MPC-7902, 7904, 7905, 7906 stay hard gates for WhatsApp.
-7. Nothing in this PR activates a channel flag, adds a provider or spends money.
+## 11. Remaining release gates (exact, updated after part 2)
+1. CK-8502 accepted (inbound contract) before any channel-to-request linkage. Not started.
+2. Activate delivery receipts: create the Resend webhook (URL and events in section 12) and store its signing secret as GitHub secret `SCAN_REPORT_RESEND_WEBHOOK_SECRET`; the next deploy syncs it. Needs the Resend dashboard and repository secret settings.
+3. G6: replace the legacy "within 60 seconds" text. It is a visitor-facing copy change, so the PR template requires the swarm run and real-people check first.
+4. MPC-7902, 7904, 7905, 7906 remain hard gates for WhatsApp; STOP / consent / deletion on channels (G2) belongs to MPC-7904.
+5. Channel adapters other than web stay PENDING.
 
-Signed: Claude (Anthropic), Claude Code session for CK-8503, 2026-10-26 08:20 UTC.
+Signed: Claude (Anthropic), Claude Code session for CK-8503, 2026-10-26 (part 2 appended below).
+
+## 12. Part 2 (2026-10-26): G4 receipts, G5 atomic dedupe, G7 send visibility
+
+What was added, all additive, all tested before merge:
+
+| Change | Where | Active when |
+|---|---|---|
+| Atomic one-scan-per-24h | migration `20261026220000_ck_8503_scan_receipts_and_dedupe.sql` (`mpt_request_scan`), `index.js` `requestScan` | when the migration is applied (the Worker falls back until then) |
+| Delivery receipts | same migration (`scans.delivery_status`, `mpt_record_email_receipt`), `lib/receipts.js`, route `POST /api/resend-webhook`, lifecycle states `delivered` / `delivery_failed` | only when `RESEND_WEBHOOK_SECRET` is set |
+| Send visibility | `workers/webhook-receiver/send.js` | on deploy (logging only) |
+| Deploy workflow | `deploy-scan-report.yml` runs the lifecycle test before deploy and syncs the optional receipt secret | on deploy |
+
+**Activating receipts (the only part that needs an outside system):** (1) in the Resend dashboard create a webhook to `https://mpt-scan-report.myprivacytool.workers.dev/api/resend-webhook` for `email.sent`, `email.delivery_delayed`, `email.delivered`, `email.bounced`, `email.failed`, `email.complained`; (2) store the signing secret (`whsec_…`) as GitHub repository secret `SCAN_REPORT_RESEND_WEBHOOK_SECRET`; (3) re-run the "Deploy scan-report Worker" workflow (the secret-sync step sets it, nothing is printed). Rollback: delete the webhook in Resend or remove the Worker secret; the endpoint goes back to 404 and rows simply stop receiving receipts. Resend retries for events it could not deliver.
+
+**Interplay with MPC-7471-F3 (`request_id`):** `mpt_request_scan` also takes the optional `request_id` and returns the existing scan's, so F3's rule is unchanged: a retry carrying the same `request_id` gets the original outcome (replay), anyone else just learns "duplicate". Simultaneous copies of one request collapse into one scan plus replays; simultaneous different requests still make exactly one scan (tested in JS and on real Postgres with 8 parallel sessions and 8 different ids). The function reads `request_id` through `to_jsonb()` and writes it by dynamic SQL only when supplied, so it works even before F3's migration is applied; the previous check-then-insert path remains as the fallback while the function is missing.
+
+**Tests:** `lifecycle.test.mjs` 71 checks (was 48): adds receipts (signature, replay window, size cap, off by default, unknown message id, late/duplicate events, complaint, bounce is not overwritten, migration-missing 500), the fixed race (3 simultaneous requests -> 1 scan, 1 confirmation) and the rollout fallback. `supabase/tests/run.sh` on real Postgres 16: permissions, ranking, 24h window and **8 parallel sessions -> exactly 1 scan** (removing the advisory lock makes it create 2, so the test can fail). Mutation checks on the Worker: signature check forced true, replay window removed, endpoint on without a secret: each fails tests. `send.vitest.mjs` 3 tests: status-only logging, no URL/token/message in logs. All existing scan-report suites unchanged (worker 225, referral 68 after a one-line test fix so its fake answers 404 for unknown RPCs like PostgREST).
+
+**Not done, and why:** the channel adapters other than web (CK-8502 not started; hard gates MPC-7902/7904/7905/7906); G6 copy (needs the copy review process); the Resend webhook registration (outside this repository).

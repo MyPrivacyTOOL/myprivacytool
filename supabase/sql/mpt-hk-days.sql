@@ -18,14 +18,14 @@ grant execute on function public.mpt_hk_date(timestamptz), public.mpt_hk_ts(date
 create or replace view public.mpt_daily_metrics with (security_invoker = true) as
 with bounds as (
   select least(
-           coalesce((select public.mpt_hk_date(min(created_at)) from public.scans), public.mpt_hk_date(now())),
+           coalesce((select public.mpt_hk_date(min(hour)) from public.scan_hourly_counts), public.mpt_hk_date(now())),
            coalesce((select public.mpt_hk_date(min(period_start)) from public.mpt_raw_metrics), public.mpt_hk_date(now()))
          ) as first_day
 ),
 days as (
   select d::date as day from bounds, generate_series(bounds.first_day::timestamp, public.mpt_hk_date(now())::timestamp, interval '1 day') d
 ),
-scan_n as (select public.mpt_hk_date(created_at) as day, count(*) n from public.scans group by 1),
+scan_n as (select public.mpt_hk_date(hour) as day, sum(scans_created) n from public.scan_hourly_counts group by 1),
 eng_n as (
   select public.mpt_hk_date(created_at) as day, count(*) sessions, count(*) filter (where full_scan_completed) full_scans
   from public.mpt_user_engagement group by 1
@@ -54,7 +54,7 @@ ga_events as (
 )
 select
   days.day,
-  (select count(*) from public.scans s where s.created_at < public.mpt_hk_ts(days.day + 1))::bigint as cumulative_scans,
+  (select coalesce(sum(h.scans_created), 0) from public.scan_hourly_counts h where h.hour < public.mpt_hk_ts(days.day + 1))::bigint as cumulative_scans,
   coalesce(scan_n.n, 0)::bigint as new_scans,
   coalesce(eng_n.sessions, 0)::bigint as engagement_sessions,
   coalesce(eng_n.full_scans, 0)::bigint as engagement_full_scans,
@@ -80,7 +80,7 @@ left join ga_events on ga_events.day = days.day
 left join public.mpt_youtube_daily yt on yt.metric_date = days.day;
 
 comment on view public.mpt_daily_metrics is
-  'MPC-7376 / HKT follow-up. One row per Hong Kong day (00:00-24:00 HKT). cumulative_scans = rows in public.scans (D5). engagement_* and ga4_scan_events are separate signals, never merged. NULL = not collected, never an estimate. Counts only, no personal data. service_role only.';
+  'MPC-7376 / HKT follow-up. One row per Hong Kong day (00:00-24:00 HKT). cumulative_scans = scans created, summed from public.scan_hourly_counts (D5, MPC-8671; survives the scans purge). engagement_* and ga4_scan_events are separate signals, never merged. NULL = not collected, never an estimate. Counts only, no personal data. service_role only.';
 
 create or replace view public.mpt_weekly_metrics with (security_invoker = true) as
 with bounds as (
@@ -116,13 +116,13 @@ mrr as (
 )
 select
   weeks.week_of,
-  (select count(*) from public.scans s where s.created_at < least(public.mpt_hk_ts(weeks.week_of + 7), public.mpt_hk_ts(public.mpt_hk_date(now()) + 1)))::bigint as cumulative_scans,
-  (select count(*) from public.scans s
-     where s.created_at >= public.mpt_hk_ts(weeks.week_of) and s.created_at < public.mpt_hk_ts(weeks.week_of + 7))::bigint as weekly_new_scans,
+  (select coalesce(sum(h.scans_created), 0) from public.scan_hourly_counts h where h.hour < least(public.mpt_hk_ts(weeks.week_of + 7), public.mpt_hk_ts(public.mpt_hk_date(now()) + 1)))::bigint as cumulative_scans,
+  (select coalesce(sum(h.scans_created), 0) from public.scan_hourly_counts h
+     where h.hour >= public.mpt_hk_ts(weeks.week_of) and h.hour < public.mpt_hk_ts(weeks.week_of + 7))::bigint as weekly_new_scans,
   -- Scan-to-paid conversion has no stored history: only the current week is filled, from live users.
   case when weeks.week_of = date_trunc('week', public.mpt_hk_date(now())::timestamp)::date
-        and (select count(*) from public.scans) > 0
-       then round(100.0 * paid.paid_users / (select count(*) from public.scans), 2) end as conversion_rate_pct,
+        and (select coalesce(sum(scans_created), 0) from public.scan_hourly_counts) > 0
+       then round(100.0 * paid.paid_users / (select sum(scans_created) from public.scan_hourly_counts), 2) end as conversion_rate_pct,
   mrr.mrr as current_mrr,
   public.mpt_ga4_metric(ga_week.payload, 'activeUsers') as ga4_active_users,
   blog.n as blog_posts_published,
@@ -141,4 +141,4 @@ left join latest_week_count blog on blog.source = 'blog' and blog.week_of = week
 left join latest_week_count xt on xt.source = 'x' and xt.week_of = weeks.week_of;
 
 comment on view public.mpt_weekly_metrics is
-  'MPC-7376 / HKT follow-up. One row per Monday-start Hong Kong week. Notion tracker mapping: week_of=Week Of, cumulative_scans=Cumulative Scans, weekly_new_scans=Weekly New Scans, conversion_rate_pct=Conversion Rate %, current_mrr=Current MRR, ga4_active_users=GA4 Active Users, blog_posts_published=Blog Posts Published, x_threads_posted=X Threads Posted. cumulative_scans = rows in public.scans as of week end (or now) per D5. engagement_* and ga4_scan_events are separate signals. NULL = not collected. service_role only.';
+  'MPC-7376 / HKT follow-up. One row per Monday-start Hong Kong week. Notion tracker mapping: week_of=Week Of, cumulative_scans=Cumulative Scans, weekly_new_scans=Weekly New Scans, conversion_rate_pct=Conversion Rate %, current_mrr=Current MRR, ga4_active_users=GA4 Active Users, blog_posts_published=Blog Posts Published, x_threads_posted=X Threads Posted. cumulative_scans = scans created as of week end, from public.scan_hourly_counts (MPC-8671) (or now) per D5. engagement_* and ga4_scan_events are separate signals. NULL = not collected. service_role only.';

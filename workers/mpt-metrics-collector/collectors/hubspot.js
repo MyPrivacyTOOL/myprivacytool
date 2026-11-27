@@ -11,6 +11,8 @@
 //    the contact/deal search endpoints, whatever the token could do.
 //  * Error text carries the endpoint label and HTTP status only, never a response body.
 import { previousHkDay } from '../lib/hk.js';
+import { callRecipient } from '../../../shared/recipients/outbound.ts';
+import { recipientCtx } from '../lib/recipient-ctx.js';
 
 export const HUBSPOT_PORTAL_ID = 246502821;
 const API = 'https://api.hubapi.com';
@@ -26,11 +28,11 @@ export async function hubspotRead(env, method, path, label, body) {
   const m = String(method).toUpperCase();
   if (!(m === 'GET' || (m === 'POST' && SEARCH_PATH.test(path)))) throw new Error(`hubspot ${label}: refused non-read call`);
   for (let attempt = 0; ; attempt++) {
-    const res = await fetch(`${API}${path}`, {
+    const res = await callRecipient('hubspot', { url: `${API}${path}`, init: {
       method: m,
       headers: { Authorization: `Bearer ${env.HUBSPOT_READONLY_TOKEN}`, ...(body ? { 'Content-Type': 'application/json' } : {}) },
       body: body ? JSON.stringify(body) : undefined,
-    });
+    }, sent: [] }, recipientCtx(env));
     if (res.status === 429 && attempt === 0) { await sleep(Number(env.HUBSPOT_PAUSE_MS ?? 1000)); continue; }
     if (!res.ok) throw Object.assign(new Error(`hubspot ${label}: HTTP ${res.status}`), { status: res.status });
     return res.json();

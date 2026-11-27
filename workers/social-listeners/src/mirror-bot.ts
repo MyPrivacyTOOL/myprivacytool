@@ -2,16 +2,25 @@
 // Flow: "MIRROR" -> consent request -> "MIRROR YES" -> public profile scan -> educational mirror DM.
 // Retention: none. The consent step is stateless (the explicit "MIRROR YES" message is the consent), the scan result lives
 // only in memory for the length of one request, and logs carry event names only (no handles, ids or profile content).
+import { callRecipient } from "../../../shared/recipients/outbound";
 import type { Logger } from "./logger";
-import { type Env, pick } from "./shared";
+import { type Env, pick, recipientCtx } from "./shared";
+import type { DataItem } from "../../../shared/recipients/registry";
 import { getUserAccessToken } from "./x-oauth";
 import { uploadDmVideo } from "./x-media";
 import { classifyTheme, recordXDm } from "./funnel";
-import { eraseContact, touchContact } from "./social";
+import { type EventOrigin, eraseContact, touchContact } from "./social";
+import { cleanData, eventTime, userFields } from "./x-hexagons";
+import { emailGuessOn, guessFromProfile, sealGuess } from "../../../shared/email-guess";
 
 // Tagging convention for channel bots (MPC-7641): utm_source=<platform>&utm_medium=channel_osint&utm_campaign=bot_reply.
 // Short link (public/x.html): clean in the DM, shows a preview card, then forwards to /scan with the same utm tracking.
 const SCAN_URL = "https://myprivacytool.io/x";
+// MPC-11111 (the magic guess, off by default): when the person's own public bio holds exactly one email address, the Mirror's bridge link goes straight to /scan
+// with the same utm tags /x adds, plus a sealed token in the URL FRAGMENT (never sent to any server) that lets the page offer that address back. See shared/email-guess.ts.
+const GUESS_SCAN_URL = "https://myprivacytool.io/scan?utm_source=x&utm_medium=channel_osint&utm_campaign=bot_reply";
+// DRAFT wording, needs Chris's approval before EMAIL_GUESS_ENABLED is turned on (PR checklist: copy change).
+export const GUESS_NOTICE = "I noticed an email address in your public bio. When you open the link, I'll offer it back to you for the scan so you don't have to type it. I don't store it.";
 const X_API = "https://api.x.com/2";
 const X_TIMEOUT_MS = 5000;
 
@@ -47,6 +56,8 @@ export interface MirrorDm {
   command: Exclude<MirrorCommand, null>;
   /** True for a bare Y/N: not yet known to answer our consent request, check with isConsentPending before acting. */
   bare?: true;
+  /** Platform event id, time and hexagon values for the record (CK-8502). */
+  origin?: EventOrigin;
 }
 
 const MAX_DEPTH = 8;
@@ -72,32 +83,41 @@ function dmFields(o: unknown): { sender: string; text: string } | null {
  */
 export function extractMirrorDms(payload: unknown): MirrorDm[] {
   const out: MirrorDm[] = [];
-  for (const { senderId, text } of extractDms(payload)) {
+  for (const { senderId, text, origin } of extractDms(payload)) {
     const command = parseMirrorCommand(text);
     const bare = command ? null : parseBareReply(text);
-    if (command) out.push({ senderId, text, command });
-    else if (bare) out.push({ senderId, text, command: bare, bare: true });
+    if (command) out.push({ senderId, text, command, origin });
+    else if (bare) out.push({ senderId, text, command: bare, bare: true, origin });
   }
   return out;
 }
 
 /** Every inbound DM (any text) in an X webhook payload, own echoes excluded, duplicates collapsed. */
-export function extractDms(payload: unknown): { senderId: string; text: string }[] {
+export function extractDms(payload: unknown): { senderId: string; text: string; origin?: EventOrigin }[] {
   const self = selfId(payload);
-  const out: { senderId: string; text: string }[] = [];
+  const out: { senderId: string; text: string; origin?: EventOrigin }[] = [];
   const seen = new Set<string>();
-  const walk = (node: unknown, depth: number) => {
+  const walk = (node: unknown, depth: number, parent?: unknown) => {
     if (!node || typeof node !== "object" || depth > MAX_DEPTH) return;
-    if (Array.isArray(node)) return node.forEach((n) => walk(n, depth + 1));
+    if (Array.isArray(node)) return node.forEach((n) => walk(n, depth + 1, parent));
     const f = dmFields(node);
     if (f && f.sender !== self && f.text.trim()) {
       const key = `${f.sender}|${f.text}`;
       if (!seen.has(key)) {
         seen.add(key);
-        out.push({ senderId: f.sender, text: f.text });
+        const ev = pick(parent, "type") === "message_create" ? parent : undefined;
+        const id = pick(ev, "id"), created = Number(pick(ev, "created_timestamp"));
+        const at = Number.isFinite(created) && created > 0 ? created : undefined;
+        out.push({
+          senderId: f.sender, text: f.text,
+          origin: {
+            eventKey: typeof id === "string" || typeof id === "number" ? `dm:${id}` : undefined, occurredAt: at,
+            data: cleanData({ ...userFields(pick(payload, "users", f.sender)), ...eventTime(at), "x.message_text": f.text }),
+          },
+        });
       }
     }
-    for (const v of Object.values(node)) walk(v, depth + 1);
+    for (const v of Object.values(node)) walk(v, depth + 1, node);
   };
   walk(payload, 0);
   return out;
@@ -190,8 +210,23 @@ export const ERROR_MESSAGE =
 
 const yesNo = (b: boolean) => (b ? "visible" : "not set");
 
-/** Builds the educational mirror text from public profile fields only. Pure: no I/O. */
-export function buildMirrorMessage(p: XProfile): string {
+/**
+ * The bridge link for one Mirror DM. Normally the plain /x short link. With the magic guess ON (EMAIL_GUESS_ENABLED "true" and a key) and exactly one email address
+ * in the person's own public bio, a link to /scan carrying the sealed guess in its fragment. Never throws: any problem means the plain link.
+ */
+export async function bridgeFor(env: Env, p: XProfile): Promise<{ url: string; notice?: string }> {
+  try {
+    if (!emailGuessOn(env)) return { url: SCAN_URL };
+    const guess = guessFromProfile({ bio: p.description });
+    const token = guess ? await sealGuess(env.EMAIL_GUESS_KEY, guess, "x") : null;
+    return token ? { url: `${GUESS_SCAN_URL}#g=${token}`, notice: GUESS_NOTICE } : { url: SCAN_URL };
+  } catch {
+    return { url: SCAN_URL };
+  }
+}
+
+/** Builds the educational mirror text from public profile fields only. Pure: no I/O. `bridge` is only set when the magic guess is on and found an address. */
+export function buildMirrorMessage(p: XProfile, bridge: { url?: string; notice?: string } = {}): string {
   const visible: string[] = [];
   if (p.description) visible.push(`• Bio: "${p.description.slice(0, 160)}" (may reveal job, location, interests)`);
   else visible.push(`• Bio: ${yesNo(false)}`);
@@ -212,22 +247,27 @@ export function buildMirrorMessage(p: XProfile): string {
     `${head}\n\nWhat anyone can see:\n${visible.join("\n")}\n\n` +
     "What stays protected (I never saw it): your DMs, email address, phone number, IP address, login history and who you message.\n\n" +
     "Why it matters: combining small public details is how people get profiled, doxxed or targeted by scams.\n\n" +
-    `Next step: run a free full scan at ${SCAN_URL}\n\n` +
+    `Next step: run a free full scan at ${bridge.url ?? SCAN_URL}\n\n` +
+    (bridge.notice ? `${bridge.notice}\n\n` : "") +
     "I stored nothing from this scan. Your data was discarded when this message was sent."
   );
 }
 
-async function xFetch(env: Env, path: string, init: RequestInit & { token: string }): Promise<Response> {
+async function xFetch(env: Env, path: string, init: RequestInit & { token: string }, sent: readonly DataItem[]): Promise<Response> {
   const { token, ...rest } = init;
   const ctl = new AbortController();
   const timer = setTimeout(() => ctl.abort(), X_TIMEOUT_MS);
   try {
-    return await fetch(`${X_API}${path}`, {
-      ...rest,
-      // A FormData body (media upload) needs the runtime to set its own multipart Content-Type.
-      headers: { Authorization: `Bearer ${token}`, ...(rest.body instanceof FormData ? {} : { "Content-Type": "application/json" }), ...(rest.headers ?? {}) },
-      signal: ctl.signal,
-    });
+    return await callRecipient("x-api", {
+      url: `${X_API}${path}`,
+      init: {
+        ...rest,
+        // A FormData body (media upload) needs the runtime to set its own multipart Content-Type.
+        headers: { Authorization: `Bearer ${token}`, ...(rest.body instanceof FormData ? {} : { "Content-Type": "application/json" }), ...(rest.headers ?? {}) },
+        signal: ctl.signal,
+      },
+      sent, // declared by the caller: a lookup sends the user id, a DM also sends its text, a media chunk sends neither
+    }, recipientCtx(env));
   } finally {
     clearTimeout(timer);
   }
@@ -237,7 +277,7 @@ async function xFetch(env: Env, path: string, init: RequestInit & { token: strin
 export async function fetchPublicProfile(env: Env, userId: string): Promise<XProfile | null> {
   if (!env.X_BEARER_TOKEN || !/^\d+$/.test(userId)) return null;
   const fields = "name,username,description,location,url,created_at,protected,verified,profile_image_url,pinned_tweet_id,public_metrics";
-  const res = await xFetch(env, `/users/${userId}?user.fields=${fields}`, { method: "GET", token: env.X_BEARER_TOKEN });
+  const res = await xFetch(env, `/users/${userId}?user.fields=${fields}`, { method: "GET", token: env.X_BEARER_TOKEN }, ["username"]);
   if (!res.ok) return null;
   return ((await res.json()) as { data?: XProfile }).data ?? null;
 }
@@ -246,7 +286,7 @@ export async function fetchPublicProfile(env: Env, userId: string): Promise<XPro
 export async function fetchUsername(env: Env, userId: string): Promise<string | undefined> {
   if (!/^\d+$/.test(userId) || !env.X_BEARER_TOKEN) return undefined;
   try {
-    const res = await xFetch(env, `/users/${userId}?user.fields=username`, { method: "GET", token: env.X_BEARER_TOKEN });
+    const res = await xFetch(env, `/users/${userId}?user.fields=username`, { method: "GET", token: env.X_BEARER_TOKEN }, ["username"]);
     const u = res.ok ? ((await res.json()) as { data?: { username?: unknown } }).data?.username : undefined;
     return typeof u === "string" && /^\w{1,15}$/.test(u) ? u : undefined;
   } catch {
@@ -255,11 +295,11 @@ export async function fetchUsername(env: Env, userId: string): Promise<string | 
 }
 
 /** Calls X with the user-context token. Refreshes the token and retries once on 401. Null when no token can be had. */
-async function xUser(env: Env, log: Logger, path: string, init: RequestInit): Promise<Response | null> {
+async function xUser(env: Env, log: Logger, path: string, init: RequestInit, sent: readonly DataItem[]): Promise<Response | null> {
   for (const force of [false, true]) {
     const token = await getUserAccessToken(env, log, force);
     if (!token) return null;
-    const res = await xFetch(env, path, { ...init, token });
+    const res = await xFetch(env, path, { ...init, token }, sent);
     if (res.status !== 401) return res;
   }
   return null;
@@ -269,7 +309,7 @@ async function xUser(env: Env, log: Logger, path: string, init: RequestInit): Pr
 export async function fetchFollowsUs(env: Env, userId: string, log: Logger): Promise<boolean | null> {
   if (!/^\d+$/.test(userId)) return null;
   try {
-    const res = await xUser(env, log, `/users/${userId}?user.fields=connection_status`, { method: "GET" });
+    const res = await xUser(env, log, `/users/${userId}?user.fields=connection_status`, { method: "GET" }, ["username"]);
     if (!res?.ok) return null;
     const cs = ((await res.json()) as { data?: { connection_status?: unknown } }).data?.connection_status;
     return Array.isArray(cs) ? cs.includes("followed_by") : null;
@@ -279,9 +319,9 @@ export async function fetchFollowsUs(env: Env, userId: string, log: Logger): Pro
 }
 
 /** Notes the activity in the CRM feed after the reply is out (so it never delays the reply). */
-async function noteContact(env: Env, senderId: string, handle: string | undefined, event: "dm" | "mirror_consent", log: Logger): Promise<void> {
+async function noteContact(env: Env, senderId: string, handle: string | undefined, event: "dm" | "mirror_consent", log: Logger, origin?: EventOrigin): Promise<void> {
   if (!env.SUPABASE_URL || !env.SUPABASE_KEY) return;
-  await touchContact(env, senderId, handle, event, log, await fetchFollowsUs(env, senderId, log));
+  await touchContact(env, senderId, handle, event, log, await fetchFollowsUs(env, senderId, log), origin);
 }
 
 /**
@@ -295,14 +335,14 @@ export async function sendXDm(env: Env, recipientId: string, text: string, log?:
   if (opts.video) {
     // An animated GIF autoplays and loops in the DM; if X refuses it, the same clip goes as a normal video, then as text alone.
     for (const category of ["dm_gif", "dm_video"] as const) {
-      const mediaId = await uploadDmVideo(env, quiet, (p, init) => xUser(env, quiet, p, init), category);
+      const mediaId = await uploadDmVideo(env, quiet, (p, init) => xUser(env, quiet, p, init, []), category);
       if (!mediaId) continue;
-      const withVideo = await xUser(env, quiet, path, { method: "POST", body: JSON.stringify({ text, attachments: [{ media_id: mediaId }] }) });
+      const withVideo = await xUser(env, quiet, path, { method: "POST", body: JSON.stringify({ text, attachments: [{ media_id: mediaId }] }) }, ["message_text", "username"]);
       if (withVideo?.ok) return true;
       quiet.warn("x_dm_video_rejected", { status: withVideo?.status ?? 0, category });
     }
   }
-  const res = await xUser(env, quiet, path, { method: "POST", body: JSON.stringify({ text }) });
+  const res = await xUser(env, quiet, path, { method: "POST", body: JSON.stringify({ text }) }, ["message_text", "username"]);
   return Boolean(res?.ok);
 }
 
@@ -334,7 +374,7 @@ export async function isConsentPending(env: Env, senderId: string, selfId: strin
   if (!/^\d+$/.test(senderId) || !selfId) return false;
   if (!(await allowed(env, senderId, log))) return false;
   try {
-    const res = await xUser(env, log, `/dm_conversations/with/${senderId}/dm_events?max_results=5&event_types=MessageCreate&dm_event.fields=created_at,sender_id,text`, { method: "GET" });
+    const res = await xUser(env, log, `/dm_conversations/with/${senderId}/dm_events?max_results=5&event_types=MessageCreate&dm_event.fields=created_at,sender_id,text`, { method: "GET" }, ["username"]);
     if (!res?.ok) return false;
     const events = ((await res.json()) as { data?: { sender_id?: string; text?: string; created_at?: string }[] }).data ?? [];
     const mine = events.find((e) => String(e.sender_id) === selfId); // X lists newest first
@@ -353,7 +393,7 @@ export async function handleMirrorDm(env: Env, dm: MirrorDm, log: Logger): Promi
       await recordXDm(env, "help", "x.mirror.request", log);
       const handle = await fetchUsername(env, dm.senderId);
       await sendXDm(env, dm.senderId, branded(handle, CONSENT_MESSAGE), log);
-      await noteContact(env, dm.senderId, handle, "dm", log);
+      await noteContact(env, dm.senderId, handle, "dm", log, dm.origin);
       return;
     }
     if (dm.command === "decline") {
@@ -361,7 +401,7 @@ export async function handleMirrorDm(env: Env, dm: MirrorDm, log: Logger): Promi
       await recordXDm(env, "help", "x.mirror.decline", log);
       const handle = await fetchUsername(env, dm.senderId);
       await sendXDm(env, dm.senderId, branded(handle, DECLINE_MESSAGE), log);
-      await noteContact(env, dm.senderId, handle, "dm", log);
+      await noteContact(env, dm.senderId, handle, "dm", log, dm.origin);
       return;
     }
     log.info("mirror_consent_granted");
@@ -373,16 +413,17 @@ export async function handleMirrorDm(env: Env, dm: MirrorDm, log: Logger): Promi
       return;
     }
     log.info("mirror_scan_complete");
-    const sent = await sendXDm(env, dm.senderId, branded(profile.username, "Thank you for saying yes.\n\n" + buildMirrorMessage(profile) + `\n\n${FOLLOW_LINE}`), log, { video: true });
+    const bridge = await bridgeFor(env, profile);   // MPC-11111: the plain /x link unless the magic guess is on and the bio holds one address
+    const sent = await sendXDm(env, dm.senderId, branded(profile.username, "Thank you for saying yes.\n\n" + buildMirrorMessage(profile, bridge) + `\n\n${FOLLOW_LINE}`), log, { video: true });
     log.info(sent ? "mirror_delivered" : "mirror_delivery_failed");
-    await noteContact(env, dm.senderId, profile.username, "mirror_consent", log);
+    await noteContact(env, dm.senderId, profile.username, "mirror_consent", log, dm.origin);
   } catch (err) {
     log.error("mirror_failed", { error: err instanceof Error ? err.name : "unknown" });
   }
 }
 
 /** Replies to a DM that is not a Mirror command. Same per-sender / global limits as Mirror, so it cannot be used to flood. */
-export async function handleOrdinaryDm(env: Env, dm: { senderId: string; text?: string }, log: Logger): Promise<void> {
+export async function handleOrdinaryDm(env: Env, dm: { senderId: string; text?: string; origin?: EventOrigin }, log: Logger): Promise<void> {
   if (!(await allowed(env, dm.senderId, log))) return;
   const choice = dm.text?.trim().replace(/[.!)]$/, "");
   const reply = choice && /^[123]$/.test(choice) ? INTENT_REPLIES[choice] : undefined;
@@ -391,7 +432,7 @@ export async function handleOrdinaryDm(env: Env, dm: { senderId: string; text?: 
   const username = await fetchUsername(env, dm.senderId);
   const sent = await sendXDm(env, dm.senderId, reply ? branded(username, reply) : branded(username, WELCOME_BODY), log, { video: true });
   log.info(sent ? "welcome_sent" : "welcome_failed");
-  await noteContact(env, dm.senderId, username, "dm", log);
+  await noteContact(env, dm.senderId, username, "dm", log, dm.origin);
 }
 
 /** "Delete my data": removes the person from the CRM feed and says so. Rate limited like every DM we answer. */

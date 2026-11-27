@@ -32,6 +32,7 @@ function fake({ resendFail = false } = {}) {
       if (u.pro_months_earned < 12) { u.pro_months_earned++; r.rewarded_at = 'now'; return res(200, [{ referrer_user_id: u.id, rewarded: true, pro_months_earned: u.pro_months_earned }]); }
       return res(200, [{ referrer_user_id: u.id, rewarded: false, pro_months_earned: u.pro_months_earned }]);
     }
+    if (url.includes('/rest/v1/rpc/')) return res(404, { code: 'PGRST202' });   // like PostgREST for a function that does not exist (CK-8503: handleScan then falls back to check-then-insert)
     const m = url.match(/rest\/v1\/(\w+)(\?.*)?$/); const t = m[1]; const q = new URLSearchParams(m[2] || '');
     if (method === 'POST') {
       const row = { id: `id${++n}`, created_at: new Date().toISOString(), pro_months_earned: 0, ...JSON.parse(o.body) };
@@ -217,7 +218,7 @@ const mk = async (F, extra = {}) => { const u = user(F, 'me@example.com', { refe
 {
   const F = fake(); const ref = user(F, 'ref@example.com', { referral_code: 'ABCDEFGH' });
   globalThis.fetch = F.f; const w = [];
-  const rs = await worker.fetch(req('/api/scan', { email: 'new.friend@example.com', consent: true, ref: 'abcdefgh' }), { ...ON, SUPABASE_URL: 'https://x' }, { waitUntil: (p) => w.push(p) }); await Promise.all(w);
+  const rs = await worker.fetch(req('/api/scan', { email: 'new.friend@example.com', consent: true, ref: 'abcdefgh' }), { ...ON, SUPABASE_URL: 'https://x.supabase.co' }, { waitUntil: (p) => w.push(p) }); await Promise.all(w);
   check(rs.status === 200 && F.db.referrals.length === 1 && F.db.referrals[0].referrer_user_id === ref.id && F.db.referrals[0].status === 'signed_up', 'POST /api/scan with ref (any case): a new friend is linked to the referrer');
   const G = fake(); user(G, 'ref@example.com', { referral_code: 'ABCDEFGH' }); globalThis.fetch = G.f;
   await worker.fetch(req('/api/scan', { email: 'new.friend@example.com', consent: true, ref: 'ABCDEFGH' }), { ...ON, REFERRALS_ENABLED: 'false' }, { waitUntil: (p) => w.push(p) }); await Promise.all(w);

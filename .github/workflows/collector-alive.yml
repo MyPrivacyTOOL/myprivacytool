@@ -1,0 +1,30 @@
+name: Collector alive check
+
+# MPC-7557: the nightly-test Slack alert is raised by the metrics collector Worker, so it cannot report that the collector itself has died (it stored nothing from
+# 2026-10-27 to 2026-11-02 and nobody was told). This check does not depend on the collector: it reads the newest collector row from the database and turns this run
+# RED when it is older than 26 hours (GitHub then emails the repository watchers). Read-only, one row, counts and ages only. Script and tests: scripts/collector-alive/.
+# 18:00 UTC is 1h45 after the collector's 16:15 UTC run. Exit 2 = credentials missing = also red; a missing check is never a pass.
+
+on:
+  schedule:
+    - cron: '0 18 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  alive:
+    name: Collector alive
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL || 'https://xmdmkumwxpgahmlweuug.supabase.co' }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.NEW_SUPABASE_SECRET_KEY || secrets.SCAN_REPORT_SUPABASE_SERVICE_ROLE_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Newest collector row is fresh
+        run: node scripts/collector-alive/check.mjs

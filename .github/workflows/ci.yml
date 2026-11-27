@@ -39,6 +39,8 @@ jobs:
         run: npm run test:coverage
       - name: Existing node:test suites (github-channel, oauth-poc, mpt-leads, scan-report)
         run: npm run test:workers:node
+      - name: Metrics collector deploy-gate tests (same script the deploy workflow runs)
+        run: npm run test:workers:metrics
       - name: Coverage summary
         if: always()
         run: |
@@ -128,7 +130,7 @@ jobs:
       - name: Apply bootstrap + the proposed support schema
         run: |
           psql -X -v ON_ERROR_STOP=1 "$PGURL" -f supabase/tests/bootstrap.sql
-          psql -X -v ON_ERROR_STOP=1 "$PGURL" -f supabase/migrations/20261027140000_mpc_8528_support_cases.sql
+          psql -X -v ON_ERROR_STOP=1 "$PGURL" -f supabase/migrations_archive/20261027140000_mpc_8528_support_cases.sql
           psql -X -v ON_ERROR_STOP=1 "$PGURL" -c "create role authenticator login noinherit password 'ci-auth'" -c "grant anon, authenticated, service_role to authenticator"
       - name: Start PostgREST
         run: |
@@ -169,6 +171,15 @@ jobs:
           VITE_SAVE_WEB_SCANS: "true"
           # CK-8494: the re-check journey is build-only and OFF in production; this CI build turns it on so e2e/recheck-trace.spec.ts can exercise it.
           VITE_RECHECK_JOURNEY: "true"
+          # The full-screen device reveal is ON in production. Most E2E specs load "/" and would be covered by it, so this CI build turns it
+          # off; e2e/device-reveal.spec.ts opens it with ?view=device.
+          VITE_DEVICE_HERO: "false"
+          # MPC-10790: production has the Deep Research email form on; the registry crawl visits /deep-research and asserts Turnstile does not load until the click.
+          VITE_DEEP_RESEARCH: "true"
+          # MPC-10790 follow-up: a DUMMY Cloudflare Web Analytics token (never the production one) so loadCfWebAnalytics() does not return early in CI and the
+          # registry crawl can observe static.cloudflareinsights.com. Without it a regression that loaded the beacon before the Scan me click was invisible here.
+          # Nothing leaves the runner: the E2E `net` fixture and the crawl abort every non-localhost request (still recorded by the crawl).
+          VITE_CF_WEB_ANALYTICS_TOKEN: "ci-dummy-token"
         run: npm run build
       - name: Verify build output
         run: |
@@ -252,10 +263,104 @@ jobs:
         run: |
           node scripts/ci/check-env.mjs --worker workers/mpt-leads --worker workers/oauth-poc --worker workers/scan-report --worker workers/mirror-risk --worker workers/partner-api
 
+  registry-scan:
+    # MPC-9884 (Open Tracker design 1.4) layers 1 and 3, BLOCKING: no outbound host outside shared/recipients/recipients.json.
+    #  - Layer 1: TypeScript-compiler-API scan of src/ functions/ workers/ shared/ index.html public/ + CSS for unregistered URL literals,
+    #    fetch/XMLHttpRequest/WebSocket/EventSource/sendBeacon/RTCPeerConnection/importScripts outside shared/recipients/outbound.*, and wrapper
+    #    calls without a literal registry key. Existing findings are in shared/recipients/ci-allowlist.json (each "pending MPC-9885/9886"); the list is a
+    #    ratchet: a new finding fails, and so does an entry whose call site is gone (delete it).
+    #  - Layer 3: the Worker/Function fetch spy (shared/recipients/fetch-spy.ts) and the scanner's own tests.
+    name: Registry scan + fetch spy (outbound hosts)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Layer 1 - static scan against the registry and allowlist
+        run: node scripts/registry-ci/check.mjs static
+      - name: Visit-log isolation (MPC-9889, rule 3)
+        run: node scripts/ci/check-visit-log-isolation.mjs
+      - name: Learning aggregate SQL lint (MPC-9892, no per-scan inserts, fixed columns)
+        run: node scripts/ci/check-learning-aggregate-sql.mjs
+      - name: Layer 3 - fetch spy + scanner tests
+        run: npx vitest run shared/recipients scripts/registry-ci
+
+  registry-crawl:
+    # MPC-9884 layer 2, BLOCKING: crawl of the built site (every sitemap route pre-click, then the scan action post-click) with a patched
+    # RTCPeerConnection recording iceServers. Fails on an unregistered host, a non-first-party host pre-click (Turnstile excepted), or an enabled:false host.
+    name: Registry crawl of the built site (Playwright)
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Crawl the production build
+        run: npm run test:registry-crawl
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: registry-crawl
+          path: test-results/registry-crawl.json
+          if-no-files-found: ignore
+          retention-days: 7
+
+  registry-hygiene:
+    # MPC-9884 layer 4: schema valid, registry hash reproduces the Supabase seed, allowlist entries no older than 14 days (all FAIL);
+    # DPA.tsx lists every dpa_listed entry and every enabled entry has a call site (WARNINGS until MPC-9894 / MPC-9885-6 land).
+    # The live table-vs-file hash compare needs credentials this workflow does not have: it runs nightly in sync-recipients.yml.
+    name: Registry hygiene
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: node scripts/registry-ci/check.mjs hygiene
+
+  build-node18:
+    # MPC-9894 follow-up: Cloudflare Pages builds production on Node 18 (its build log said v18.20.8). A `prebuild` step that imports .ts modules
+    # passed here on Node 22 and then failed every Pages deploy for two days. This job runs the same `npm run build` (prebuild, vite, postbuild) on
+    # the Pages Node version so that cannot merge again. Keep the version in step with the Pages project's build image.
+    name: Production build on the Pages Node version (18)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 18.20.8
+          cache: npm
+      - run: npm ci
+      - name: Build exactly as Cloudflare Pages does
+        run: npm run build
+      - name: Verify build output
+        run: |
+          for f in dist/index.html dist/privacy.html dist/sitemap.xml; do
+            [ -s "$f" ] || { echo "::error::$f missing or empty"; exit 1; }
+          done
+
   ci-gate:
     name: CI gate
     if: always()
-    needs: [unit, lint, db, support-rest, build, pages-functions, e2e, pipeline-guards]
+    needs: [unit, lint, db, support-rest, build, build-node18, pages-functions, e2e, pipeline-guards, registry-scan, registry-crawl, registry-hygiene]
     runs-on: ubuntu-latest
     steps:
       - name: Require every job to have succeeded

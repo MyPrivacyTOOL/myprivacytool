@@ -1,0 +1,61 @@
+// MPC-9813: pure checks for the automated live check of the email confirm gate and the "show us your listing" check. No network, no secrets.
+// The canonical address: Cloudflare Pages redirects the same page's ".html" address (308), so the check pastes the address that answers 200 directly.
+export const FIXTURE_URL = 'https://www.myprivacytool.io/test-fixtures/listing-synthetic';
+export const IDENTITY = { full_name: 'Zelda Quillfeather', city_region: 'Austin, TX', country: 'US', phone: '5125550142' };   // invented person
+
+/** The POST /api/scan body: the nightly chain's synthetic scan plus the typed details and the pasted page. */
+export function f1Body(email, hexagons) {
+  return {
+    email, consent: true, consent_source: 'synthetic_f1', scan: hexagons, save_consent: true, save_consent_version: '2026-10-12-v1', started_ms: 1000,
+    utm_source: 'synthetic', utm_medium: 'f1-live-check', utm_campaign: 'mpc-9813', 'cf-turnstile-response': 'XXXX.DUMMY.TOKEN.XXXX',
+    listing: { ...IDENTITY, urls: [FIXTURE_URL] },
+  };
+}
+
+/** Problems with the confirmation email as sent (empty list = fine). */
+/** The confirm link as the Worker writes it: the site's /scan/live page, with the email's UTM tags (added by the sender before the fragment), then #v=<scan>.<expiry>.<signature>. */
+export const CONFIRM_LINK_RE = /https:\/\/[^\s#?]+\/scan\/live(\?[^\s#]*)?#v=[0-9a-f-]{36}\.\d{10,15}\.[A-Za-z0-9_-]+/;
+
+/** Hosts of the https links in a text, for a failure message that says what was actually there (no paths, no tokens). */
+export function linkHosts(text) {
+  return [...new Set((String(text || '').match(/https:\/\/[^\s\/"'<>]+/g) || []).map((u) => u.slice(8)))].slice(0, 6);
+}
+
+/** Problems with the click-to-confirm email as the provider returns it (subject, plain text, HTML). */
+export function checkConfirmationEmail({ subject, text, html }) {
+  const p = [];
+  if (!/Confirm your email/i.test(subject || '')) p.push(`subject is not the click-to-confirm one: "${String(subject).slice(0, 80)}"`);
+  if (!/We only check details you.ve confirmed are yours/.test(text || '')) p.push('plain text lacks the honest sentence');
+  if (!/Confirm this is my email/.test(html || '')) p.push('HTML lacks the "Confirm this is my email" button');
+  if (!CONFIRM_LINK_RE.test(text || '')) p.push(`plain text lacks the signed confirm link (links in the text point at: ${linkHosts(text).join(', ') || 'none'})`);
+  return p;
+}
+
+/** Problems with the stored per-page result for the fixture page. */
+export function checkStoredResult(results) {
+  const p = [];
+  if (!Array.isArray(results) || results.length !== 1) return [`expected 1 stored result, got ${Array.isArray(results) ? results.length : 'none'}`];
+  const r = results[0];
+  if (r.state !== 'listed') p.push(`state is "${r.state}", expected "listed" (reason: ${r.not_checked_reason || 'none'}, note: ${r.note || 'none'})`);
+  if (r.match !== 'exact' || r.confidence !== 'high' || r.is_guess !== false) p.push(`match/confidence/is_guess = ${r.match}/${r.confidence}/${r.is_guess}, expected exact/high/false`);
+  if (r.evidence_url !== FIXTURE_URL) p.push('evidence_url is not the pasted page');
+  if (!r.source || r.source.class !== 'free' || r.source.provider !== 'user_supplied_page' || !r.source.checked_at) p.push('source is not {class: free, provider: user_supplied_page, checked_at}');
+  const rest = JSON.stringify({ ...r, evidence_url: undefined });
+  if (/Quillfeather|Austin|78701|555/.test(rest)) p.push('the stored result contains page text or the typed details');
+  return p;
+}
+
+/** Problems with the report email as sent (text + html). */
+export function checkReportBlock({ text, html }) {
+  const p = [];
+  // MPC-9814 renamed the block: the pasted page now sits inside the "Broker sites" section of the report. A report sent by the previous Worker
+  // ("Listings you showed us") is still accepted, so a run that straddles the deploy is judged on what that report was.
+  const t = text || '', h = html || '';
+  const newBlock = /BROKER SITES/.test(t), oldBlock = /LISTINGS YOU SHOWED US/.test(t);
+  if (!newBlock && !oldBlock) p.push('report text lacks "BROKER SITES" (or the earlier "LISTINGS YOU SHOWED US")');
+  if (!(newBlock ? /: LISTED\n\s+We found a listing that matches what you told us/ : /LISTED, a match for the details you gave/).test(t)) p.push('report text lacks the Listed state line');
+  if (!t.includes(FIXTURE_URL)) p.push('report text lacks the evidence page link');
+  if (!(newBlock ? /Broker sites/ : /Listings you showed us/).test(h)) p.push('report HTML lacks the broker block');
+  if (/NOT LISTED/.test(t)) p.push('report says NOT LISTED for a page that lists the identity');
+  return p;
+}

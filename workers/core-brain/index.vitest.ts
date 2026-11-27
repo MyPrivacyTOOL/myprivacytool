@@ -2,6 +2,10 @@
 // MPC-8601: core-brain webhook. Qwen and Supabase are stubbed through global fetch; no network.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import worker from "./index";
+import { createFetchSpy } from "../../shared/recipients/fetch-spy";
+import recipientsData from "../../shared/recipients/recipients.data.js";
+import { parseRegistry } from "../../shared/recipients/registry";
+import { setBundledRegistryForTests } from "../../shared/recipients/outbound";
 
 const env = {
   SUPABASE_URL: "https://proj.supabase.co",
@@ -12,10 +16,10 @@ const env = {
 
 /** The response fields these tests read. */
 type Reply = { error?: { code?: string }; locale?: string; message_keys?: string[]; response_key?: string; state_source?: string };
-type Stub = { qwen?: unknown; state?: unknown; qwenFail?: boolean; stateFail?: boolean; rpcFail?: "http" | "throw" };
+type Stub = { qwen?: unknown; state?: unknown; qwenHang?: boolean; qwenFail?: boolean; stateFail?: boolean; rpcFail?: "http" | "throw" };
 let calls: { url: string; init?: RequestInit }[] = [];
 
-function stub({ qwen, state = [], qwenFail, stateFail, rpcFail }: Stub) {
+function stub({ qwen, state = [], qwenHang, qwenFail, stateFail, rpcFail }: Stub) {
   calls = [];
   vi.stubGlobal("fetch", async (url: string, init?: RequestInit) => {
     calls.push({ url: String(url), init });
@@ -25,6 +29,8 @@ function stub({ qwen, state = [], qwenFail, stateFail, rpcFail }: Stub) {
       return Response.json({ state: "ok", trust_level: 0, persisted: true });
     }
     if (String(url).includes("/chat/completions")) {
+      // Never answers; ends only when the Worker's timeout aborts the request, like a stalled outside service.
+      if (qwenHang) return new Promise<Response>((_, reject) => init?.signal?.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError"))));
       if (qwenFail) return new Response("boom", { status: 500 });
       return Response.json({ choices: [{ message: { content: JSON.stringify(qwen) } }] });
     }
@@ -90,7 +96,11 @@ describe("intent -> response key", () => {
     expect(r.status).toBe(200);
     expect(r.body).toMatchObject({ intent: "scan", intent_source: "qwen", trust_level: 0, state_source: "anonymous", locale: "en" });
     expect(r.body.response_key).toBe("bot.first_hexagon.title");
-    expect(r.body.message_keys).toHaveLength(10);
+    expect(r.body.message_keys).toHaveLength(11);
+    // Owner rule 2026-10-29 (19 or over only): the age line comes right before the Y/N prompts, so the Y is also the age declaration.
+    const keys = r.body.message_keys as string[];
+    expect(keys.indexOf("bot.first_hexagon.age")).toBe(keys.indexOf("bot.first_hexagon.reply_y") - 1);
+    expect(keys.indexOf("bot.first_hexagon.age")).toBeGreaterThan(keys.indexOf("bot.first_hexagon.question"));
   });
 
   it("scan for a trusted user (conversation_states.trust_level) goes to the report CTA", async () => {
@@ -153,6 +163,27 @@ describe("intent -> response key", () => {
     expect(r.body).toMatchObject({ intent: "scan", locale: "ja" });
     expect(new URL(calls.find((c) => c.url.includes("conversation_states"))!.url).searchParams.get("sender_id")).toBe("eq.7");
   });
+
+  // MPC-10053 (re-scoped, build-and-test): the literal Telegram commands answer without error. Rules only (no Qwen key), test sender id, no network.
+  it("answers the literal /start, /help and /scan commands (and /start@Bot, /start scan) with the right keys and never errors", async () => {
+    const noQwen = { ...env, QWEN_API_KEY: undefined };
+    const cases: [string, string, string][] = [
+      ["/start", "scan", "bot.first_hexagon.title"],
+      ["/start scan", "scan", "bot.first_hexagon.title"],
+      ["/start@MyPrivacyTOOL_Bot", "scan", "bot.first_hexagon.title"],
+      ["/scan", "scan", "bot.first_hexagon.title"],
+      ["/help", "help", "bot.unknown.title"],
+      ["/help@MyPrivacyTOOL_Bot", "help", "bot.unknown.title"],
+    ];
+    for (const [text, intent, key] of cases) {
+      stub({});
+      const r = await post({ message: { chat: { id: 9001 }, text, entities: [{ offset: 0, length: text.split(" ")[0].length, type: "bot_command" }], from: { id: 9001, is_bot: false, language_code: "en" } } }, undefined, noQwen);
+      expect(r.status, text).toBe(200);
+      expect(r.body, text).toMatchObject({ intent, intent_source: "rules", response_key: key });
+      expect(r.body.error, text).toBeUndefined();
+    }
+    expect(calls.some((c) => c.url.includes("/chat/completions"))).toBe(false);
+  });
 });
 
 describe("degradation and privacy", () => {
@@ -163,6 +194,20 @@ describe("degradation and privacy", () => {
     expect((await post(msg("scan me"))).body).toMatchObject({ intent: "scan", intent_source: "rules" });
     stub({ qwen: { intent: "bogus", confidence: 1 } });
     expect((await post(msg("help please"))).body).toMatchObject({ intent: "help", intent_source: "rules" });
+  });
+
+  it("a Qwen call that never answers is abandoned within 2 s and the rules classifier answers", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    try {
+      stub({ qwenHang: true });
+      const pending = post(msg("scan me"));
+      await vi.advanceTimersByTimeAsync(2000);
+      const r = await pending;
+      expect(r.status).toBe(200);
+      expect(r.body).toMatchObject({ intent: "scan", intent_source: "rules" });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("works without a Qwen key: rules classify, and Qwen is never called", async () => {
@@ -525,5 +570,67 @@ describe("rate limiting (MPC-7257)", () => {
     expect(out).toContain("rate_limited");
     expect(out).not.toContain("sender-777");
     expect(out).not.toContain("my secret text");
+  });
+});
+
+// MPC-9885: every outbound call reaches a registered recipient.
+describe("recipient wrapper (fetch-spy)", () => {
+  it("Qwen and Supabase calls are registered; keys are dashscope and supabase", async () => {
+    const spy = createFetchSpy({ respond: (u) => new Response(u.includes("dashscope") ? JSON.stringify({ choices: [{ message: { content: '{"intent":"scan","confidence":0.9}' } }] }) : "[]", { status: 200 }) });
+    vi.stubGlobal("fetch", spy.fetch);
+    const e = { ...env, QWEN_API_KEY: "q" };
+    await worker.fetch(new Request("https://brain.test/webhook", { method: "POST", headers: { "x-mpt-webhook-secret": e.WEBHOOK_SECRET }, body: JSON.stringify(msg("scan me")) }), e);
+    const keys = new Set(spy.calls.map((c) => (c.host.endsWith(".supabase.co") ? "supabase" : c.recipient)));
+    expect([...keys].sort()).toEqual(["dashscope", "supabase"]);
+    spy.assertAllRegistered();
+  });
+});
+
+// MPC-11111: dm_received, the first stage of the GA4 flow check. Ships off; carries the channel name and nothing else.
+describe("GA4 dm_received (MPC-11111)", () => {
+  const ga4On = { ...env, GA4_SERVER_EVENTS_ENABLED: "true", GA4_API_SECRET: "test-secret-not-real" };
+  const ga4Calls = () => calls.filter((c) => c.url.includes("google-analytics.com"));
+  const enableRegistry = () => {
+    const reg = parseRegistry(JSON.parse(JSON.stringify(recipientsData)));
+    reg.recipients.find((r) => r.key === "ga4-measurement-protocol")!.enabled = true;
+    return setBundledRegistryForTests(reg);
+  };
+  it("sends nothing in the shipped state, even with the env switch and secret set (the registry entry is disabled)", async () => {
+    stub({ qwen: { intent: "scan", confidence: 0.9 } });
+    const r = await post(msg("scan me"), undefined, ga4On);
+    expect(r.status).toBe(200);
+    expect(ga4Calls()).toHaveLength(0);
+  });
+  it("with every gate open sends one dm_received with the channel only: no sender id, no text", async () => {
+    stub({ qwen: { intent: "scan", confidence: 0.9 } });
+    const restore = enableRegistry();
+    try {
+      const r = await post(msg("my secret question about jane@example.com", { platform: "Telegram" }), undefined, ga4On);
+      expect(r.status).toBe(200);
+      const sent = ga4Calls();
+      expect(sent).toHaveLength(1);
+      const wire = String(sent[0].init?.body);
+      const body = JSON.parse(wire);
+      expect(body.events).toEqual([{ name: "dm_received", params: { channel: "telegram" } }]);
+      // The only other field is client_id: 32 random hex chars, so it can contain "42" by chance. Check the fields instead of a substring
+      // of the whole body (the old check failed about 1 run in 9).
+      expect(Object.keys(body).sort()).toEqual(["client_id", "events"]);
+      expect(body.client_id).toMatch(/^[0-9a-f]{32}$/);
+      expect(body.client_id).not.toBe("42");
+      expect(JSON.stringify(body.events)).not.toContain("42"); // the sender id
+      expect(wire).not.toContain("secret question"); // the text
+      expect(wire).not.toContain("jane@");
+    } finally { restore(); }
+  });
+  it("never changes the reply when GA4 fails", async () => {
+    stub({ qwen: { intent: "scan", confidence: 0.9 } });
+    const restore = enableRegistry();
+    try {
+      const failing = vi.fn(async (url: string, init?: RequestInit) => { if (String(url).includes("google-analytics.com")) throw new Error("GA4 down"); return Response.json([]); });
+      vi.stubGlobal("fetch", failing);
+      const r = await post(msg("scan me"), undefined, ga4On);
+      expect(r.status).toBe(200);
+      expect(failing.mock.calls.some((c) => String(c[0]).includes("google-analytics.com"))).toBe(true);
+    } finally { restore(); }
   });
 });

@@ -1,7 +1,9 @@
 // MPC-7471-F3: the post-scan popup asks the SAME report pipeline as /scan (POST /api/scan on the scan-report Worker), with the separate optional save box.
 // Every test stubs fetch: nothing here can reach a real Worker or send an email.
+vi.unmock("@/lib/turnstile");   // MPC-9888: this file drives the real loader through a stubbed window.turnstile
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { act, render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { __resetScanConsentForTests, __seedScanConsentForTests } from "@/lib/scanConsent";
 import userEvent from "@testing-library/user-event";
 import { jsonResponse } from "@/test/render";
 import EmailCaptureModal from "./EmailCaptureModal";
@@ -13,7 +15,7 @@ import type { HexagonData } from "@/lib/deviceDetection";
 
 const SCAN_NUMBER = "0f2b6c1e-8a3d-4e57-9b10-6c2d4f8a1e93";
 const EMAIL = "mpc7471f3+unit@example.com";
-const REPORT_BOX = /email me my results and occasional privacy tips/i;
+const REPORT_BOX = /email me my results and follow-ups about them/i;
 const UUID4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 beforeEach(() => { sessionStorage.clear(); localStorage.clear(); });
@@ -294,6 +296,18 @@ describe("Turnstile", () => {
     await user.click(send());
     expect(await screen.findByRole("alert")).toHaveTextContent("Verifying you are human");
     expect(f).not.toHaveBeenCalled();
+  });
+
+  // MPC-10790: Cloudflare's script follows the Scan me consent; a dialog mounted without it loads nothing, and arms when the consent arrives.
+  it("loads nothing until this journey holds the scan consent, then renders the widget", async () => {
+    const t = stubTurnstile("tok-1");
+    __resetScanConsentForTests();
+    setup();
+    await new Promise((r) => setTimeout(r, 50));
+    expect(t.render).not.toHaveBeenCalled();
+    __seedScanConsentForTests();
+    act(() => { window.dispatchEvent(new Event("mpt:scan-consent")); });
+    await vi.waitFor(() => expect(t.render).toHaveBeenCalledTimes(1));
   });
 
   it("resets the widget after a refusal so the retry gets a fresh token", async () => {

@@ -3,6 +3,7 @@
 // The retention cut is tested against a real Postgres in supabase/tests/schema.test.sql. All rows here are made up.
 import { describe, expect, it, vi } from "vitest";
 import { classify, treatAsPerson } from "./classify";
+import { createFetchSpy } from "../recipients/fetch-spy";
 import { buildVisit, captureEnabled, captureVisit, cleanQuery, cleanReferrer, redactSecretPath, recordVisit, safeCf, type CaptureEnv } from "./capture";
 import { RULES, RULESET_VERSION, type RequestFacts } from "./ruleset";
 import { onRequest } from "../../functions/_middleware";
@@ -124,7 +125,7 @@ describe("raw visit row", () => {
   });
 });
 
-const env: CaptureEnv = { EDGE_CAPTURE_ENABLED: "true", SUPABASE_URL: "https://store.example.test", SUPABASE_SERVICE_ROLE_KEY: "service-key" };
+const env: CaptureEnv = { EDGE_CAPTURE_ENABLED: "true", SUPABASE_URL: "https://store.supabase.co", SUPABASE_SERVICE_ROLE_KEY: "service-key" };
 
 describe("switch", () => {
   it("is off unless explicitly on", () => {
@@ -151,17 +152,55 @@ describe("switch", () => {
 });
 
 describe("store failure and no delay", () => {
-  it("posts one row to the store with the service key when on", async () => {
+  const botReq = (url = "https://x.test/p") => req(url, { "user-agent": "Mozilla/5.0 (compatible; Googlebot/2.1)" });
+  it("posts one BOT row to the store with the service key when on", async () => {
     const f = vi.fn().mockResolvedValue(new Response(null, { status: 201 }));
-    expect(await captureVisit(env, req("https://x.test/p", { "user-agent": "Mozilla/5.0 Chrome/1 Safari/1", accept: "x", "accept-language": "en" }), 200, f)).toBe(true);
+    expect(await captureVisit(env, botReq(), 200, f)).toBe(true);
     const [url, init] = f.mock.calls[0];
-    expect(url).toBe("https://store.example.test/rest/v1/edge_visits");
+    expect(url).toBe("https://store.supabase.co/rest/v1/edge_visits");
     expect(init.headers.authorization).toBe("Bearer service-key");
-    expect(JSON.parse(init.body)).toMatchObject({ path: "/p", class: "person", rule: "R8" });
+    expect(JSON.parse(init.body)).toMatchObject({ path: "/p", class: "bot", rule: "R2" });
+  });
+  it("MPC-9889: a person visit is NOT written to edge_visits; it goes to the person sink, which gets the request", async () => {
+    const f = vi.fn().mockResolvedValue(new Response(null, { status: 201 }));
+    const sink = vi.fn().mockResolvedValue(true);
+    const person = req("https://x.test/p", { "user-agent": "Mozilla/5.0 Chrome/1 Safari/1", accept: "x", "accept-language": "en" });
+    expect(await captureVisit(env, person, 200, f, sink)).toBe(true);
+    expect(sink).toHaveBeenCalledTimes(1);
+    expect(sink.mock.calls[0][1]).toBe(person);
+    expect(f).not.toHaveBeenCalled();
+  });
+  it("MPC-9889: an unknown visit (treated as a person) also goes to the sink, never to edge_visits", async () => {
+    const f = vi.fn();
+    const sink = vi.fn().mockResolvedValue(true);
+    const unknown = req("https://x.test/p", { "user-agent": "Mozilla/5.0 Chrome/120.0 Safari/537.36" });   // browser UA, browser headers stripped: R9 unknown
+    expect(classify({ userAgent: "Mozilla/5.0 Chrome/120.0 Safari/537.36", asnOrg: null, headers: {}, httpProtocol: "HTTP/2" }).cls).toBe("unknown");
+    expect(await captureVisit(env, unknown, 200, f, sink)).toBe(true);
+    expect(f).not.toHaveBeenCalled();
+  });
+  it("MPC-9889: bot and AI visits never reach the person sink", async () => {
+    const sink = vi.fn();
+    const f = vi.fn().mockResolvedValue(new Response(null, { status: 201 }));
+    expect(await captureVisit(env, req("https://x.test/", { "user-agent": "Mozilla/5.0 (compatible; GPTBot/1.1)" }), 200, f, sink)).toBe(true);
+    expect(await captureVisit(env, botReq(), 200, f, sink)).toBe(true);
+    expect(sink).not.toHaveBeenCalled();
+    expect(f).toHaveBeenCalledTimes(2);
+  });
+  it("MPC-9889: with no person sink a person visit is dropped, not stored raw", async () => {
+    const f = vi.fn();
+    const personReq = req("https://x.test/p", { "user-agent": "Mozilla/5.0 Chrome/1 Safari/1", accept: "x", "accept-language": "en" });
+    expect(await captureVisit(env, personReq, 200, f)).toBe(false);
+    expect(f).not.toHaveBeenCalled();
+  });
+  it("MPC-9889: the bot row is one registered call to edge_visits (machine mirror), nothing else", async () => {
+    const spy = createFetchSpy();
+    expect(await captureVisit(env, botReq(), 200, spy.fetch)).toBe(true);
+    expect(spy.calls.map((c) => c.url)).toEqual(["https://store.supabase.co/rest/v1/edge_visits"]);
+    spy.assertAllRegistered();
   });
   it("store down (network error), store error (500), missing config: false, never throws", async () => {
-    expect(await captureVisit(env, req("https://x.test/"), 200, vi.fn().mockRejectedValue(new Error("down")))).toBe(false);
-    expect(await captureVisit(env, req("https://x.test/"), 200, vi.fn().mockResolvedValue(new Response("no", { status: 500 })))).toBe(false);
+    expect(await captureVisit(env, botReq("https://x.test/"), 200, vi.fn().mockRejectedValue(new Error("down")))).toBe(false);
+    expect(await captureVisit(env, botReq("https://x.test/"), 200, vi.fn().mockResolvedValue(new Response("no", { status: 500 })))).toBe(false);
     const f = vi.fn();
     expect(await recordVisit({ EDGE_CAPTURE_ENABLED: "1" }, buildVisit(req("https://x.test/"), 200), f)).toBe(false);
     expect(f).not.toHaveBeenCalled();

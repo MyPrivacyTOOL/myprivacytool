@@ -1,13 +1,17 @@
 import { useState } from "react";
+import FeatureStatus from "@/components/FeatureStatus";
 import { Link } from "react-router-dom";
 import { KeyRound, Mail, Phone } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import Seo from "@/components/Seo";
 import pageMeta from "@/data/pageMeta.json";
+import { businessTeamsEnabled } from "@/lib/businessTeam";
 import { submitHubSpotForm, consentFields } from "@/lib/hubspot";
 import ConsentCheckbox from "@/components/ConsentCheckbox";
+import { BUSINESS_CONSENT_LABEL } from "@/lib/consentWording";
 import { trackBusinessLead } from "@/lib/analytics";
+import { queueBusinessRequest } from "@/lib/businessRequest";
 
 // HubSpot form "Business Inquiry" (portal 246502821). Form GUIDs are public (they ship in
 // every embed). Override per environment with VITE_HUBSPOT_BUSINESS_FORM_ID. The form defines a
@@ -21,6 +25,7 @@ const Business = () => {
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
   const [consent, setConsent] = useState(false);
+  const [ref, setRef] = useState("");
   const submitted = status === "success";
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -30,6 +35,16 @@ const Business = () => {
     setErrorMsg("");
     const [firstname, ...rest] = form.name.trim().split(/\s+/);
     try {
+      // MPC-9825: queue first. The 48-hour clock starts when this row exists; if it cannot be written the visitor sees an error and nothing is promised.
+      const queued = await queueBusinessRequest({
+        name: form.name.trim(),
+        email: form.email.trim(),
+        company: form.company.trim(),
+        size: form.size,
+        consent,
+        consentSource: "business_page",
+      });
+      setRef(queued.ref);
       await submitHubSpotForm({
         formId: FORM_ID,
         fields: {
@@ -96,7 +111,8 @@ const Business = () => {
               >
                 <h2 className="text-xl font-bold mb-2">Get a Free Company Audit</h2>
                 <p className="text-muted-foreground text-sm mb-6">
-                  We'll scan your team and send an exposure report within 48 hours.
+                  We'll send you a team exposure summary within 48 hours of your request. Today a person prepares it by hand from each consenting employee's free browser and email scan and any listings you show us; data-broker coverage is{" "}
+                  <FeatureStatus feature="F1" state="planned" className="ml-0" />.
                 </p>
                 <Input
                   placeholder="Your name"
@@ -130,7 +146,7 @@ const Business = () => {
                   <option value="51-200">51–200 employees</option>
                   <option value="200+">200+ employees</option>
                 </select>
-                <ConsentCheckbox id="business-consent" checked={consent} onChange={setConsent} disabled={status === "loading"} labelClassName="text-muted-foreground" />
+                <ConsentCheckbox id="business-consent" label={BUSINESS_CONSENT_LABEL} checked={consent} onChange={setConsent} disabled={status === "loading"} labelClassName="text-muted-foreground" />
                 {status === "error" && (
                   <p role="alert" className="text-destructive text-xs">{errorMsg}</p>
                 )}
@@ -144,6 +160,11 @@ const Business = () => {
                 <p className="text-muted-foreground text-xs text-center">
                   No payment required. Results in 48 hours.
                 </p>
+                {businessTeamsEnabled() && (
+                  <p className="text-muted-foreground text-xs text-center" data-testid="team-check-link">
+                    Want each person to check their own data? <Link to="/business/team" className="underline hover:text-foreground">Run a team check</Link>. Nobody is checked unless they authorise it themselves.
+                  </p>
+                )}
                 <p className="text-muted-foreground text-xs text-center">
                   We use your details only to prepare and send your audit. See our{" "}
                   <Link to="/privacy" className="underline hover:text-foreground">Privacy Policy</Link>.
@@ -154,9 +175,10 @@ const Business = () => {
                 <div className="text-brand text-4xl mb-4">✓</div>
                 <h3 className="text-xl font-bold mb-2">Request received</h3>
                 <p className="text-muted-foreground text-sm">
-                  We'll run your company audit and send results to{" "}
+                  We'll send your team summary to{" "}
                   <span className="text-foreground">{form.email}</span> within 48 hours.
                 </p>
+                {ref && <p className="text-muted-foreground text-xs mt-3">Your reference: <span className="text-foreground font-mono">{ref}</span></p>}
               </div>
             )}
           </div>
@@ -203,17 +225,17 @@ const Business = () => {
           <h2 className="text-2xl font-bold text-center mb-12">How the company audit works</h2>
           <div className="space-y-6">
             {[
-              { step: "01", title: "Submit your team list", desc: "Provide a list of employee names and work emails (or let us start with your leadership team)." },
-              { step: "02", title: "We run the full scan", desc: "We check data brokers for each team member: addresses, phone numbers, family, social profiles." },
-              { step: "03", title: "You get the exposure report", desc: "We send you a company privacy report within 48 hours: who's exposed, what data is visible, and your risk level." },
-              { step: "04", title: "We remove your team", desc: "On your approval, we send removal requests across all brokers. Most removals complete within 7–14 days." },
-              { step: "05", title: "Monthly monitoring", desc: "Brokers re-add data over time. We scan monthly and send new removal requests, so your team stays in control of its footprint." },
-            ].map(({ step, title, desc }) => (
+              { step: "01", title: "Invite your team", desc: "Give us your employees' work emails and we send each person an invitation. Nothing is checked about anyone until that person agrees for themselves. A list of emails from you is not their consent." },
+              { step: "02", title: "We check what each person shows us", desc: "For each person who agrees, we check the pages they show us for their own details, for example a data-broker listing that may be theirs. We do not search every broker for them.", feature: "F6" as const },
+              { step: "03", title: "You get a team summary", desc: "Within 48 hours we send you counts for the people who agreed: how many were checked and how many have a listing that may be theirs. Each person sees their own results first. You see one person's detail only if that person chooses to share it with you." },
+              { step: "04", title: "We remove your team", desc: "On your approval, we send removal requests across all brokers. Most removals complete within 7–14 days.", feature: "F6" as const, pin: "in_build" as const },
+              { step: "05", title: "Monthly monitoring", desc: "Brokers re-add data over time. We scan monthly and send new removal requests, so your team stays in control of its footprint.", feature: "F6" as const, pin: "in_build" as const },
+            ].map(({ step, title, desc, feature, pin }: { step: string; title: string; desc: string; feature?: "F6"; pin?: "in_build" }) => (
               <div key={step} className="flex gap-6 items-start">
                 <div className="text-brand font-bold text-2xl w-10 flex-shrink-0">{step}</div>
                 <div>
                   <div className="font-semibold text-foreground mb-1">{title}</div>
-                  <div className="text-muted-foreground text-sm leading-relaxed">{desc}</div>
+                  <div className="text-muted-foreground text-sm leading-relaxed">{desc}{feature && <FeatureStatus feature={feature} state={pin} />}</div>
                 </div>
               </div>
             ))}
@@ -247,7 +269,7 @@ const Business = () => {
                 <ul className="space-y-2 mb-6">
                   {features.map((f) => (
                     <li key={f} className="flex items-start gap-2 text-sm text-muted-foreground">
-                      <span className="text-brand flex-shrink-0 mt-0.5">✓</span> {f}
+                      <span className="text-brand flex-shrink-0 mt-0.5">✓</span> <span>{f}{F6_FEATURES.includes(f) && <FeatureStatus feature="F6" state="in_build" />}</span>
                     </li>
                   ))}
                 </ul>
@@ -268,5 +290,8 @@ const Business = () => {
     </div>
   );
 };
+
+// MPC-9836: tier features that are not built yet (F6). MPC-10612: pinned "In build" (state prop) so they keep their marker after F6 (team scanning) goes live. "Company report" and support are staffed, so unmarked.
+const F6_FEATURES = ["Monthly scan", "Automated removals", "Slack/Teams alerts", "API access", "SSO / SCIM"];
 
 export default Business;

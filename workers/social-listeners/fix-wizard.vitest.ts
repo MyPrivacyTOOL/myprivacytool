@@ -58,9 +58,10 @@ function setup(envOver: Record<string, unknown> = {}, o: Opts = {}) {
       if (i >= 0) Object.assign(items[i], body); else items.push({ ...body });
       return new Response("", { status: 201 });
     }
+    if (url.includes("/rest/v1/channel_probe_captures")) return Response.json([]); // STOP clears this sender's probe-log rows (MPC-9907)
     return new Response("{}", { status: 404 });
   }));
-  const env = { TELEGRAM_WEBHOOK_SECRET: "s", TELEGRAM_BOT_TOKEN: TOKEN, SUPABASE_URL: "https://sb.test", SUPABASE_KEY: "svc",
+  const env = { TELEGRAM_WEBHOOK_SECRET: "s", TELEGRAM_BOT_TOKEN: TOKEN, SUPABASE_URL: "https://x.supabase.co", SUPABASE_KEY: "svc",
     CORE_BRAIN: { fetch: vi.fn(async () => Response.json({ ok: true, ignored: true })) }, TELEGRAM_FIX_WIZARD: "on", PROBE_TELEGRAM_IDS: String(ID), ...envOver } as unknown as Env;
   const post = (u: unknown) => worker.fetch(new Request("https://x/webhook/telegram", { method: "POST", headers: { "X-Telegram-Bot-Api-Secret-Token": "s" }, body: JSON.stringify(u) }), env);
   const tg = (m: string) => calls.filter((c) => c.url.endsWith(`/${m}`));
@@ -78,7 +79,7 @@ describe("gating", () => {
     const other = setup();
     await other.post(cmd("/fix", 2, { ...fromUser, id: OTHER }));
     expect(other.tg("sendMessage")).toHaveLength(0);
-    expect(other.calls.filter((c) => c.url.includes("sb.test"))).toHaveLength(0);
+    expect(other.calls.filter((c) => c.url.includes("x.supabase.co"))).toHaveLength(0);
   });
   it("ignores /fix and buttons outside a private chat and from bots", () => {
     expect(parseFixUpdate({ update_id: 1, message: { text: "/fix", from: fromUser, chat: { id: -5, type: "group" } } })).toBeNull();
@@ -102,7 +103,7 @@ describe("release scope (TELEGRAM_SCAN_SCOPE)", () => {
     await t.post(cmd("/fix", 200, stranger));
     await t.post(cb(`fw|${B8}|l`, 201, stranger));
     expect(t.tg("sendMessage").concat(t.tg("editMessageText"))).toHaveLength(0);
-    expect(t.calls.some((c) => c.url.includes("sb.test"))).toBe(false);
+    expect(t.calls.some((c) => c.url.includes("x.supabase.co"))).toBe(false);
   });
   it("ignores any value other than exactly \"all\"", async () => {
     for (const v of ["ALL", "on", "true", "1", ""]) {
@@ -201,14 +202,14 @@ describe("Delete my scan data button", () => {
   it("on confirm erases consent, scan data and DEEP data for the tapping user only, then says Done", async () => {
     const t = setup();
     await t.post(cb(`fw|${B8}|dy`, 61));
-    expect(rpcs(t)).toEqual(["mpt_erase_chat_sender", "mpt_delete_profile_snapshots", "mpt_delete_deep_data"]);
+    expect(rpcs(t)).toEqual(["mpt_erase_chat_sender", "mpt_delete_profile_snapshots", "mpt_delete_event_flags", "mpt_delete_deep_data"]);
     expect(t.calls.filter((c) => c.url.includes("/rpc/")).every((c) => Object.values(c.body).some((v) => v === String(ID) || v === "telegram"))).toBe(true);
     expect(t.shown()).toMatch(/Done\. I deleted/);
   });
   it("still deletes when the scan is already gone, and never says Done on a failure", async () => {
     const gone = setup({}, { baseline: null });
     await gone.post(cb("fw|zzzzzzzz|dy", 62));
-    expect(rpcs(gone)).toHaveLength(3);
+    expect(rpcs(gone)).toHaveLength(4);
     const bad = setup({}, { rpcFail: true });
     await bad.post(cb(`fw|${B8}|dy`, 63));
     expect(bad.shown()).toMatch(/could not finish deleting/);
@@ -356,7 +357,7 @@ describe("Scan again and sharing", () => {
     expect(text).toMatch(/not proof that you are safer/);
     expect(text).toContain("https://myprivacytool.io/scan?");
     expect(text).toContain("https://myprivacytool.io/pricing?");
-    expect(t.calls.filter((c) => !c.url.includes("api.telegram.org") && !c.url.includes("sb.test"))).toHaveLength(0);
+    expect(t.calls.filter((c) => !c.url.includes("api.telegram.org") && !c.url.includes("x.supabase.co"))).toHaveLength(0);
     expect(text).not.toMatch(/guarantee|automatic(ally)? remov|broker/i);
   });
   it("share is an optional URL button with generic content only", async () => {

@@ -1,4 +1,4 @@
-import { SAVE_CONSENT_LABEL } from "@/lib/saveConsent";
+import { activeSaveLabel } from "@/lib/saveConsent";
 
 interface SaveScanConsentCheckboxProps {
   id: string;
@@ -24,7 +24,7 @@ export default function SaveScanConsentCheckbox({ id, checked, onChange, disable
         onChange={(e) => onChange(e.target.checked)}
         className="mt-0.5 shrink-0"
       />
-      <span>{SAVE_CONSENT_LABEL}</span>
+      <span>{activeSaveLabel()}</span>
     </label>
   );
 }

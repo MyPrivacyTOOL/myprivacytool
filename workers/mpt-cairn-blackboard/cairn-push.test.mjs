@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { mapFact, mapIntent, sessionIdFor, push } from './cairn-push.mjs';
 import worker from './worker.js';
 
-const ENV = { SUPABASE_URL: 'https://example.supabase.test', SUPABASE_SERVICE_ROLE_KEY: 'sb_test', CAIRN_BRIDGE_TOKEN: 'bridge-token', CAIRN_HASH_PEPPER: 'pepper' };
+const ENV = { SUPABASE_URL: 'https://example.supabase.co', SUPABASE_SERVICE_ROLE_KEY: 'sb_test', CAIRN_BRIDGE_TOKEN: 'bridge-token', CAIRN_HASH_PEPPER: 'pepper' };
 const sessions = []; const facts = []; const intents = []; let nextId = 1; const sent = [];
 const table = { cairn_sessions: sessions, cairn_facts: facts, cairn_intents: intents };
 const rowsFor = (name, q) => {
@@ -20,7 +20,7 @@ const rowsFor = (name, q) => {
 const respond = (b, h = {}) => new Response(b === null ? null : JSON.stringify(b), { status: 200, headers: h });
 globalThis.fetch = async (url, init = {}) => {
   const u = new URL(url); const method = init.method ?? 'GET';
-  if (u.hostname === 'bridge.test') {
+  if (u.hostname === 'bridge.myprivacytool.workers.dev') {
     sent.push({ path: u.pathname, auth: init.headers.authorization, body: JSON.parse(init.body) });
     return worker.fetch(new Request(url, init), ENV, { waitUntil() {} });
   }
@@ -50,7 +50,7 @@ const snapshot = {
     { id: 'i002', from: ['f001'], to: 'f002', description: 'Explore the profile', creator: 'reasoner', worker: null, created_at: '2026-10-23T10:01:00Z', concluded_at: null },
   ],
 };
-const env = { CAIRN_TOKEN: 'bridge-token', SEED_EMAIL: 'seed@example.com', BRIDGE_URL: 'https://bridge.test' };
+const env = { CAIRN_TOKEN: 'bridge-token', SEED_EMAIL: 'seed@example.com', BRIDGE_URL: 'https://bridge.myprivacytool.workers.dev' };
 const opts = { sleep: async () => {}, pauseMs: 0 };
 
 // 1. mapping

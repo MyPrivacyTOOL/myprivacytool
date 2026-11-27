@@ -24,6 +24,9 @@ That is the two-part test: what the message delivers, then what a public lookup 
 - In mode `on` it only ever holds our own test accounts. Mode `all` captures real users: see below.
 
 ## Mode all (decision D-A, "capture everywhere")
+**Switched off on 2026-11-26 (MPC-9907, option A).** It logged senders before they had answered the 19-or-over question, against what `/privacy` says.
+`wrangler.toml` now sets `PROBE_MODE = "off"`. STOP removes the sender's earlier `channel_probe_captures` rows. Rows of people who never send STOP were not touched.
+
 **Off by default. This mode captures real users and holds personal data (PII).** Before `PROBE_MODE=all` is switched on, the stored-data rules
 (task "Align stored-data rules and user-facing wording with D-A") and the privacy wording must be aligned; the bot copy that says it
 "can't see your profile" is untrue for public profiles and is a follow-up.
@@ -37,7 +40,7 @@ That is the two-part test: what the message delivers, then what a public lookup 
   personal channel, and `lookup:getFile` for up to 5 of the largest profile photos (file_path metadata only; image bytes are never downloaded or stored).
   Each lookup row is the raw `{status, response}`, so Telegram's refusals are evidence too.
 - **Throttle:** if the same sender had a `lookup:getChat` row within `PROBE_LOOKUP_HOURS` (default 24), only the raw `update` is saved. If the check errors, the lookups run.
-- **Retention:** `expires_at = now + PROBE_RETENTION_DAYS` (default 90, clamped 1-365). Purge with `select public.mpt_purge_expired_channel_probe_captures()`.
+- **Retention:** by default rows have **no expiry** (`expires_at` null): kept until the person asks for deletion. Set `PROBE_RETENTION_DAYS` (1-365) to make them expire; purge with `select public.mpt_purge_expired_channel_probe_captures()` (null never matches). Same for the event log (`PROBE_LOG_RETENTION_DAYS`). Needs migration `20261101120000_telegram_keep_until_asked.sql`.
 - **Safety:** every Telegram call and the save are wrapped with a 5s timeout; the webhook always forwards to core-brain and returns 200. The bot token is never written to a row or a log.
 - **Rollback:** unset `PROBE_MODE`. Stored rows expire on their own, or delete them: `delete from public.channel_probe_captures where expires_at > now() + interval '7 days';`.
 - The table comment was updated by migration 20261015150000; the original migration header (already applied) still says test accounts only.
@@ -45,6 +48,7 @@ That is the two-part test: what the message delivers, then what a public lookup 
 ## Full event log
 **Mode `on` only.** A complete record of one conversation, for allow-listed or opted-in accounts. Mode `all` never writes to it (no message-content, outbound or brain logging there) and mode `off` does nothing.
 
+- **Synthetic check account (CK-9912):** the Worker secret `SYNTHETIC_IDS` (comma-separated numeric ids; the owner's own test account only) is logged here in **every** mode, including `all`, so the CI Telegram round-trip check (`.github/workflows/telegram-roundtrip.yml`) can read message in, core-brain and reply out. Unset = nobody. Everyone else is exactly as described below. Rollback: delete the secret.
 - **Who:** `PROBE_MODE=on` AND the sender (any update type `updateActor` supports, never a bot) is in `PROBE_TELEGRAM_IDS` or `PROBE_LOG_OPTIN_IDS` (comma-separated numeric Telegram ids). Anyone else is not logged and costs no extra call.
 - **Table:** `public.telegram_event_log` (migration `20261015170000_telegram_event_log.sql`, service_role only, RLS enabled and forced). Columns: `id, created_at, platform, direction, kind, sender_id, chat_id, update_id, session_id, payload, expires_at`.
   - `direction = 'in'`: the raw update, untrimmed (`kind` = update type, e.g. `message`).
@@ -53,7 +57,7 @@ That is the two-part test: what the message delivers, then what a public lookup 
   - **Extra `out` rows for allow-listed senders.** The existing mode-`on` probe lookups (`getChat`, `getUserProfilePhotos`, and `getChat` for a personal channel) are Telegram calls made for the logged chat, so senders in `PROBE_TELEGRAM_IDS` get those as `out` rows too, besides `sendMessage`. Senders only in `PROBE_LOG_OPTIN_IDS` get no probe lookups, so their `out` rows are the bot's own replies (`sendMessage`).
   - `update_id` links the in, out and brain rows of one update. A retried `update_id` is not logged twice (unique `(direction, update_id, kind)`, insert is `ON CONFLICT DO NOTHING`).
 - **Sessions:** `session_id = <chat_id>:<sender_id>:<n>`. `n` starts at 1 and goes up after 30 minutes without an inbound message from that chat and sender. If the lookup fails, a new session is started (numbered by the clock) rather than failing.
-- **Retention:** `PROBE_LOG_RETENTION_DAYS`, default 90, clamped 1-365, or `forever` (`expires_at` null). Purge with `select public.mpt_purge_expired_telegram_event_log();`.
+- **Retention:** `PROBE_LOG_RETENTION_DAYS`: unset or `forever` = no expiry (`expires_at` null, kept until the person asks for deletion); a number is clamped 1-365. Purge with `select public.mpt_purge_expired_telegram_event_log();`.
 - **Safety:** every write is `ctx.waitUntil`, has a 5s timeout and swallows errors; the webhook still returns 200 for a logging failure and always forwards to core-brain. The bot token is never in a row (it is only in request URLs, and rows are scrubbed of it anyway) or a log.
 - **Personal data:** rows hold full message content. Only add ids of people who agreed (`PROBE_LOG_OPTIN_IDS`).
 - **Read a session:** `select created_at, direction, kind, payload from public.telegram_event_log where session_id = '<chat>:<sender>:<n>' order by created_at;`

@@ -250,6 +250,14 @@ Compatibility Flags: nodejs_compat (for Buffer, crypto APIs)
 - [ ] Check latency: Inspect Cloudflare Analytics → Workers
   - p99 latency should be <500ms
   - p50 latency should be <200ms
+  - **Revised 2026-10-29 (MPC-7284 p99 read): read these as Worker WALL time for requests that make no Qwen call**
+    (health, auth, rules, state). Cloudflare reports microseconds. On 321 requests in 24 h the p50 was 1.2 ms, p95 2.5 ms
+    and CPU p99 5.6 ms, but the all-requests wall p99 was 2.70 s: the slowest ~1% wait on an outside call (Qwen or
+    Supabase). The Qwen call is therefore capped at 2 s (`QWEN_TIMEOUT_MS`); past that the rules classifier answers
+    (`intent_source: "rules"`), so the worst case for a Qwen-classified message is about 2 s plus Supabase (3 s cap),
+    not the 5 s it was. Measure the Qwen path separately and set its target from real traffic. Re-read after real X/Telegram
+    traffic exists; the 2026-10-29 read is mostly health and auth probes. Query: Cloudflare GraphQL
+    `workersInvocationsAdaptive(filter: {scriptName: "core-brain"}) { quantiles { wallTimeP50 wallTimeP99 cpuTimeP99 } }`.
 - [ ] Verify event volume: Confirm >0 events from X and Telegram
   ```sql
   SELECT source, COUNT(*) FROM mpt_classifications 

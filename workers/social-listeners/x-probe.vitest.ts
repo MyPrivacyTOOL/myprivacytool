@@ -17,17 +17,17 @@ function setup(opts: { fullFieldsStatus?: number; throws?: boolean } = {}) {
     const headers = init?.headers as Record<string, string> | undefined;
     calls.push({ url, body: init?.body ? JSON.parse(String(init.body)) : undefined, auth: headers?.Authorization });
     if (opts.throws) throw new Error("network down");
-    if (url.startsWith("https://sb.test/")) return new Response(null, { status: 201 });
+    if (url.startsWith("https://x.supabase.co/")) return new Response(null, { status: 201 });
     if (url.includes("/tweets")) return Response.json({ data: [{ id: "1", text: "hello" }] });
     if (opts.fullFieldsStatus && url.includes("verified_type")) return Response.json({ errors: [{ message: "invalid field" }] }, { status: opts.fullFieldsStatus });
     return Response.json({ data: { id: "111", username: "Tester", description: "bio" } });
   }));
   const env = (over: Record<string, unknown> = {}) =>
-    ({ SUPABASE_URL: "https://sb.test", SUPABASE_KEY: "svc", X_BEARER_TOKEN: BEARER, PROBE_MODE: "on", PROBE_X_IDS: "111", ...over }) as unknown as Env;
+    ({ SUPABASE_URL: "https://x.supabase.co", SUPABASE_KEY: "svc", X_BEARER_TOKEN: BEARER, PROBE_MODE: "on", PROBE_X_IDS: "111", ...over }) as unknown as Env;
   return { calls, env };
 }
 
-const saved = (calls: Call[]): SavedRow[] => calls.filter((c) => c.url === "https://sb.test/rest/v1/channel_probe_captures").flatMap((c) => c.body as SavedRow[]);
+const saved = (calls: Call[]): SavedRow[] => calls.filter((c) => c.url === "https://x.supabase.co/rest/v1/channel_probe_captures").flatMap((c) => c.body as SavedRow[]);
 const xCalls = (calls: Call[]): Call[] => calls.filter((c) => c.url.startsWith("https://api.x.com/"));
 
 const dm = (sender: string, over: Record<string, unknown> = {}) => ({

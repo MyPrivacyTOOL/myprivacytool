@@ -4,6 +4,8 @@
  * Detects various browser fingerprinting methods to help users
  * understand their privacy exposure.
  */
+import { hasScanConsent } from '@/lib/scanConsent';
+import { recipientPeerConnection, webRtcAvailable } from '@/lib/recipientClient';
 
 // Types
 export interface FingerprintResult {
@@ -892,7 +894,7 @@ export function detectTorBrowser(): TorBrowserResult {
   const standardHeight = window.innerHeight === 1000 || screen.height === 1000;
   
   // 3. Check for disabled features
-  const noWebRTC = typeof RTCPeerConnection === 'undefined';
+  const noWebRTC = !webRtcAvailable();
   const noWebGL = !document.createElement('canvas').getContext('webgl');
   
   // 4. Timezone always UTC
@@ -1120,7 +1122,7 @@ export async function detectWebRTCLeak(): Promise<WebRTCLeakResult> {
   
   try {
     // Check if RTCPeerConnection is available
-    if (typeof RTCPeerConnection === 'undefined') {
+    if (!webRtcAvailable()) {
       console.log('[FingerprintDetection] WebRTC disabled - good for privacy!');
       return {
         localIPs: [],
@@ -1136,13 +1138,14 @@ export async function detectWebRTCLeak(): Promise<WebRTCLeakResult> {
 
     // Create peer connection with STUN servers
     const config: RTCConfiguration = {
-      iceServers: [
-        { urls: 'stun:stun.l.google.com:19302' },
-        { urls: 'stun:stun1.l.google.com:19302' },
-      ],
+      // MPC-9888: Google STUN only after the Scan me click; before it, no server is named and nobody is contacted.
+      iceServers: hasScanConsent()
+        ? [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }]
+        : [],
     };
 
-    const pc = new RTCPeerConnection(config);
+    // MPC-9886: through the registry (crawl-visible). Same two Google STUN servers, same timing; the move inside the consent gate is MPC-9888.
+    const pc = await recipientPeerConnection('google-stun', config);
     
     // Create a data channel to trigger ICE gathering
     pc.createDataChannel('');

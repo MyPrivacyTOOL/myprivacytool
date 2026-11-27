@@ -1,4 +1,5 @@
 // MPC-7470 (D12): the saved-scan wording of record. Changing it needs Chris's written approval.
+import { legalBlocks } from "@/lib/legalBlocks";
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { screen } from "@testing-library/react";
 import { renderPage } from "@/test/render";
@@ -12,10 +13,10 @@ describe("Privacy: saved scan", () => {
     expect(screen.getByRole("heading", { name: "2.4 Your Saved Scan Result" })).toBeInTheDocument();
     const text = flat(document.body.textContent ?? "");
     expect(text).toContain(
-      "The free scan runs in your browser and shows you the results there. We do not save it unless you ask for your report. " +
+      "The free scan runs in your browser and shows you the results there. We do not save the result unless you ask for your report. " +
         "When you enter your email address and tick the box to save your scan result, we save the full result, meaning the technical details your browser reported " +
         "such as IP address, device, browser, language, screen and fingerprint-style values, together with your email address, for 12 months, so your report can show it. " +
-        "If you leave without giving an email address, nothing from the scan is saved. We only count, without personal data, how many visitors finish a scan and how many ask for a report, " +
+        "If you leave without giving an email address, we do not save the result (see section 2.0 for what pressing Scan me sends). We only count, without personal data, how many visitors finish a scan and how many ask for a report, " +
         "through our analytics if you accepted analytics cookies.",
     );
   });
@@ -30,19 +31,39 @@ describe("Privacy: saved scan", () => {
     expect(text).not.toMatch(/accepted the consent banner, we also save/i);
   });
 
-  it("keeps the email-check disclosure (Cloudflare: only the part after the @; Gravatar and Libravatar: a scrambled code, a SHA-256 hash, not the address)", () => {
+  // MPC-9894: the recipient sentences are generated from the registry (shared/recipients/recipients.json); these tests pin what each one must say.
+  const sentence = (key: string) => legalBlocks().privacy.groups.flatMap((g) => g.items).find((i) => i.key === key)!.text;
+
+  it("keeps the email-check disclosure (the domain only to the DNS and registration lookups; a scrambled fingerprint, not the address, to the avatar services)", () => {
     renderPage(<Privacy />);
     const text = flat(document.body.textContent ?? "");
-    expect(text).toContain("we send only the part of your email address after the @ to Cloudflare");
-    expect(text).toContain("a scrambled code made from your address (a SHA-256 hash), not the address itself, to Gravatar and to Libravatar");
+    expect(text).toContain(sentence("cloudflare-doh"));
+    expect(sentence("cloudflare-doh")).toContain("the domain of your email address");
+    expect(sentence("rdap")).toContain("the domain of your email address");
+    expect(text).toContain(sentence("gravatar"));
+    expect(sentence("gravatar")).toContain("a scrambled fingerprint of your email address");
+    expect(sentence("gravatar")).not.toMatch(/receives your email address/);
   });
 
   // MPC-8452: the GitHub commit search sends the WHOLE address, and no breach check runs today. Both must stay stated plainly (wording check 2026-10-27).
   it("says the whole address goes to GitHub, and that no breach check runs", () => {
     renderPage(<Privacy />);
     const text = flat(document.body.textContent ?? "");
-    expect(text).toContain("your whole email address, not a scrambled code, goes to GitHub");
-    expect(text).toContain("We do not currently check data breaches");
+    expect(text).toContain(sentence("github-commit-search"));
+    expect(sentence("github-commit-search")).toMatch(/receives your email address/);
+    expect(text).toContain("We do not currently check whether your email address appears in data breaches");
+  });
+
+  // MPC-9776: the optional password check sends 5 hash characters to Have I Been Pwned from the visitor's browser; that must be named here.
+  it("names Have I Been Pwned for the password check and says what is sent", () => {
+    renderPage(<Privacy />);
+    const text = flat(document.body.textContent ?? "");
+    const s = sentence("pwned-passwords");
+    expect(text).toContain(s);
+    expect(s).toContain("Have I Been Pwned");
+    expect(s).toContain("only the first 5 characters of a SHA-1 hash leave the page");
+    expect(s).toContain("never the password");
+    expect(s).toMatch(/your IP address/);
   });
 });
 
@@ -113,7 +134,7 @@ describe("Privacy: referral programme section", () => {
     renderPage(<Privacy />);
     expect(screen.getByRole("heading", { name: "16. Inviting Friends (Referral Programme)" })).toBeInTheDocument();
     const t = flat(document.getElementById("referrals")?.textContent ?? "");
-    expect(t).toContain("We keep only a SHA-256 hash of the address, never the address itself");
+    expect(t).toContain("On our servers we keep only a SHA-256 hash of the address, not the address itself");
     expect(t).toContain("send no reminders");
     expect(t).toContain("unsubscribe link");
     expect(t).toContain("up to 10 people in total");
@@ -121,14 +142,35 @@ describe("Privacy: referral programme section", () => {
   });
 });
 
+describe("Privacy: Telegram 19 or over rule and keep-until-asked (MPC-9014, draft wording)", () => {
+  it("states the bot is 19 or over, that age is self-declared, that nothing is kept before Y, and that it is kept until you ask us to delete it", () => {
+    renderPage(<Privacy />);
+    const text = flat(document.body.textContent ?? "");
+    expect(text).toContain("Our Telegram bot is for people aged 19 or over");
+    expect(text).toContain("We cannot check your age, so this relies on your answer.");
+    expect(text).toContain("we start keeping these details only after you reply Y to confirm you are 19 or over");
+    expect(text).toContain("We keep it until you ask us to delete it.");
+    expect(text).not.toContain("The 90 days count from your last message.");
+    expect(text).toContain("confirm you are 16 or older with a checkbox");
+  });
+});
+
 describe("Privacy: Telegram bot (draft wording, unreviewed)", () => {
-  it("says message text and public profile details are received, the 90 day keep, and gives the privacy address for deletion", () => {
+  it("says message text and public profile details are received, they are kept until you ask us to delete them, and gives the privacy address for deletion", () => {
     renderPage(<Privacy />);
     const text = flat(document.body.textContent ?? "");
     expect(text).toContain("we receive what you send (including message text)");
     expect(text).toContain("the public details of your profile that Telegram makes available to bots");
-    expect(text).toContain("We keep it for up to 90 days, then it is deleted automatically.");
+    expect(text).toContain("We keep it until you ask us to delete it.");
+    expect(text).not.toContain("then it is deleted automatically");
     expect(text).toContain("delete everything linked to your Telegram id at any time by writing to privacy@myprivacytool.io");
+    expect(text).toContain("send STOP, or tap");
+    expect(text).toContain("Delete my scan data");
+    expect(text).toContain("wipe your footprints and keep your footsteps clean");
+    expect(text).toContain("each hexagon is a footprint");
+    expect(text).toContain("each scan is a footstep");
+    expect(text).toContain("part of your shadow and not all of it");
+    expect(text).toContain("we never change them for you");
     expect(text).not.toContain("{contact}");
   });
 });
@@ -157,3 +199,37 @@ describe("Privacy: answers about a hexagon (2.4A)", () => {
   });
 });
 
+
+// CK-9848: the retention period of the scans (report delivery) record is stated, and the sentence is pinned.
+describe("Privacy: report delivery record retention (CK-9848)", () => {
+  it("states 7 days after delivery unless you keep your scan (MPC-9894)", () => {
+    renderPage(<Privacy />);
+    const text = (document.body.textContent ?? "").replace(/\s+/g, " ");
+    expect(text).toContain("is kept 7 days after your report is delivered, then deleted, unless you keep your scan");
+    expect(text).not.toMatch(/kept 30 days|after 30 days; the rest/);
+  });
+});
+
+describe("Privacy: unused connection tokens (MPC-11258)", () => {
+  it("6B Your controls says stored GitHub and Reddit tokens unused for 90 days are deleted automatically", () => {
+    renderPage(<Privacy />);
+    const text = flat(screen.getByTestId("connected-accounts").textContent ?? "");
+    expect(text).toContain("Even if you do not disconnect, we automatically delete a stored GitHub or Reddit token that has not been used for 90 days.");
+  });
+
+  it("the GitHub and Reddit bullets do not say 'until you disconnect' without the 90-day delete", () => {
+    renderPage(<Privacy />);
+    const text = flat(screen.getByTestId("connected-accounts").textContent ?? "");
+    expect(text).toContain("until you disconnect (we delete them automatically if the token is not used for 90 days)");
+    expect(text).toContain("until you disconnect (not used after 90 days without connecting again, and deleted automatically if not used for 90 days)");
+  });
+});
+
+describe("Privacy: security section (MPC-10805)", () => {
+  it("claims only the incident checklist that exists, not a breach detection and response process", () => {
+    renderPage(<Privacy />);
+    const text = flat(document.body.textContent ?? "");
+    expect(text).toContain("Incident Response: We keep a short written checklist for investigating a problem and rolling back a bad release. We do not yet have a full incident response plan or run practice drills");
+    expect(text).not.toContain("Procedures to detect and respond to breaches");
+  });
+});

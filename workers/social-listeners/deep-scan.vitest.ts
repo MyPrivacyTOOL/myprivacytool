@@ -28,13 +28,13 @@ function setup(envOver: Record<string, unknown> = {}, o: Opts = {}) {
     const body = init?.body ? JSON.parse(String(init.body)) : undefined;
     calls.push({ url, method, body });
     if (url.includes("api.telegram.org")) return Response.json({ ok: true });
-    if (url.includes("sb.test/rest/v1/deep_jobs")) {
+    if (url.includes("x.supabase.co/rest/v1/deep_jobs")) {
       if (method === "POST") { if (o.dedupe) return Response.json([]); const row = { id: "11111111-2222-3333-4444-555555555555", created_at: new Date().toISOString(), ...body }; jobs.unshift(row); return Response.json([row], { status: 201 }); }
       if (method === "PATCH") { if (o.patchEmpty) return Response.json([]); const j = jobs[0]; if (j) Object.assign(j, body); return Response.json(j ? [j] : []); }
       if (url.includes("select=id")) return Response.json(Array.from({ length: o.recent ?? 0 }, (_, i) => ({ id: i })));
       return Response.json(jobs.slice(0, 1));
     }
-    if (url.includes("sb.test/rest/v1/deep_osint_results")) return o.resultsFail ? new Response("", { status: 500 }) : new Response("", { status: 201 });
+    if (url.includes("x.supabase.co/rest/v1/deep_osint_results")) return o.resultsFail ? new Response("", { status: 500 }) : new Response("", { status: 201 });
     // a checked site
     const host = new URL(url).host;
     const site = SITES.find((s) => s.host === host)!;
@@ -43,11 +43,11 @@ function setup(envOver: Record<string, unknown> = {}, o: Opts = {}) {
     const json = site.id === "gitlab" ? [{ id: 1 }] : site.id === "keybase" ? { them: [{ id: "x" }] } : site.id === "hackernews" ? { id: NAME } : { login: NAME };
     return new Response(status === 200 ? JSON.stringify(json) : "{}", { status });
   }));
-  const env = { TELEGRAM_WEBHOOK_SECRET: "s", TELEGRAM_BOT_TOKEN: TOKEN, SUPABASE_URL: "https://sb.test", SUPABASE_KEY: "svc",
+  const env = { TELEGRAM_WEBHOOK_SECRET: "s", TELEGRAM_BOT_TOKEN: TOKEN, SUPABASE_URL: "https://x.supabase.co", SUPABASE_KEY: "svc",
     CORE_BRAIN: { fetch: vi.fn(async () => Response.json({ ok: true })) }, TELEGRAM_DEEP_SCAN: "on", PROBE_TELEGRAM_IDS: String(ID), ...envOver } as unknown as Env;
   const post = (u: unknown) => worker.fetch(new Request("https://x/webhook/telegram", { method: "POST", headers: { "X-Telegram-Bot-Api-Secret-Token": "s" }, body: JSON.stringify(u) }), env);
   const sent = () => calls.filter((c) => c.url.includes("/sendMessage")).map((c) => String(c.body.text));
-  const sites = () => calls.filter((c) => !c.url.includes("api.telegram.org") && !c.url.includes("sb.test"));
+  const sites = () => calls.filter((c) => !c.url.includes("api.telegram.org") && !c.url.includes("x.supabase.co"));
   return { calls, logs, jobs, post, sent, sites, env, brain: (env as any).CORE_BRAIN.fetch as ReturnType<typeof vi.fn> };
 }
 afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); });

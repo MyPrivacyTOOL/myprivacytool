@@ -56,7 +56,7 @@ const flagOn = (v) => v === 'true';
 const testInboxes = (env) => [...new Set(String(env.HK_SPAM_TEST_INBOXES ?? '').split(',').map((e) => e.trim().toLowerCase()).filter((e) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)))];
 
 // `allowed(env, email)` is the Worker's RECIPIENT_ALLOWLIST check (passed in to avoid a circular import with index.js).
-export async function runHkSpamReminderJob(env, { fetchImpl = fetch, allowed, limit, when = Date.now() } = {}) {
+export async function runHkSpamReminderJob(env, { fetchImpl = undefined, allowed, limit, when = Date.now() } = {}) {
   if (typeof allowed !== 'function') throw new Error('runHkSpamReminderJob needs the recipient allowlist check');
   const done = (o) => { console.log(JSON.stringify({ event: 'hk_spam_reminder_run', ...o })); return o; };
   if (!flagOn(env.HK_SPAM_ENABLED)) return { enabled: false };           // kill switch 1: nothing happens, not even a log line or a database read

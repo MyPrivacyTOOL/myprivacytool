@@ -83,3 +83,25 @@ Rollback: set either switch off (the route returns 404 / nothing is sent). Schem
 - Aggregation: reuse `src/lib/learning/aggregate.ts` (30 responders, 95% Wilson, proposals only). Mixed `config_version` rows must be grouped, not pooled.
 - Withdrawal/deletion: rows can disappear by manual deletion or the purge, so aggregation must tolerate missing shown rows.
 - CK-8494 should reuse the same sender and consent gate; it must not add a second event store.
+
+## 7. Re-inspection 2026-10-27 and CK-8494 outcome-event handoff (docs only)
+
+Inspected 2026-10-27 ~10:10 UTC against `main` at `574554e` (includes #534 merge `02c4b8b`, #536 CK-8493, #543 CK-8494). This session changed **no code, migration, database or switch**. It did not re-query production or Cloudflare, so rows 1, 2, 12, 16 above keep the state recorded on 2026-10-26: not re-verified.
+
+Corrections to other records:
+
+- `docs/ck-8494/README.md` says CK-8492 is "Not started". That is stale: #534 is MERGED. Nothing in it is DEPLOYED or VERIFIED OPERATING, and the answer-integrity migration is still not applied.
+- The task record notes that a merge may have deployed the Worker. Still unconfirmed.
+
+### Outcome event for the CK-8494 re-check: NOT supported by the validated path
+
+What the validated consent/event path covers today (`src/lib/learning/events.ts`, `workers/webhook-receiver/learningEvents.ts`, table `mpt_hexagon_events`): `event_type` is only `shown` or `answer`; `answer` is only `yes_me|not_me|disputed|kept`; the fields are `person_key`, `scan_window`, `hexagon_id`, `source`, `tile_kind`, `confidence_at_display`, `config_version`. Anything else is rejected, and unknown fields are never stored.
+
+There is therefore **no accepted event** carrying `hexagon_id`, `detector_version`, `outcome` (`improvement|no_change|inconclusive|incomparable|error`) or `self_reported`. The re-check record in #543 is browser-local only, so nothing is counted today. Adding the event needs, at minimum:
+
+1. A privacy-owner decision (MPC-6798) that a re-check outcome is a new purpose covered by the analytics choice and Privacy 2.4A, or needs its own wording. The #543 README says "no new event type", so this is a change to a decided scope, not a gap fix.
+2. A new closed `event_type` and enums in the Worker validator, a `detector_version` column (shape-checked) and a replay key (person, hexagon, detector version, scan window), in a migration that Chris approves and applies by hand, with rollback.
+3. The existing gates reused unchanged: both switches, consent re-read on every send, byte cap, rate limit, status-only logging, replay protection, 90-day purge.
+4. Counting rules from the #543 README: self-reported completion is reported separately from verified improvement, and every figure states its denominator and exclusions.
+
+Not implemented here, to avoid widening the privacy contract before that decision. Production proof stays PENDING.

@@ -2,20 +2,27 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import worker from './index.js';
+import { proofSid, CONSENT_VERSION } from './pop.ts';
+import { createFetchSpy } from '../../shared/recipients/fetch-spy';
 import { getConversationState, saveConversationState, purgeExpiredState, STATE_TTL_MS } from './state-store.js';
 
 const ENV = { SUPABASE_SERVICE_ROLE_KEY: 'svc' };
 let reqs: { url: string; method: string; body: any; headers: any }[]; let status: number; let contentRange: string; let seed: Record<string, any>;
+let spy: ReturnType<typeof createFetchSpy>;
+let ledgerProof: any;   // MPC-8737: the PoP proof is a ledger row, read through the mpt_ledger_pop_check RPC
 
 beforeEach(() => {
-  reqs = []; status = 200; contentRange = '*/0'; seed = {};
-  vi.stubGlobal('fetch', async (input: any, init: any = {}) => {
+  reqs = []; status = 200; contentRange = '*/0'; seed = {}; ledgerProof = null;
+  // MPC-9885: every request goes through the registry spy; the stub below only answers.
+  spy = createFetchSpy({ respond: async (input: any, init: any = {}) => {
     reqs.push({ url: String(input), method: init.method || 'GET', body: init.body ? JSON.parse(init.body) : undefined, headers: init.headers });
     if (String(input).includes('firestore.googleapis.com')) return new Response('', { status: 404 });
+    if (String(input).includes('/rest/v1/rpc/mpt_ledger_pop_check')) return new Response(JSON.stringify({ proof: ledgerProof && ledgerProof.sid === JSON.parse(init.body).p_sid ? ledgerProof.proof : null, revoked_at_ms: null }));
     const key = decodeURIComponent(/key=eq\.([^&]+)/.exec(String(input))?.[1] ?? '');
     const body = init.method === 'DELETE' ? '' : seed[key] ? JSON.stringify([{ state: seed[key] }]) : '[]';
     return new Response(body, { status, headers: { 'Content-Range': contentRange } });
-  });
+  } });
+  vi.stubGlobal('fetch', spy.fetch);
 });
 afterEach(() => vi.unstubAllGlobals());
 
@@ -40,6 +47,11 @@ describe('state store', () => {
     expect(saved?.body.key).toBe('telegram:7');
     expect(saved?.body.state.stage).toBe('awaiting_confirmation');
     expect(reqs.some((q) => q.url.includes('firestore.googleapis.com'))).toBe(false);
+    // MPC-9885: state went to Supabase and the reply to Telegram, both registered recipients.
+    // (the spy names the first registry entry that owns a host, and *.supabase.co is shared by several entries, so assert on hosts for Supabase)
+    expect(new Set(spy.calls.map((c) => c.host))).toEqual(new Set(['xmdmkumwxpgahmlweuug.supabase.co', 'api.telegram.org']));
+    expect(spy.calls.find((c) => c.host === 'api.telegram.org')?.recipient).toBe('telegram');
+    spy.assertAllRegistered();
   });
 });
 
@@ -84,13 +96,15 @@ describe('purge', () => {
   it('a successful start-deep-dive purges expired rows off the response path; a refused one does not', async () => {
     const waits: Promise<unknown>[] = [];
     const ctx = { waitUntil: (p: Promise<unknown>) => waits.push(p) };
-    const env = { ...ENV, DEEP_DIVE_SECRET: 's' };
+    const env = { ...ENV, DEEP_DIVE_SECRET: 's', PHONE_SCAN_WEB_ENABLED: '1', POP_HMAC_SECRET: 'p'.repeat(40) };
+    const session_token = 'T'.repeat(43);
     const start = (headers: Record<string, string>) => worker.fetch(new Request('https://x/api/scan/start-deep-dive', { method: 'POST', body: '{}', headers }), env, ctx);
     expect((await start({})).status).toBe(401);
     await Promise.all(waits);
     expect(reqs.some((r) => r.method === 'DELETE')).toBe(false);
-    seed['whatsapp:85212345678'] = { profileName: 'Alex', inbound_message_timestamp: 1760000000 };
-    const ok = await worker.fetch(new Request('https://x/api/scan/start-deep-dive', { method: 'POST', body: JSON.stringify({ wa_id: '85212345678' }), headers: { 'X-Webhook-Secret': 's' } }), env, ctx);
+    seed['whatsapp:85212345678'] = { profileName: 'Alex' };
+    ledgerProof = { sid: await proofSid(env, session_token), proof: { wa: '85212345678', bound_at_ms: Date.now(), inbound_ts: 1760000000, consent_v: CONSENT_VERSION, consent_accepted: true } };
+    const ok = await worker.fetch(new Request('https://x/api/scan/start-deep-dive', { method: 'POST', body: JSON.stringify({ wa_id: '85212345678', session_token }), headers: { 'X-Webhook-Secret': 's' } }), env, ctx);
     expect(ok.status).toBe(200);
     await Promise.all(waits);
     expect(reqs.filter((r) => r.method === 'DELETE')).toHaveLength(1);

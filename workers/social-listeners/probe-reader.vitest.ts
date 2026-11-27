@@ -23,11 +23,11 @@ function setup(envOver: Record<string, unknown> = {}, opts: Opts = {}) {
     const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
     const body: unknown = init?.body ? JSON.parse(String(init.body)) : undefined;
     calls.push({ url, body });
-    if (url.startsWith("https://sb.test/rest/v1/channel_probe_captures?")) {
+    if (url.startsWith("https://x.supabase.co/rest/v1/channel_probe_captures?")) {
       if (opts.throttleStatus) return new Response("err", { status: opts.throttleStatus });
       return Response.json(opts.recent ? [{ id: "x" }] : []);
     }
-    if (opts.saveThrows && url === "https://sb.test/rest/v1/channel_probe_captures") throw new Error("db down");
+    if (opts.saveThrows && url === "https://x.supabase.co/rest/v1/channel_probe_captures") throw new Error("db down");
     if (opts.telegramThrows && url.includes("api.telegram.org")) throw new Error("tg down");
     if (url.includes("/getFile")) return Response.json({ ok: true, result: { file_id: (body as { file_id: string }).file_id, file_path: `photos/${(body as { file_id: string }).file_id}.jpg` } });
     if (url.includes("/getChat")) return Response.json({ ok: true, result: { id: 111, type: "private", bio: "hi", personal_chat: { id: -100999, type: "channel" } } });
@@ -35,7 +35,7 @@ function setup(envOver: Record<string, unknown> = {}, opts: Opts = {}) {
     return Response.json({ ok: true });
   }));
   const env = {
-    TELEGRAM_WEBHOOK_SECRET: "s", TELEGRAM_BOT_TOKEN: TOKEN, SUPABASE_URL: "https://sb.test", SUPABASE_KEY: "svc",
+    TELEGRAM_WEBHOOK_SECRET: "s", TELEGRAM_BOT_TOKEN: TOKEN, SUPABASE_URL: "https://x.supabase.co", SUPABASE_KEY: "svc",
     CORE_BRAIN: { fetch: brain }, ...envOver,
   } as unknown as Env;
   const post = (u: unknown) => worker.fetch(new Request("https://x/webhook/telegram", {
@@ -44,7 +44,7 @@ function setup(envOver: Record<string, unknown> = {}, opts: Opts = {}) {
   return { calls, brain, post };
 }
 
-const saved = (calls: Call[]): SavedRow[] => calls.filter((c) => c.url === "https://sb.test/rest/v1/channel_probe_captures").flatMap((c) => c.body as SavedRow[]);
+const saved = (calls: Call[]): SavedRow[] => calls.filter((c) => c.url === "https://x.supabase.co/rest/v1/channel_probe_captures").flatMap((c) => c.body as SavedRow[]);
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -131,18 +131,14 @@ const kinds = (rows: SavedRow[]) => rows.map((r) => r.kind);
 
 describe("probe reader mode all", () => {
   const all = { PROBE_MODE: "all" };
-  it("captures a sender who is not on any allow-list, with the full lookup set and a 90 day expiry", async () => {
+  it("captures a sender who is not on any allow-list, with the full lookup set and no expiry by default", async () => {
     const { calls, brain, post } = setup(all);
     const u = update();
-    const before = Date.now();
     expect((await post(u)).status).toBe(200);
     const rows = saved(calls);
     expect(kinds(rows).sort()).toEqual(["lookup:getChat", "lookup:getChat(personal_chat)", "lookup:getFile", "lookup:getUserPersonalChatMessages", "lookup:getUserProfileAudios", "lookup:getUserProfilePhotos", "update"]);
     expect(rows.find((r) => r.kind === "update")).toMatchObject({ platform: "telegram", sender_id: "111", payload: u });
-    const days = (Date.parse(rows[0].expires_at) - before) / 86_400_000;
-    expect(days).toBeGreaterThan(89.99);
-    expect(days).toBeLessThan(90.01);
-    expect(rows.every((r) => typeof r.expires_at === "string")).toBe(true);
+    expect(rows.every((r) => r.expires_at === null)).toBe(true); // kept until the person asks for deletion
     expect(brain).toHaveBeenCalledTimes(1);
   });
   it("uses the wider lookup parameters and getFile on the largest photo only as metadata (no download)", async () => {
@@ -208,15 +204,16 @@ describe("probe reader mode all", () => {
     const a = setup(all, { throttleStatus: 500 });
     await a.post(update());
     expect(kinds(saved(a.calls))).toContain("lookup:getChat");
-    const b = setup({ ...all, SUPABASE_URL: "https://sb.test" }, { throttleStatus: 503 });
+    const b = setup({ ...all, SUPABASE_URL: "https://x.supabase.co" }, { throttleStatus: 503 });
     expect((await b.post(update())).status).toBe(200);
   });
   it("applies the retention clamp and the throttle-hours fallback", () => {
-    expect(retentionDays(asEnv({}))).toBe(90);
+    expect(retentionDays(asEnv({}))).toBeNull();
     expect(retentionDays(asEnv({ PROBE_RETENTION_DAYS: "30" }))).toBe(30);
     expect(retentionDays(asEnv({ PROBE_RETENTION_DAYS: "0" }))).toBe(1);
     expect(retentionDays(asEnv({ PROBE_RETENTION_DAYS: "9999" }))).toBe(365);
-    expect(retentionDays(asEnv({ PROBE_RETENTION_DAYS: "abc" }))).toBe(90);
+    expect(retentionDays(asEnv({ PROBE_RETENTION_DAYS: "abc" }))).toBeNull();
+    expect(retentionDays(asEnv({ PROBE_RETENTION_DAYS: "forever" }))).toBeNull();
     expect(lookupHours(asEnv({}))).toBe(24);
     expect(lookupHours(asEnv({ PROBE_LOOKUP_HOURS: "6" }))).toBe(6);
     expect(lookupHours(asEnv({ PROBE_LOOKUP_HOURS: "-1" }))).toBe(24);
@@ -225,7 +222,7 @@ describe("probe reader mode all", () => {
     const { calls, post } = setup({ ...all, PROBE_RETENTION_DAYS: "9999" });
     const before = Date.now();
     await post(update());
-    const days = (Date.parse(saved(calls)[0].expires_at) - before) / 86_400_000;
+    const days = (Date.parse(saved(calls)[0].expires_at as string) - before) / 86_400_000;
     expect(days).toBeGreaterThan(364.99);
     expect(days).toBeLessThan(365.01);
   });

@@ -15,7 +15,7 @@ Pro is not on sale (`src/pages/Pricing.tsx`: "Get launch updates"), so the rewar
 ## Where it lives
 | Piece | File |
 |---|---|
-| Tables, columns, atomic reward function | `supabase/migrations/20261013100000_mpc_7645_referrals.sql` |
+| Tables, columns, atomic reward function | `supabase/migrations/20261013100001_mpc_7645_referrals.sql` |
 | Codes, tokens, attach, complete, invite and status endpoints | `workers/scan-report/lib/referral.js` |
 | Invite, reward emails; report block (draft copy) | `workers/scan-report/lib/referralEmail.js` |
 | Wiring (`/api/referral/*`, `ref` on `/api/scan`, report block, reward on report sent) | `workers/scan-report/index.js` |
@@ -48,7 +48,7 @@ Three optional tests across the funnel (report block wording, `/invite` layout, 
 
 ## Go live
 1. Chris approves the copy in `lib/referralEmail.js`, `src/pages/Invite.tsx` and Privacy section 16 (and a lawyer reads the third-party invitation email: it is mail to someone who has not consented, sent at the user's request).
-2. Apply `20261013100000_mpc_7645_referrals.sql` to production (Supabase), then re-run `supabase/sql/mpt-dsar-erase-export.sql`.
+2. Apply `20261013100001_mpc_7645_referrals.sql` to production (Supabase), then re-run `supabase/sql/mpt-dsar-erase-export.sql`.
 3. `UNSUBSCRIBE_SECRET` is already required by the follow-up emails; confirm it is set on `mpt-scan-report`.
 4. Set the secret `REFERRALS_TEST_RECIPIENTS` to your test inboxes first (tester mode above), then set `REFERRALS_ENABLED = "true"` in `workers/scan-report/wrangler.toml` and deploy; set `VITE_REFERRALS_ENABLED=true` on the Cloudflare Pages project and redeploy. Both are needed (the site hides the page and the policy text without its flag).
 5. Test in tester mode (not with `RECIPIENT_ALLOWLIST`, which is empty in production and would hold real users' reports if set): run a scan, open the private link from the report, invite a test inbox, run a scan from that inbox through the invite, and check the reward email.

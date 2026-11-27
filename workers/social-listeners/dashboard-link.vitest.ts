@@ -23,7 +23,7 @@ function setup(envOver: Record<string, unknown> = {}, opts: { snaps?: unknown[];
     return Response.json({ ok: true });
   }));
   const brain = vi.fn(async () => Response.json({ ignored: true }));
-  const env = { TELEGRAM_WEBHOOK_SECRET: "s", TELEGRAM_BOT_TOKEN: TOKEN, PROBE_TELEGRAM_IDS: String(ID), TELEGRAM_DASHBOARD_LINKS: "on", SUPABASE_URL: "https://db.test", SUPABASE_KEY: "svc-key", CORE_BRAIN: { fetch: brain }, ...envOver } as unknown as Env;
+  const env = { TELEGRAM_WEBHOOK_SECRET: "s", TELEGRAM_BOT_TOKEN: TOKEN, PROBE_TELEGRAM_IDS: String(ID), TELEGRAM_DASHBOARD_LINKS: "on", SUPABASE_URL: "https://x.supabase.co", SUPABASE_KEY: "svc-key", CORE_BRAIN: { fetch: brain }, ...envOver } as unknown as Env;
   const post = (text: string, id = ID) => worker.fetch(new Request("https://x/webhook/telegram", { method: "POST", headers: { "X-Telegram-Bot-Api-Secret-Token": "s" },
     body: JSON.stringify({ update_id: 5, message: { message_id: 1, date: 1, text, from: { id, is_bot: false, first_name: "T" }, chat: { id, type: "private" } } }) }), env);
   return { calls, logs, post, brain, sent: () => calls.filter((c) => c.url.includes("/sendMessage")), saved: () => calls.filter((c) => c.method === "POST" && c.url.includes("/dashboard_links")) };

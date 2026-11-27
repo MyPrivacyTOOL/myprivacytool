@@ -24,6 +24,8 @@ export interface ScanCounts {
   total: number;
   /** Y: found + clear. */
   checked: number;
+  /** MPC-8689: ids of the hexagons that were checked (found or clear). */
+  checkedIds: string[];
   /** X: checked hexagons the visitor confirmed. */
   confirmed: number;
   found: number;

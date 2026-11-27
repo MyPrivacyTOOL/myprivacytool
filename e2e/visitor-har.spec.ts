@@ -6,6 +6,11 @@ import type { Page } from "@playwright/test";
 
 /** The profile the scan built from whoami, read from the queued (never sent) gtag stub in index.html. */
 async function deviceProfile(page: Page) {
+  // MPC-10790: the profile is only built for a visitor who chose "Accept analytics" AND pressed Scan me (fixtures seed the scan consent; the choice is "Essential only").
+  await page.evaluate(() => {
+    window.localStorage.setItem("mpt_cookie_consent", JSON.stringify({ v: 1, analytics: true, at: "2026-11-24T00:00:00.000Z" }));
+    window.dispatchEvent(new Event("mpt:consent"));
+  });
   await expect.poll(() => page.evaluate(() =>
     ((window as unknown as { dataLayer?: ArrayLike<unknown>[] }).dataLayer ?? []).map((a) => Array.from(a)).some((a) => a[1] === "device_profile"),
   ), { timeout: 30_000 }).toBe(true);
