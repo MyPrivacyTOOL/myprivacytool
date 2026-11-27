@@ -25,8 +25,9 @@ describe('channel groups use exactly the catalogue members', () => {
       expect([...arrivals].sort()).toEqual(arrivals);
     });
   }
-  it('has 21 email, 22 WhatsApp and 8 Messenger tiles, as the catalogue says', () => {
-    expect(channelTiles('email')).toHaveLength(21);
+  // MPC-11541: 19 email tiles, not 21: email.inbound_signature and email.wkd are Decision = Dropped in the registry and are no longer published.
+  it('has 19 email, 22 WhatsApp and 8 Messenger tiles, as the catalogue says', () => {
+    expect(channelTiles('email')).toHaveLength(19);
     expect(channelTiles('whatsapp')).toHaveLength(22);
     expect(channelTiles('messenger')).toHaveLength(8);
   });

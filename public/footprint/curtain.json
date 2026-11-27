@@ -13,5 +13,5 @@
   "slide": "left",
   "openMs": 1300,
   "zoomDelayMs": 2900,
-  "dataset": "footprint-datapoints.json"
+  "dataset": "hexagons-366.json"
 }

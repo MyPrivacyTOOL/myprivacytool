@@ -113,12 +113,6 @@ g.cell.chx.s-none .fill{fill:color-mix(in srgb,var(--green) 8%,transparent)}
 g.cell.chx.s-none .emo{opacity:.85}
 g.cell.s-none:hover .bd{stroke:var(--green);stroke-dasharray:4 4;opacity:.8;filter:none}
 g.cell.s-none text,g.cell.s-none .ck{display:none}
-g.cell .bdg{font:700 5px var(--body);letter-spacing:.08em;text-transform:uppercase;fill:var(--ink)}
-g.cell.b-planned .bdg{fill:var(--fg);opacity:.6}g.cell.s-none .bdg{display:block}
-.stage svg:not(.zoomed) g.cell .bdg{opacity:0}
-.tile .chip{font:700 10px/1 var(--body);letter-spacing:.06em;text-transform:uppercase;border:1.5px solid var(--line);border-radius:99px;padding:3px 7px;font-style:normal}
-.tile .chip.live{border-color:var(--green)}.tile .chip.in_build{border-color:var(--ask)}.tile .chip.planned{opacity:.75}
-.bdgline{margin:6px 0 0}
 g.cell.s-none .hx{transform:none!important}
 
 g.cell.s-confirmed .bd,g.cell.s-fixed .bd{stroke-width:3;opacity:1;animation:hexglow 2s ease-in-out infinite}
@@ -360,8 +354,6 @@ const GROUPS=[
  ['Security and exposure',['dns-leak','https-status','mixed-content','security-headers','browser-security','tls-config']],
  ['Behavior and habits',['mouse-tracking','typing-patterns','click-patterns','scroll-behavior','session-duration','engagement-map']]];
 const BOX_OF={};GROUPS.forEach(([n,ids])=>ids.forEach(id=>{BOX_OF[id]=n}));
-/* MPC-11541: every slab carries a status badge. Planned is the default; In build and Live come from the export (scripts/export-catalogue.mjs). */
-const BADGE_LABEL={planned:'Planned',in_build:'In build',live:'Live'};
 const STATES={none:'Unknown',scan:'Scanning',found:'Found, tap to confirm',ask:'Needs your input',told:'You told us',risk:'Confirmed exposure',confirmed:'Confirmed',fixed:'You fixed this',false:'Not you'};
 
 let st=[],sel=-1,timers=[],playing=false;
@@ -387,7 +379,7 @@ function clean(raw,o){
   const s=v=>v==null?'':String(v);
   return {id:s(raw.id)||('hx-'+o),label:s(raw.label||raw.id||('Item '+(o+1))),group:s(raw.group||'Other'),box:s(raw.box||BOX_OF[raw.id]||raw.group||'Other'),cat:s(raw.cat),tile:tileOf(s(raw.id),raw.tile),
     emoji:s(raw.emoji)||'⬡',ex:s(raw.ex),conf:Number(raw.conf)||0,real:false,risk:s(raw.risk),sens:['high','medium','low'].includes(raw.sens)?raw.sens:'low',
-    ch:s(raw.channel||'Web'),cap:s(raw.cap),val:s(raw.val),exposure:!!raw.exposure,state:s(raw.state),slug:s(raw.slug),badge:BADGE_LABEL[raw.badge]?raw.badge:'',_o:o,...(REAL[s(raw.id)]?{ex:REAL[s(raw.id)].ex,conf:REAL[s(raw.id)].conf,real:true}:{})}}
+    ch:s(raw.channel||'Web'),cap:s(raw.cap),val:s(raw.val),exposure:!!raw.exposure,state:s(raw.state),slug:s(raw.slug),_o:o,...(REAL[s(raw.id)]?{ex:REAL[s(raw.id)].ex,conf:REAL[s(raw.id)].conf,real:true}:{})}}
 const cmp=(a,b)=>{for(let i=0;i<a.length;i++)if(a[i]!==b[i])return a[i]-b[i];return 0};
 function rankKey(it){const demo=START_ORDER.indexOf(it.id);if(demo>=0)return [0,demo,0,0,0];
   return [1,(it.state==='risk'||it.state==='ask')?0:1,isExposure(it)?0:1,{high:0,medium:1,low:2}[it.sens],it._o]}
@@ -441,8 +433,6 @@ function build(items,active){
     g.innerHTML=`<g class="hx"><path class="fill" d="${HEX}"/><path class="bd" d="${HEX}"/>
       <text class="emo" x="50" y="32"></text><text class="lbl" x="50" y="48"></text><text class="val" x="50" y="60"></text><text class="cnf" x="50" y="72"></text><text class="stb" x="50" y="83"></text>
       <g class="ck" transform="translate(65 8)"><circle cx="10" cy="10" r="10"/><path d="M6 10 L9 13 L15 7"/></g></g>`;
-    g.setAttribute('data-channel',it.ch);
-    if(it.badge){const b=g.querySelector('.bdg');b.textContent=BADGE_LABEL[it.badge];g.classList.add('b-'+it.badge);g.setAttribute('data-badge',it.badge);g.setAttribute('aria-label',it.label+': '+BADGE_LABEL[it.badge])}
     g.addEventListener('click',()=>{if(!justDragged)select(i)});
     g.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();select(i)}});
     frag.appendChild(g)});
@@ -573,7 +563,7 @@ function showPanel(){
   if(sel<0){panel.innerHTML=`<div class="badge">${mini('ask',68,'🔍')}</div><div><div class="tag">Next</div><h2>Tap a pulsing purple hexagon</h2><p>Purple means MPT found something that may be you. Answer it to turn it green (confirmed) or red (a real exposure to fix). Tap anywhere in the rain to scan a hidden spot.</p></div>`;return}
   const it=ITEMS[sel],s=st[sel];
   let body='',acts='',title=it.label,tag=`${it.group} · ${STATES[s]}`,extra='';
-  if(s==='none'){title=mode==='boxes'?it.label:'Unknown';tag=mode==='boxes'?`${it.group} · Not checked yet`:'Hidden in the rain';body='MPT has not looked at this spot yet. A deep scan checks it. If it is routine it shows up for you to confirm. If it is sensitive it asks you first.';acts=`<button class="violet" data-a="scan">Run deep scan</button>`;if(it.badge==='planned'||it.badge==='in_build'){tag=`${it.group} · ${BADGE_LABEL[it.badge]}`;title=it.label;body=esc(it.val)+(it.cap?' '+esc(it.cap):'');acts=''}}
+  if(s==='none'){title=mode==='boxes'?it.label:'Unknown';tag=mode==='boxes'?`${it.group} · Not checked yet`:'Hidden in the rain';body='MPT has not looked at this spot yet. A deep scan checks it. If it is routine it shows up for you to confirm. If it is sensitive it asks you first.';acts=`<button class="violet" data-a="scan">Run deep scan</button>`}
   else{
     extra=`<dl><div><dt>What we capture</dt><dd>${esc(it.cap)}</dd></div><div><dt>Why it matters</dt><dd>${esc(it.val)}</dd></div>${(s==='ask'||s==='risk')&&it.risk?`<div><dt>Risk</dt><dd>${esc(cleanRisk(it))}</dd></div>`:''}</dl>`;
     const ex=it.ex?`<div class="ex">${it.real?'Your value':'Example value'}: <b>${esc(it.ex)}</b>${it.conf?' · confidence '+it.conf+'%':''}${it.real?'':'<span class="smp-pill" data-testid="sample-pill">Sample</span>'}</div>`:'';

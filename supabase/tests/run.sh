@@ -307,12 +307,5 @@ psql_ "$TEST_URL" -f supabase/migrations/20261108160000_mpc_9824_business_teams.
 psql_ "$TEST_URL" -f supabase/migrations/20261115000000_mpc_9824_summary_member_id.sql
 psql_ "$TEST_URL" -At -f supabase/tests/mpc-9824-business-teams.test.sql
 
-# MPC-11541: the full footprint table. Applied by the loop above; applied again to prove it is idempotent, then count(*) must equal the count the export derives from the registry rule.
-echo "== footprint data points (MPC-11541): count(*) equals the exported count"
-node scripts/export-catalogue.mjs --check
-FOOTPRINT_EXPECTED=$(node scripts/export-catalogue.mjs --print-count)
-psql_ "$TEST_URL" -f supabase/migrations/20261127080000_mpc_11541_footprint_datapoints.sql
-psql_ "$TEST_URL" -At -v expected="$FOOTPRINT_EXPECTED" -f supabase/tests/mpc-11541-footprint-datapoints.test.sql
-
 psql_ "$ADMIN_URL" -c "drop database if exists $TEST_DB"
 echo "OK: Supabase integration tests passed ($rows RLS rows + schema assertions)"

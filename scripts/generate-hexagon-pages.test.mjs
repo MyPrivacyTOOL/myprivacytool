@@ -1,4 +1,4 @@
-// MPC-8689: every hexagon gets its own page with a unique, stable address; the master page lists all of them (654 since the 2026-11-27 registry export, MPC-11541).
+// MPC-8689: every hexagon gets its own page with a unique, stable address; the master page lists all of them (650 since the 2026-11-27 registry export with Decision = Dropped rows left out, MPC-11541).
 import assert from 'node:assert/strict';
 import { mkdtempSync, readFileSync, existsSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -7,8 +7,8 @@ import { HEXAGON_CATALOGUE } from '../shared/hexagon-registry/catalogue.js';
 import { writeHexagonPages, hexagonPage, misuse } from './generate-hexagon-pages.mjs';
 
 const out = mkdtempSync(path.join(tmpdir(), 'hex-pages-'));
-assert.equal(writeHexagonPages(out), 655);
-assert.equal(readdirSync(path.join(out, 'hexagon')).length, 655);
+assert.equal(writeHexagonPages(out), 651);
+assert.equal(readdirSync(path.join(out, 'hexagon')).length, 651);
 for (const h of HEXAGON_CATALOGUE) {
   const f = path.join(out, 'hexagon', h.slug, 'index.html');
   assert.ok(existsSync(f), `page for ${h.id}`);
@@ -20,10 +20,10 @@ for (const h of HEXAGON_CATALOGUE) {
   assert.equal(hexagonPage(h).includes('<script>'), false, 'hexagon pages need no script');
 }
 const master = readFileSync(path.join(out, 'hexagon', 'index.html'), 'utf8');
-assert.equal((master.match(/<tr data-r=/g) || []).length, 654);
+assert.equal((master.match(/<tr data-r=/g) || []).length, 650);
 assert.ok(master.includes('54 run in the scan'), 'master page carries the one count sentence');
-assert.ok(!/\b(654|653|662|368|366)\b/.test(master.replace(/<tr data-r=[\s\S]*<\/tbody>/, '')), 'no headline total in the master page copy (MPC-11541)');
-assert.ok(master.includes('285 High') && master.includes('269 Medium') && master.includes('100 Low'));
+assert.ok(!/\b(650|651|654|653|662|368|366)\b/.test(master.replace(/<tr data-r=[\s\S]*<\/tbody>/, '')), 'no headline total in the master page copy (MPC-11541)');
+assert.ok(master.includes('284 High') && master.includes('268 Medium') && master.includes('98 Low'));
 // A registry row with no access recorded says so instead of printing an empty access line.
 const noAccess = HEXAGON_CATALOGUE.find((h) => !h.access);
 assert.ok(noAccess && hexagonPage(noAccess).includes('<dt>Access</dt><dd>Not recorded yet</dd>'));
@@ -31,10 +31,13 @@ console.log('generate-hexagon-pages.test.mjs ok');
 
 // Owner decision 7 (batch 2, 2026-10-29): the 14 share-list pages carry hand-written text, and it does not borrow generic claims that do not fit.
 import { REVIEWED } from './hexagon-reviewed-copy.mjs';
-const SHARE = ['webrtc-leak', 'name-in-your-address', 'at-username', 'sms-phone-number', 'phone-number-whatsapp-id', 'profile-name', 'username-and-display-name', 'viber-name-and-photo', 'if-they-email-us-signature-block', 'caller-number', 'voice', 'header-line', 'return-address', 'voice-recording'];
+const SHARE = ['webrtc-leak', 'name-in-your-address', 'at-username', 'sms-phone-number', 'phone-number-whatsapp-id', 'profile-name', 'username-and-display-name', 'viber-name-and-photo', 'caller-number', 'voice', 'header-line', 'return-address', 'voice-recording'];
 // MPC-9791: connected-devices is a draft entry (owner review pending), not one of the 14 owner-reviewed share-list pages.
 const DRAFTS = ['connected-devices'];
-assert.deepEqual(Object.keys(REVIEWED).sort(), [...SHARE, ...DRAFTS].sort());
+// MPC-11541: email.inbound_signature (registry row 90) is Decision = Dropped, so it has no page now. Its reviewed text stays in hexagon-reviewed-copy.mjs (nothing is deleted) but is unused.
+const DROPPED = ['if-they-email-us-signature-block'];
+assert.deepEqual(Object.keys(REVIEWED).sort(), [...SHARE, ...DRAFTS, ...DROPPED].sort());
+for (const slug of DROPPED) assert.ok(!HEXAGON_CATALOGUE.some((x) => x.slug === slug), `${slug} is dropped, so it is not in the catalogue`);
 for (const slug of SHARE) {
   const h = HEXAGON_CATALOGUE.find((x) => x.slug === slug);
   assert.ok(h, `${slug} is in the catalogue`);

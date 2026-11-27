@@ -1,16 +1,60 @@
 {
  "version": "registry-2026-11-27",
- "total": 654,
+ "total": 650,
  "registry": {
   "data_source": "40c28547-eaa7-81c6-a953-000b18c5b905",
   "row_type": "Data point",
   "data_point_rows": 655,
-  "published": 654,
+  "published": 650,
   "excluded": [
+   {
+    "registry_id": 78,
+    "label": "IP hostname",
+    "reason": "Decision = Dropped in the registry: stays a data point there, not published",
+    "was": {
+     "id": "web.reverse_dns",
+     "decision": "dropped",
+     "decision_reason": "MPC-7350 rules out sending the visitor's IP to a third-party resolver.",
+     "decided": "2026-10-29"
+    }
+   },
+   {
+    "registry_id": 90,
+    "label": "If they email us: signature block",
+    "reason": "Decision = Dropped in the registry: stays a data point there, not published",
+    "was": {
+     "id": "email.inbound_signature",
+     "decision": "dropped",
+     "decision_reason": "Reads the message body, which holds personal data; the inbound Email Worker is approved for sender details and mail app and timezone only.",
+     "decided": "2026-10-29"
+    }
+   },
+   {
+    "registry_id": 99,
+    "label": "Own-server encryption key",
+    "reason": "Decision = Dropped in the registry: stays a data point there, not published",
+    "was": {
+     "id": "email.wkd",
+     "decision": "dropped",
+     "decision_reason": "The Web Key Directory request carries a hash of the address, which breaks \"address never sent\".",
+     "decided": "2026-10-29"
+    }
+   },
+   {
+    "registry_id": 153,
+    "label": "Reactions and poll answers",
+    "reason": "Decision = Dropped in the registry: stays a data point there, not published",
+    "was": {
+     "id": "tg.reactions_polls",
+     "decision": "dropped",
+     "decision_reason": "Needs a chat the bot administers, and poll answers only exist for polls the bot sent; it would show for almost no one.",
+     "decided": "2026-10-29"
+    }
+   },
    {
     "registry_id": 538,
     "label": "Public registers",
-    "reason": "Decision = Dropped (owner, 2026-11-27): stays a data point in the registry, not published"
+    "reason": "Decision = Dropped in the registry: stays a data point there, not published"
    }
   ]
  },
@@ -1445,27 +1489,6 @@
    "plan_reason": "Marked Verify: not built until a probe on our own test account confirms the field"
   },
   {
-   "id": "web.reverse_dns",
-   "registry_id": 78,
-   "channel": "web",
-   "channel_label": "Web scan",
-   "group": "Core",
-   "code": "B1",
-   "arrival": "B",
-   "risk": "medium",
-   "label": "IP hostname",
-   "evidence_key": "ip_hostname",
-   "reveals": "Reverse DNS name of the IP; often names the ISP area or a company",
-   "field": "PTR lookup of the IP",
-   "status": "new",
-   "access": "OK",
-   "source": "",
-   "slug": "ip-hostname",
-   "decision": "dropped",
-   "decision_reason": "MPC-7350 rules out sending the visitor's IP to a third-party resolver.",
-   "decided": "2026-10-29"
-  },
-  {
    "id": "web.vpn_tor",
    "registry_id": 79,
    "channel": "web",
@@ -1688,27 +1711,6 @@
    "plan_reason": "Marked Verify: not built until a probe on our own test account confirms the field"
   },
   {
-   "id": "email.inbound_signature",
-   "registry_id": 90,
-   "channel": "email",
-   "channel_label": "Email",
-   "group": "Core",
-   "code": "A7",
-   "arrival": "A",
-   "risk": "high",
-   "label": "If they email us: signature block",
-   "evidence_key": "if_they_email_us_signature_block",
-   "reveals": "Job title, company, phone in the signature",
-   "field": "Email Worker raw body",
-   "status": "new",
-   "access": "OK",
-   "source": "https://developers.cloudflare.com/email-routing/email-workers/runtime-api/",
-   "slug": "if-they-email-us-signature-block",
-   "decision": "dropped",
-   "decision_reason": "Reads the message body, which holds personal data; the inbound Email Worker is approved for sender details and mail app and timezone only.",
-   "decided": "2026-10-29"
-  },
-  {
    "id": "email-provider",
    "registry_id": 91,
    "channel": "email",
@@ -1857,27 +1859,6 @@
    "access": "OK",
    "source": "https://github.com/MyPrivacyTOOL/myprivacytool/blob/main/docs/osint-list-mpc-8452.md",
    "slug": "mail-transport-protection"
-  },
-  {
-   "id": "email.wkd",
-   "registry_id": 99,
-   "channel": "email",
-   "channel_label": "Email",
-   "group": "Core",
-   "code": "B9",
-   "arrival": "B",
-   "risk": "low",
-   "label": "Own-server encryption key",
-   "evidence_key": "own_server_encryption_key",
-   "reveals": "Whether their own mail server publishes a PGP key",
-   "field": "Web Key Directory (Tier 3)",
-   "status": "new",
-   "access": "OK",
-   "source": "https://github.com/MyPrivacyTOOL/myprivacytool/blob/main/docs/osint-list-mpc-8452.md",
-   "slug": "own-server-encryption-key",
-   "decision": "dropped",
-   "decision_reason": "The Web Key Directory request carries a hash of the address, which breaks \"address never sent\".",
-   "decided": "2026-10-29"
   },
   {
    "id": "email.attachments",
@@ -2905,27 +2886,6 @@
    "access": "OK",
    "source": "https://core.telegram.org/bots/api",
    "slug": "blocked-or-unblocked-us"
-  },
-  {
-   "id": "tg.reactions_polls",
-   "registry_id": 153,
-   "channel": "telegram",
-   "channel_label": "Telegram",
-   "group": "Core",
-   "code": "A17",
-   "arrival": "A",
-   "risk": "low",
-   "label": "Reactions and poll answers",
-   "evidence_key": "reactions_and_poll_answers",
-   "reveals": "What they react with and vote for",
-   "field": "message_reaction, poll_answer",
-   "status": "new",
-   "access": "OK",
-   "source": "https://core.telegram.org/bots/api",
-   "slug": "reactions-and-poll-answers",
-   "decision": "dropped",
-   "decision_reason": "Needs a chat the bot administers, and poll answers only exist for polls the bot sent; it would show for almost no one.",
-   "decided": "2026-10-29"
   },
   {
    "id": "tg.bio",

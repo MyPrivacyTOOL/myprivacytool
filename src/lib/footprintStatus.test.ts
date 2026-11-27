@@ -34,10 +34,10 @@ describe("/footprint/ status badges", () => {
 });
 
 describe("/footprint/ has no headline total", () => {
-  it("page text, title and description carry no 653, 654, 655, 662, 368, 367 or 366", () => {
+  it("page text, title and description carry no 650, 653, 654, 655, 662, 368, 367 or 366", () => {
     const head = page.slice(0, page.indexOf("<style>"));
     const body = page.slice(page.indexOf("<body"), page.indexOf("<script>"));
-    for (const part of [head, body]) expect(part).not.toMatch(/\b(653|654|655|662|368|367|366)\b/);
+    for (const part of [head, body]) expect(part).not.toMatch(/\b(650|653|654|655|662|368|367|366)\b/);
     expect(page).not.toMatch(/\$\{CHANS\.length\} channels found/);
     expect(page).not.toMatch(/N\+' data points'/);
   });

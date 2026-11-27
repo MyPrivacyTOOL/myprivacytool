@@ -1,6 +1,6 @@
 // MPC-8689: the catalogue matches the approved discovery and the code, and changes no existing count.
-// MPC-11541 (2026-11-27): the source is the Hexagon Registry export (Row Type = Data point, 655 rows) less the one owner-excluded row (538) = 654 published. The 367 items that were already
-// published keep every approved value (risk tier, arrival, wording, slug, plan and decision notes), so the assertions about the discovery below run on those (rows without `added`).
+// MPC-11541 (2026-11-27): the source is the Hexagon Registry export (Row Type empty or Data point = 655 rows) less the rows with Decision = Dropped (78, 90, 99, 153, 538) = 650 published.
+// The 363 items that were already published (367 less the four dropped ones that were in it) keep every approved value (risk tier, arrival, wording, slug, plan and decision notes), so the assertions about the discovery below run on those (rows without `added`).
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { HEXAGON_CATALOGUE, CATALOGUE_CHANNELS } from './catalogue.js';
@@ -10,14 +10,21 @@ import { TELEGRAM_HEXAGONS, X_HEXAGONS, TELEGRAM_EXTRA_HEXAGONS, EXTRA_HEXAGON_I
 const count = (f, k) => HEXAGON_CATALOGUE.filter(f).reduce((m, i) => ((m[i[k]] = (m[i[k]] || 0) + 1), m), {});
 const legacy = (i) => !i.added; // published before the registry export
 const rawSource = JSON.parse(readFileSync(new URL('./hexagons-366.json', import.meta.url), 'utf8'));
-// The count is the registry's: Data point rows (655) = published (654) + owner-excluded (538, Decision = Dropped). The build asserts the same and fails if they differ.
+// The count is the registry's: Data point rows (655) = published (650) + Decision = Dropped (5). The export asserts the same and stops if they differ.
+// THE CI ASSERTION (MPC-11541): the published catalogue count equals the registry rows with Row Type empty or Data point, minus the Dropped ones. The public dataset is the same count.
 assert.equal(rawSource.registry.data_point_rows, 655);
-assert.equal(rawSource.registry.published, 654);
-assert.deepEqual(rawSource.registry.excluded.map((e) => e.registry_id), [538]);
+assert.equal(rawSource.registry.published, 650);
+assert.deepEqual(rawSource.registry.excluded.map((e) => e.registry_id), [78, 90, 99, 153, 538]);
+assert.ok(rawSource.registry.excluded.every((e) => /Decision = Dropped/.test(e.reason)), 'every excluded row is excluded because its Decision is Dropped, nothing else');
 assert.equal(HEXAGON_CATALOGUE.length, rawSource.registry.data_point_rows - rawSource.registry.excluded.length);
-assert.equal(HEXAGON_CATALOGUE.length, 654);
-assert.equal(HEXAGON_CATALOGUE.filter(legacy).length, 367);
-assert.equal(new Set(HEXAGON_CATALOGUE.map((i) => i.registry_id)).size, 654, 'every item is one registry row');
+assert.equal(HEXAGON_CATALOGUE.length, 650);
+assert.equal(rawSource.items.length, HEXAGON_CATALOGUE.length);
+const publicDataset = JSON.parse(readFileSync(new URL('../../public/footprint/hexagons-366.json', import.meta.url), 'utf8'));
+assert.equal(publicDataset.length, HEXAGON_CATALOGUE.length, 'the /footprint/ dataset has exactly the catalogue count');
+assert.ok(!HEXAGON_CATALOGUE.some((i) => rawSource.registry.excluded.some((e) => e.registry_id === i.registry_id)), 'no Dropped row is published');
+assert.deepEqual(rawSource.registry.excluded.filter((e) => e.was).map((e) => e.was.id).sort(), ['email.inbound_signature', 'email.wkd', 'tg.reactions_polls', 'web.reverse_dns'], 'the old record of each dropped item is kept');
+assert.equal(HEXAGON_CATALOGUE.filter(legacy).length, 363);
+assert.equal(new Set(HEXAGON_CATALOGUE.map((i) => i.registry_id)).size, 650, 'every item is one registry row');
 assert.ok(HEXAGON_CATALOGUE.every((i) => typeof i.evidence_key === 'string'), 'every item carries its Evidence Key');
 // 33 Channel Keys (the 27 built + 6 research-only) and the blank key, which is "general": never a channel, never counted as one.
 const KEYS = ['web', 'email', 'telegram', 'whatsapp', 'sms', 'phone', 'x', 'instagram', 'messenger', 'tiktok', 'line', 'kakaotalk', 'wechat', 'linkedin', 'github', 'letter', 'fax', 'discord', 'slack', 'mastodon', 'twitch', 'bluesky', 'viber', 'imessage-rcs', 'zalo', 'youtube', 'weibo', 'douyin', 'reddit', 'snapchat', 'qq', 'naver', 'brokers'];
@@ -25,19 +32,20 @@ assert.equal(KEYS.length, 33);
 assert.deepEqual(CATALOGUE_CHANNELS.map((c) => c.key).filter((k) => k !== 'general').sort(), [...KEYS].sort());
 assert.equal(CATALOGUE_CHANNELS.length, 34);
 assert.equal(count(() => true, 'channel').general, 120, 'blank Channel Key rows are filed as general');
-assert.deepEqual(count(() => true, 'risk'), { high: 285, medium: 269, low: 100 });
-assert.deepEqual(count(() => true, 'status'), { defined: 101, new: 553 });
-assert.deepEqual(count(legacy, 'risk'), { high: 91, medium: 208, low: 68 });
-assert.deepEqual(count(legacy, 'arrival'), { A: 201, B: 94, C: 64, D: 8 });
-assert.deepEqual(count(legacy, 'group'), { Core: 190, 'Global social': 75, Asian: 74, Offline: 28 });
-assert.deepEqual(count(legacy, 'status'), { defined: 101, new: 266 });
-assert.equal(new Set(HEXAGON_CATALOGUE.map((i) => i.id)).size, 654, 'ids are unique');
-assert.equal(new Set(HEXAGON_CATALOGUE.map((i) => i.slug)).size, 654, 'slugs are unique');
+// The four dropped items were: web.reverse_dns (medium, B), email.inbound_signature (high, A), email.wkd (low, B), tg.reactions_polls (low, A), all unbuilt (new).
+assert.deepEqual(count(() => true, 'risk'), { high: 284, medium: 268, low: 98 });
+assert.deepEqual(count(() => true, 'status'), { defined: 101, new: 549 });
+assert.deepEqual(count(legacy, 'risk'), { high: 90, medium: 207, low: 66 });
+assert.deepEqual(count(legacy, 'arrival'), { A: 199, B: 92, C: 64, D: 8 });
+assert.deepEqual(count(legacy, 'group'), { Core: 186, 'Global social': 75, Asian: 74, Offline: 28 });
+assert.deepEqual(count(legacy, 'status'), { defined: 101, new: 262 });
+assert.equal(new Set(HEXAGON_CATALOGUE.map((i) => i.id)).size, 650, 'ids are unique');
+assert.equal(new Set(HEXAGON_CATALOGUE.map((i) => i.slug)).size, 650, 'slugs are unique');
 assert.ok(HEXAGON_CATALOGUE.every((i) => /^[a-z0-9]+(-[a-z0-9]+)*$/.test(i.slug)), 'slugs are url-safe');
 for (const c of CATALOGUE_CHANNELS) assert.ok(CHANNELS[c.key], `channel ${c.key} is in CHANNELS`);
 const perChannel = count((i) => i.channel, 'channel');
 // Channel = the registry Channel Key (8 rows differ from their id prefix: x.location, x.email, x.dm_media, li.email, gh.public_email, email-domain-record, email.web_archive, tg.miniapp_*).
-assert.equal(perChannel.web, 110); assert.equal(perChannel.telegram, 48); assert.equal(perChannel.email, 32);
+assert.equal(perChannel.web, 109); assert.equal(perChannel.telegram, 47); assert.equal(perChannel.email, 30);
 
 // 101 defined = 91 whose ids are exactly what the code defines (54 web + 7 email + 30 Telegram, nothing renamed) + 10 X candidates that main's CK-8502 X hexagons
 // build under different ids. Each of those 10 carries code_ids, and every code_id must be a real X hexagon; nothing is renamed or guessed.
@@ -70,10 +78,15 @@ assert.ok(brokers.every((i) => i.arrival === 'B' && i.access === 'Verify' && i.r
 assert.deepEqual(CATALOGUE_CHANNELS.find((c) => c.key === 'brokers'), { key: 'brokers', code: 'DB', label: 'Data brokers and news archives', group: 'Core' });
 assert.deepEqual([...RECORDS_EXTRA_IDS].sort(), brokers.map((i) => i.id).sort());
 // Drops and holds (2026-10-29) stay in the file with their reason; nothing is deleted. The inbound sender and mail app items are approved, built later.
+// MPC-11541: the four drops are Decision = Dropped in the registry, so they are no longer published items; their record (decision, reason, date) is kept in registry.excluded[].was.
+// Held items (97, 174) are not Dropped and stay published.
 const raw = rawSource.items;
 const decided = Object.fromEntries(raw.filter((i) => i.decision).map((i) => [i.id, i.decision]));
-assert.deepEqual(decided, { 'web.reverse_dns': 'dropped', 'email.wkd': 'dropped', 'tg.reactions_polls': 'dropped', 'email.inbound_signature': 'dropped', 'email.subdomains': 'held', 'tg.join_request_bio': 'held' });
+assert.deepEqual(decided, { 'email.subdomains': 'held', 'tg.join_request_bio': 'held' });
 assert.ok(raw.filter((i) => i.decision).every((i) => i.decision_reason && i.decided === '2026-10-29' && i.status === 'new'));
+const keptDrops = Object.fromEntries(rawSource.registry.excluded.filter((e) => e.was).map((e) => [e.was.id, e.was.decision]));
+assert.deepEqual(keptDrops, { 'web.reverse_dns': 'dropped', 'email.wkd': 'dropped', 'tg.reactions_polls': 'dropped', 'email.inbound_signature': 'dropped' });
+assert.ok(rawSource.registry.excluded.filter((e) => e.was).every((e) => e.was.decision_reason && e.was.decided === '2026-10-29'), 'each dropped item keeps its reason and date');
 assert.equal(channelOfHexagon('tg.username'), 'TG');
 console.log('catalogue.test.mjs ok');
 
