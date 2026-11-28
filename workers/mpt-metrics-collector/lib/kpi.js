@@ -33,20 +33,31 @@ export function topSources(payloads, n = 5) {
   return { total: sum, rows: all.slice(0, n).map(([name, sessions]) => ({ name, sessions, share_pct: sum ? Math.round((1000 * sessions) / sum) / 10 : null })) };
 }
 
+// How a funnel step treats test records, and how its row says so (CK-11491).
+export const TEST_BASIS_LABEL = { removed: 'tests removed', included: 'includes tests', not_removable: 'test visits not removed' };
+
 // Funnel visit -> scan -> save -> convert over the same window. Every step is compared with the step before it.
 // A step with no data is null and the steps after it show no rate (the chain is broken, so no rate is invented).
-export function funnel({ sessions, scans, saves, paid }) {
-  const steps = [['Visit (GA4 sessions)', sessions], ['Scan completed', scans], ['Saved scan (contact given)', saves], ['Paid conversion', paid]];
-  return steps.map(([name, value], i) => {
+// CK-11491: a rate and a drop-off exist only between two steps that treat test records the same way (`tests`, one TEST_BASIS_LABEL key per step).
+// A step whose basis is not stated is never compared. A step larger than the one before it is not a part of it, so it gets no rate either.
+export function funnel({ sessions, scans, saves, paid, tests = {} }) {
+  const steps = [['Visit (GA4 sessions)', sessions, tests.sessions], ['Scan completed', scans, tests.scans], ['Saved scan (contact given)', saves, tests.saves], ['Paid conversion', paid, tests.paid]];
+  return steps.map(([name, value, basis], i) => {
     const prev = i ? num(steps[i - 1][1]) : null;
     const v = num(value);
-    return { name, value: v, from_previous_pct: i && v !== null && prev ? Math.round((1000 * v) / prev) / 10 : null, drop_off: i && v !== null && prev !== null ? Math.max(0, prev - v) : null };
+    const comparable = i > 0 && v !== null && prev !== null && Object.hasOwn(TEST_BASIS_LABEL, basis ?? '') && basis === steps[i - 1][2] && v <= prev;
+    return {
+      name: v !== null && Object.hasOwn(TEST_BASIS_LABEL, basis ?? '') ? `${name} - ${TEST_BASIS_LABEL[basis]}` : name,
+      value: v,
+      from_previous_pct: comparable && prev ? Math.round((1000 * v) / prev) / 10 : null,
+      drop_off: comparable ? prev - v : null,
+    };
   });
 }
 
 // Assemble the whole scorecard from already-read inputs.
 //   totals: { scans, paid, saves, mrr }  days: [{day,new_scans,ga4_sessions,new_users}] newest first (today first)
-//   weeks: [{week_of,weekly_new_scans}] newest first (current partial week first)  sources: payload[]  window: { sessions, scans, saves, paid } for the funnel
+//   weeks: [{week_of,weekly_new_scans}] newest first (current partial week first)  sources: payload[]  window: { sessions, scans, saves, paid, tests } for the funnel
 export function buildScorecard({ today, totals, days, weeks, sources, window }) {
   const arr = num(totals.mrr) === null ? null : totals.mrr * 12;
   const lastFull = weeks?.[1]?.weekly_new_scans ?? null;
