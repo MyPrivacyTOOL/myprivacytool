@@ -76,7 +76,9 @@ test('finish refuses what the table would refuse: a value on a no-value status, 
 test('a second run the same day replaces the first but keeps what it said', () => {
   const failed = failedRows(ASOF, 'boom', '2026-11-27T06:00:00Z')[0];
   const good = rowsFromReport(firstReport, ASOF)[0];
-  assert.match(chainNote(failed, good).note, /^Recovered: an earlier run today failed \(.*boom.*\)/);
+  const rec = chainNote(failed, good).note;
+  assert.match(rec, /^Recovered after a failed run at 2026-11-27T06:00:00Z: boom\. Week of /);
+  assert.ok(rec.length < good.note.length + 90, 'the recovery prefix stays short');
   assert.match(chainNote(good, failed).note, /earlier run today had recorded 0 \(no_stored_scans\)/);
   assert.equal(chainNote(good, failed).value, null);
   assert.deepEqual(chainNote(undefined, good), good);
@@ -155,7 +157,8 @@ test('job, a good run after a failed one the same day: recovered, and the failur
   const r = await runJob([], ENV, w.fetch, NOW + 60_000);
   assert.equal(r.code, 0);
   assert.equal(w.table.size, 4);
-  assert.match(w.table.get(`${ASOF}|M1`).note, /Recovered: an earlier run today failed/);
+  assert.match(w.table.get(`${ASOF}|M1`).note, /^Recovered after a failed run at 2026-11-27T06:00:\d\dZ: failure drill: .*HTTP 404\. Week of /);
+  assert.doesNotMatch(w.table.get(`${ASOF}|M1`).note, /replaced by this failure/);   // the failed note's own history is not quoted back
   assert.equal(w.table.get(`${ASOF}|M1`).status, 'no_stored_scans');
 });
 

@@ -4,6 +4,7 @@ import { callRecipient } from '../../shared/recipients/outbound.ts';
 import { workerRecipientContext } from '../../shared/recipients/worker-ctx.ts';
 import { blogSubscribe } from './blog-subscribe.js';   // MPC-10616
 import { createBusinessRequest, markLate, postDigest, sendDelayNotices } from './business-requests.js';   // MPC-9825
+import { resolveSupabaseUrl, missingSupabaseUrlMessage } from './supabase-url.js';   // CK-11575
 // MPC-7471-F4: the score versions this Worker may store. The scoring itself runs in the browser (and, for saved scans, in scan-report) from the same shared contract.
 import { SCORE_VERSION, LEGACY_SCORE_VERSION } from '../../shared/hexagon-registry/score.js';
 import { SCORE_VERSION_V2 } from '../../shared/hexagon-registry/scoreV2.js';
@@ -660,19 +661,20 @@ async function sweepPending(env) {
 // MPC-6956: insert one row into public.mpt_user_engagement using the service_role key
 // (the table has RLS forced and no anon/authenticated write access). Stores no PII:
 // only a random session id and funnel booleans. Never throws.
-const DEFAULT_SUPABASE_URL = 'https://xmdmkumwxpgahmlweuug.supabase.co';
 // The public publishable key (not a secret; the same one scan-report's accounts use). Supabase Auth needs an apikey on /auth/v1/user.
 const DEFAULT_PUBLISHABLE_KEY = 'sb_publishable_4Nn6HUiPhuUqCgS04tvU0Q_3Ua6R2tV';
 // MPC-7616: host only (never the key), so a SUPABASE_URL secret pointing at the wrong project shows up in the logs.
-const supabaseHost = (env) => { try { return new URL(env.SUPABASE_URL || DEFAULT_SUPABASE_URL).host; } catch (_) { return 'invalid SUPABASE_URL'; } };
+const supabaseHost = (env) => { const u = resolveSupabaseUrl(env); if (!u) return 'no SUPABASE_URL'; try { return new URL(u).host; } catch (_) { return 'invalid SUPABASE_URL'; } };
 async function recordEngagement(env, sessionId, flags, rctx = workerRecipientContext(env)) {
   if (!env.SUPABASE_SERVICE_ROLE_KEY) {
     console.warn('Supabase not configured - skipping engagement write');
     return false;
   }
+  const supabaseUrl = resolveSupabaseUrl(env);   // CK-11575
+  if (!supabaseUrl) { console.error(missingSupabaseUrlMessage(env)); return false; }
   try {
     const res = await callRecipient('supabase', {
-      url: `${env.SUPABASE_URL || DEFAULT_SUPABASE_URL}/rest/v1/mpt_user_engagement`,
+      url: `${supabaseUrl}/rest/v1/mpt_user_engagement`,
       init: {
         method: 'POST',
         headers: {
@@ -701,9 +703,11 @@ async function recordEngagement(env, sessionId, flags, rctx = workerRecipientCon
 async function provedEmailFromBearer(env, request, rctx) {
   const token = (request.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '');
   if (!token || token.length > 4096) return null;
+  const supabaseUrl = resolveSupabaseUrl(env);   // CK-11575
+  if (!supabaseUrl) { console.error(missingSupabaseUrlMessage(env)); return null; }
   try {
     const res = await callRecipient('supabase', {
-      url: `${(env.SUPABASE_URL || DEFAULT_SUPABASE_URL).replace(/\/$/, '')}/auth/v1/user`,
+      url: `${supabaseUrl.replace(/\/$/, '')}/auth/v1/user`,
       init: { headers: { apikey: env.SUPABASE_PUBLISHABLE_KEY || DEFAULT_PUBLISHABLE_KEY, Authorization: `Bearer ${token}` } },
       sent: [],
     }, rctx);
@@ -724,6 +728,8 @@ async function saveBaseline(env, email, riskScore, categoryScores, scoreVersion 
   const score = Number(riskScore);
   if (riskScore === null || riskScore === '' || !Number.isFinite(score) || score < 0 || score > 100) return null;
   if (!env.SUPABASE_SERVICE_ROLE_KEY) return null;
+  const supabaseUrl = resolveSupabaseUrl(env);   // CK-11575
+  if (!supabaseUrl) { console.error(missingSupabaseUrlMessage(env)); return null; }
   const versioned = env.BASELINE_SCORE_VERSION_COLUMN === 'true';
   if (!versioned && scoreVersion !== LEGACY_SCORE_VERSION) return null;
   const overall = Math.round(score);
@@ -737,7 +743,7 @@ async function saveBaseline(env, email, riskScore, categoryScores, scoreVersion 
   try {
     const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(String(email).trim().toLowerCase()));
     const emailHash = [...new Uint8Array(digest)].map(b => b.toString(16).padStart(2, '0')).join('');
-    const base = `${env.SUPABASE_URL || DEFAULT_SUPABASE_URL}/rest/v1/mpt_score_baselines`;
+    const base = `${supabaseUrl}/rest/v1/mpt_score_baselines`;
     const headers = { apikey: env.SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`, 'Content-Type': 'application/json' };
 
     // First scan of this version wins: insert and ignore the conflict if one exists, then read it back.

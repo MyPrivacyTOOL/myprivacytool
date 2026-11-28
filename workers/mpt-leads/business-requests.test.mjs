@@ -52,6 +52,9 @@ failInsert = true; const before = rows.length;
 r = await post({ ...good, email: 'd@acme.example' }); check(r.status === 502 && rows.length === before && slackPosts.some((t) => /NOT queued/.test(t)), 'queue write failure returns 502 (page shows an error, no false promise) and alerts Slack');
 failInsert = false;
 r = await post(good, { ...env, SUPABASE_SERVICE_ROLE_KEY: undefined }); check(r.status === 503, 'missing service key returns 503, never a false success');
+// CK-11575: a non-production environment without SUPABASE_URL is "not configured": 503 and no call to any Supabase host, never the production fallback.
+{ const before = calls.length; r = await post(good, { ...env, ENVIRONMENT: 'development' });
+  check(r.status === 503 && calls.slice(before).every((c) => !c.url.includes('supabase.co')), 'non-production without SUPABASE_URL returns 503 and calls no Supabase host'); }
 
 // Late sweep
 rows = []; const now = new Date('2026-11-10T00:00:00Z');

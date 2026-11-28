@@ -86,7 +86,12 @@ export function failedRows(asOf, reason, atIso) {
 export function chainNote(prev, next) {
   if (!prev) return next;
   const was = prev.status === 'failed' ? 'failed' : prev.value === null ? prev.status : `${prev.value} (${prev.status})`;
-  if (prev.status === 'failed' && next.status !== 'failed') return { ...next, note: clip(`Recovered: an earlier run today failed (${clip(prev.note, 300)}) ${next.note}`) };
+  if (prev.status === 'failed' && next.status !== 'failed') {
+    // keep the evidence, short: when the failed run happened and why, not the whole failed note (which may itself quote an even earlier run)
+    const m = /^Run FAILED at (\S+?): (.*?)\. No value was measured/s.exec(prev.note);
+    const what = m ? `at ${m[1]}: ${clip(m[2], 200)}` : `(${clip(prev.note, 200)})`;
+    return { ...next, note: clip(`Recovered after a failed run ${what}. ${next.note}`) };
+  }
   if (prev.status !== 'failed' && next.status === 'failed') return { ...next, note: clip(`${next.note} An earlier run today had recorded ${was}; it is replaced by this failure.`) };
   return next;
 }
