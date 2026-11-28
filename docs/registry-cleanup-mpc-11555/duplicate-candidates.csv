@@ -1,0 +1,44 @@
+channel_key,evidence_key,rows (id title),my_call,reason
+discord,group_membership,317 Public Server Membership; 433 Server membership details,likely duplicate,public server membership vs server membership details
+discord,linked_accounts,318 Connected Accounts; 437 Linked accounts,likely duplicate,connected accounts vs linked accounts
+fax,fax_machine_id_tsi,267 Station ID; 525 Fax machine ID (TSI),likely duplicate,fax machine ID (TSI) vs station ID: same fact
+instagram,profile_photo,247 Profile Picture URL; 565 Profile photo,likely duplicate,profile photo vs profile picture URL
+letter,postmark,271 Postmark Date; 530 Postmark,likely duplicate,postmark vs postmark date
+linkedin,full_name,219 Full Name; 425 Name,likely duplicate,name vs full name
+messenger,page_scoped_id,203 Page-scoped ID; 251 FB User ID,likely duplicate,FB user ID vs page-scoped ID
+naver,phone_number,229 Linked Phone; 516 Mobile number,likely duplicate,mobile number vs linked phone
+naver,profile_photo,227 Profile Picture; 580 Profile photo,likely duplicate,profile photo vs profile picture
+phone,carrier,284 Carrier Name; 522 Carrier,likely duplicate,carrier vs carrier name
+reddit,account_age,215 Account Creation Date; 217 Cake Day,likely duplicate,cake day is the account creation date's anniversary
+sms,message_attachments,109 Pictures sent (MMS); 308 MMS Media URLs,likely duplicate,MMS media URLs vs pictures sent (MMS)
+sms,message_text,108 What you typed; 303 Message Body Content,likely duplicate,message body content vs what you typed
+sms,message_time,107 Message time; 302 Message Timestamp,likely duplicate,message timestamp vs message time
+telegram,where_forwards_come_from,147 Where forwards come from; 366 Telegram Forwarding Metadata (Original Author/Channel),likely duplicate,forwarding metadata vs where forwards come from
+tiktok,tiktok_ids,212 TikTok User ID; 455 TikTok IDs,likely duplicate,TikTok IDs vs TikTok user ID
+web,connection_type,8 Connection Type; 289 Network Type,likely duplicate,network type vs connection type
+web,how_you_found_us,9 How You Found Us; 359 HTTP Referrer URL,likely duplicate,HTTP referrer URL vs how you found us
+web,motion_sensors,20 Motion Sensors; 382 Mobile Sensor Context Leakage (Accelerometer/Compass),likely duplicate,mobile sensor context vs motion sensors
+web,profile_links,328 Profile Website; 346 Website,likely duplicate,website vs profile website
+web,web_archive_snapshots,363 Historical Web Archive Snapshots; 394 Historical Web Archive & Cache Leakage,likely duplicate,two rows for the same archive lookup
+x,private_account,194 Private account; 330 Protected/Tweet Privacy,likely duplicate,protected tweets vs private account
+youtube,audience_size,234 Subscriber Count; 571 Audience size,likely duplicate,audience size vs subscriber count
+discord,banner_and_colour,313 Banner Image; 435 Banner and colour,"overlap, needs a look",banner image vs banner plus colour: one is wider
+discord,username,311 Username; 427 Username and display name,"overlap, needs a look",username vs username and display name: one is wider
+instagram,audience_size,200 Follower count; 248 Follower/Following Count,"overlap, needs a look",follower count vs follower and following count
+naver,birthday_or_age,"228 Age Range; 515 Age, birthday, birth year","overlap, needs a look","age, birthday and birth year vs age range"
+phone,call_forwarding,288 Call Forwarding Status; 518 Forwarded call,"overlap, needs a look",forwarded call event vs forwarding status
+sms,phone_number,105 Phone number; 300 Sender Phone Number; 301 Receiver Phone Number,"overlap, needs a look",sender number and phone number look the same; receiver number (301) is different
+web,cookies,33 Cookies; 361 First-Party Analytics Cookie ID,"overlap, needs a look",cookie status vs the analytics cookie ID
+douyin,douyin_ids,224 Douyin ID; 649 Douyin IDs,"kept by the owner (near-title import 644-652, rules page section 1)",row 649
+naver,naver_app_id,225 Naver ID; 652 Naver app ID,"kept by the owner (near-title import 644-652, rules page section 1)",row 652; the rules page names this exact pair as two different data points
+phone,phone_number,279 Caller ID (Number); 650 Caller number,"kept by the owner (near-title import 644-652, rules page section 1)",row 650
+wechat,wechat_openid,255 WeChat ID; 646 WeChat OpenID,"kept by the owner (near-title import 644-652, rules page section 1)",row 646
+discord,profile_colour,315 Accent Color; 320 Profile Theme,distinct,profile theme vs accent colour are different settings
+email,profile_photo,92 Public profile picture; 93 Second profile-picture service,distinct,second profile-picture service is a different source
+kakaotalk,birthday_or_age,477 Age range and birth year; 574 Birthday,distinct,birthday vs age range and birth year
+letter,postal_address,269 Return Address; 270 Recipient Address,distinct,recipient address vs return address
+telegram,bio,154 Bio; 174 Bio in join request,distinct,bio in a join request is a different path (held)
+telegram,profile_photo,156 Profile photo; 157 Older profile photos,distinct,older photos vs current photo
+telegram,recent_posts,168 Public channel posts; 173 Personal channel latest posts,distinct,personal channel posts vs public channel posts
+twitch,message_text,620 Chat message; 621 Whisper text,distinct,whisper vs chat message
+whatsapp,phone_number,120 Phone number (WhatsApp ID); 135 Phone or contact card you share,distinct,shared contact card vs the sender's own number

@@ -1,0 +1,25 @@
+hexagon_id,title,channel_key,class_now,how_decided,reason
+359,HTTP Referrer URL,web,A,"approved same-channel, same-key precedent","approved class of the same Channel Key + Evidence Key (row 9, referrer) is A: arrives with the first request"
+360,UTM Campaign Parameters,web,A,"judgment, anchored on the approved referrer (A)","campaign parameters arrive in the first request URL, same family as the approved referrer (A)"
+361,First-Party Analytics Cookie ID,web,A,"approved same-channel, same-key precedent","approved class of the same Channel Key + Evidence Key (row 33, Cookies) is A"
+362,Document Metadata (Author/IP/GPS),web,B,judgment from the row's own title and evidence,"read from public documents by lookup, no action from the person"
+363,Historical Web Archive Snapshots,web,B,judgment from the row's own title and evidence,"public web-archive lookup, no sign-in"
+366,Telegram Forwarding Metadata (Original Author/Channel),telegram,A,"approved same-channel, same-key precedent","approved class of the same Channel Key + Evidence Key (row 147, forward origin) is A"
+368,Telegram Public Subscriber & Growth Metrics,telegram,B,judgment from the row's own title and evidence,"public subscriber count; same key is B on YouTube, Instagram, X, Zalo, LINE"
+371,Image EXIF Metadata (GPS/Camera),web,B,judgment from the row's own title and evidence,EXIF read from images already public on the site
+372,Data Broker Sister-Domain Repopulation,,B,judgment from the row's own title and evidence,people-search listing: same key is B on brokers
+377,LinkedIn Custom URL Cross-Platform Leakage,,B,judgment from the row's own title and evidence,"custom URL is public on the LinkedIn profile; looked up, not sent"
+380,User Agent & Device Fingerprinting Leakage,web,A,judgment from the row's own title and evidence,"user agent arrives with the first request; same family as Browser (A, row 3)"
+382,Mobile Sensor Context Leakage (Accelerometer/Compass),web,A,"approved same-channel, same-key precedent","approved class of the same Channel Key + Evidence Key (row 20, Motion Sensors) is A"
+383,Public DNS Zone Transfer Exposure,web,B,judgment from the row's own title and evidence,public DNS lookup
+384,Domain Registration Contact Info Exposure (WHOIS),web,B,judgment from the row's own title and evidence,WHOIS is a public registry lookup; same fact as row 94 (B)
+385,HTML Source Code Metadata Leakage,web,B,judgment from the row's own title and evidence,read from the public page source
+394,Historical Web Archive & Cache Leakage,web,B,judgment from the row's own title and evidence,public web-archive/cache lookup (same key as 363)
+395,Landline Public Records,,B,judgment from the row's own title and evidence,public records lookup by number
+396,Mobile Data Broker Listing,,B,judgment from the row's own title and evidence,broker listing: same key is B on brokers (row 372's key)
+397,TrueCaller Caller ID,,B,judgment from the row's own title and evidence,caller-name lookup: same key is B on phone and sms
+400,Family Member Discovery,,B,judgment from the row's own title and evidence,relatives come from people-search / public-record listings (B on brokers)
+406,Email Scan Trigger (Ephemeral),discord,C,judgment from the row's own title and evidence,the person runs the Discord command that triggers the scan
+410,OAuth Scope Over-Permission,,C,judgment from the row's own title and evidence,scopes exist only because the person granted them in the consent screen
+414,Third-Party App Integration Risks,,C,judgment from the row's own title and evidence,integrations exist only because the person authorised them
+545,Google Account Footprint,,B,judgment from the row's own title and evidence,"what is public on a Google account, looked up from the address"
