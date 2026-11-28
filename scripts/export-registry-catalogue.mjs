@@ -12,6 +12,9 @@
 //   follows the registry Channel Key and it gains registry_id and evidence_key.
 // - A row that is new gets its fields from the registry and `added: "2026-11-27"`. Risk: Critical and High are "high". A row with no arrival class is filed as D ("wider
 //   lookup, not in the baseline"), the least-claiming class. Nothing is invented: an empty registry field stays empty.
+// - MPC-11555: an item that came from the registry (it carries `added`) was never approved, so it FOLLOWS the registry's arrival class on every run (a blank class is D). When its class
+//   changes, or its code now clashes with another item's in the channel it sits on, it gets a new code (class letter + the next free number in that channel). Approved items
+//   (no `added`) keep their arrival class and code whatever the registry says. A re-run on the output changes nothing.
 // - Rows with Decision = Dropped stay data points in the registry but are not published (Chris, 2026-11-27: 78, 90, 99, 153, 538 = 5 rows). The rule is the registry field, not a list of ids.
 //   Decision = Held rows (97, 174) stay published. Count check: published + excluded = Data point rows, and the build asserts it again. --expect-published=<n> stops the export when the derived count differs.
 import { readFileSync, writeFileSync } from 'node:fs';
@@ -60,8 +63,22 @@ export function exportCatalogue(rows, { dataPointRows, previous, expectPublished
     const code = clean(r['Catalogue Code']); const old = code && byId.get(code);
     if (old && (clean(r.Footprint) === old.label || !owner.has(code))) owner.set(code, r['Hexagon ID']);
   }
+  // MPC-11555: where each published row's existing item will sit after this export, worked out first so a code is judged in the channel the item ends up on (not the one it was issued in).
+  const placed = new Map();
+  for (const r of dataRows) {
+    if (r.Decision === EXCLUDED_DECISION) continue;
+    const rid = r['Hexagon ID']; const code = clean(r['Catalogue Code']);
+    const old = byRid.get(rid) ?? (code && owner.get(code) === rid ? byId.get(code) : null);
+    const key = clean(r['Channel Key']);
+    placed.set(rid, { old, channel: key || (old && !key ? old.channel : 'general') });
+  }
   const seq = {};
-  for (const i of previous.items) { const m = /^([A-D])(\d+)$/.exec(i.code); if (m) seq[`${i.channel}|${m[1]}`] = Math.max(seq[`${i.channel}|${m[1]}`] ?? 0, +m[2]); }
+  const bump = (channel, code) => { const m = /^([A-D])(\d+)$/.exec(code); if (m) seq[`${channel}|${m[1]}`] = Math.max(seq[`${channel}|${m[1]}`] ?? 0, +m[2]); };
+  const placedIds = new Set([...placed.values()].filter((p) => p.old).map((p) => p.old.id));
+  for (const i of previous.items) if (!placedIds.has(i.id)) bump(i.channel, i.code); // excluded items still reserve their numbers
+  for (const { old, channel } of placed.values()) if (old) bump(channel, old.code);
+  const held = new Set([...placed.values()].filter(({ old }) => old && !old.added).map(({ old, channel }) => `${channel}|${old.code}`)); // approved items never give up a code
+  const arrivalOf = (r) => (/Class ([A-D])/.exec(r['Arrival Order / Capture Point'] || '') || [])[1] ?? 'D';
   for (const r of dataRows) {
     const rid = r['Hexagon ID'];
     if (r.Decision === EXCLUDED_DECISION) {
@@ -75,13 +92,16 @@ export function exportCatalogue(rows, { dataPointRows, previous, expectPublished
       continue;
     }
     const code = clean(r['Catalogue Code']);
-    const old = byRid.get(rid) ?? (code && owner.get(code) === rid ? byId.get(code) : null);
-    const key = clean(r['Channel Key']);
-    const channel = key || (old && !key ? old.channel : 'general');
+    const { old, channel } = placed.get(rid);
     if (old) claimed.add(old.id);
     const label = old ? old.label : clean(r.Footprint);
-    const base = old ?? (() => {
-      const arrival = (/Class ([A-D])/.exec(r['Arrival Order / Capture Point'] || '') || [])[1] ?? 'D';
+    let reissued = old;
+    if (old?.added) { // registry-sourced, never approved: follows the registry's arrival class (see the header)
+      const want = arrivalOf(r);
+      if (want !== old.arrival || held.has(`${channel}|${old.code}`)) { const k = `${channel}|${want}`; seq[k] = (seq[k] ?? 0) + 1; reissued = { ...old, arrival: want, code: `${want}${seq[k]}` }; }
+    }
+    const base = reissued ?? (() => {
+      const arrival = arrivalOf(r);
       const k = `${channel}|${arrival}`; seq[k] = (seq[k] ?? 0) + 1;
       return {
         id: code && !byId.has(code) ? code : `reg-${rid}`, channel_label: channelLabel[channel], group: channelGroup[channel], code: `${arrival}${seq[k]}`, arrival,
@@ -91,6 +111,7 @@ export function exportCatalogue(rows, { dataPointRows, previous, expectPublished
     })();
     const item = { ...base, channel, channel_label: channelLabel[channel], registry_id: rid, evidence_key: clean(r['Evidence Key']) };
     if (!old && (byId.has(item.id) || published.some((p) => p.id === item.id))) throw new Error(`registry export: id ${item.id} would clash`);
+    held.add(`${channel}|${item.code}`);
     published.push(item);
   }
   if (expectPublished !== undefined && dataRows.length - excluded.length !== expectPublished) throw new Error(`registry export: derived ${dataRows.length - excluded.length} publishable rows (${dataRows.length} Data point rows less ${excluded.length} with Decision = ${EXCLUDED_DECISION}), expected ${expectPublished}. Stop and report.`);
