@@ -383,12 +383,15 @@ async function handleConfirmation(text, state, env, stateKey) {
   const n = text.trim().toUpperCase();
 
   if (n === 'Y' || n === 'YES') {
+    // MPC-7129: removed the phantom "full Privacy Report within 60 seconds" promise
+    // and the /report link (removal product not yet built). CTA now points to /scan
+    // which is the live product and delivers a real exposure summary.
     await saveConversationState(env, stateKey, { ...state, stage: 'confirmed', confirmedAt: Date.now() });
     await recordEngagement(env, stateKey, {
       email_confirmed: state.platform === 'email',
       mobile_confirmed: state.platform === 'sms',
     });
-    return '✅ Thanks for confirming!\n\nYour full Privacy Report is being prepared. You\'ll receive it here within 60 seconds.\n\nWant to remove yourself from data broker sites? Visit:\nhttps://myprivacytool.io/report';
+    return '✅ Got it — thanks for confirming.\n\nRun your full free scan to see exactly which data broker sites list you and what they hold:\nhttps://myprivacytool.io/scan\n\nIt takes about 60 seconds and shows your real exposure score.';
   }
 
   if (n === 'N' || n === 'NO') {
