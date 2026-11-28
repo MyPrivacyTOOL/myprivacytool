@@ -15,6 +15,8 @@
 // - MPC-11555: an item that came from the registry (it carries `added`) was never approved, so it FOLLOWS the registry's arrival class on every run (a blank class is D). When its class
 //   changes, or its code now clashes with another item's in the channel it sits on, it gets a new code (class letter + the next free number in that channel). Approved items
 //   (no `added`) keep their arrival class and code whatever the registry says. A re-run on the output changes nothing.
+// - MPC-11555: the same holds for `group`: a registry-sourced item takes the group of the channel it sits on (the group most of that channel's approved items carry), so an item that moves off
+//   "general" no longer keeps "Core" on an Instagram or WeChat tile. Approved items keep their group.
 // - Rows with Decision = Dropped stay data points in the registry but are not published (Chris, 2026-11-27: 78, 90, 99, 153, 538 = 5 rows). The rule is the registry field, not a list of ids.
 //   Decision = Held rows (97, 174) stay published. Count check: published + excluded = Data point rows, and the build asserts it again. --expect-published=<n> stops the export when the derived count differs.
 import { readFileSync, writeFileSync } from 'node:fs';
@@ -52,6 +54,10 @@ export function exportCatalogue(rows, { dataPointRows, previous, expectPublished
   const byId = new Map(previous.items.map((i) => [i.id, i]));
   const byRid = new Map(previous.items.filter((i) => i.registry_id).map((i) => [i.registry_id, i])); // a re-run finds its own items by registry id first
   const channelLabel = {}; const channelGroup = {};
+  // MPC-11555: a channel's group is the one most of its approved (not `added`) items carry (ties: alphabetical); a channel with no approved item keeps the first group seen, then CHANNEL_META.
+  const tally = {};
+  for (const i of previous.items.filter((x) => !x.added)) { const t = (tally[i.channel] ??= {}); t[i.group] = (t[i.group] || 0) + 1; }
+  for (const [ch, t] of Object.entries(tally)) channelGroup[ch] = Object.entries(t).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0][0];
   for (const i of previous.items) { channelLabel[i.channel] ??= i.channel_label; channelGroup[i.channel] ??= i.group; }
   for (const [k, m] of Object.entries(CHANNEL_META)) { channelLabel[k] ??= m.label; channelGroup[k] ??= m.group; }
 
@@ -100,6 +106,7 @@ export function exportCatalogue(rows, { dataPointRows, previous, expectPublished
       const want = arrivalOf(r);
       if (want !== old.arrival || held.has(`${channel}|${old.code}`)) { const k = `${channel}|${want}`; seq[k] = (seq[k] ?? 0) + 1; reissued = { ...old, arrival: want, code: `${want}${seq[k]}` }; }
     }
+    if (old?.added && channelGroup[channel] && reissued.group !== channelGroup[channel]) reissued = { ...reissued, group: channelGroup[channel] }; // follows its channel's group, like its class
     const base = reissued ?? (() => {
       const arrival = arrivalOf(r);
       const k = `${channel}|${arrival}`; seq[k] = (seq[k] ?? 0) + 1;
