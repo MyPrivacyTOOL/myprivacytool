@@ -82,6 +82,8 @@ export interface Env {
   TELEGRAM_SCAN_SCOPE?: string;
   /** MPC-7894 Telegram fix wizard: "on" enables /fix and its buttons for senders in PROBE_TELEGRAM_IDS; anything else (default) is off. */
   TELEGRAM_FIX_WIZARD?: string;
+  /** MPC-11622: "on" shows the tier-weighted exposure score (exposure-tier-1) in the baseline report. Off (default): the report is unchanged; the score is still computed and stored beside the old risk. A production switch: the owner flips it. */
+  TELEGRAM_EXPOSURE_DISPLAY?: string;
   /** MPC-7893 one-time dashboard link: "on" lets senders in PROBE_TELEGRAM_IDS ask for it with "dashboard"; anything else (default) is off. */
   TELEGRAM_DASHBOARD_LINKS?: string;
   /** MPC-8689 one-time footprint handoff link: "on" lets senders in PROBE_TELEGRAM_IDS ask for it with "footprint"; anything else (default) is off. */
