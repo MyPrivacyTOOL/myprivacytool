@@ -33,8 +33,9 @@ describe("exposure in the Telegram report (MPC-11622)", () => {
     expect(r.text).toContain("Telegram exposure 48 · 11 of 25 fields returned");
     expect(r.text).toContain("Always sent: 29 of 100. This part is the platform, not your settings.");
     expect(r.text).toContain("Your settings: 19 more.");
-    expect(r.text).toMatch(/lowest score possible is 35: 20% of the range you can change/);
-    expect(r.text).toContain("What you can change: 19 points from 4 settings you can change. Biggest first:");
+    expect(r.text).toContain("Position: 20% of the range you can change (0% = nothing changeable is exposed, 100% = all of it is; the lowest possible score is 35).");
+    expect(r.text).toContain("19 points from 4 settings you can change. Biggest first:");
+    expect(r.text.match(/lowest (possible )?score (possible )?is 35/g)).toHaveLength(1); // the floor is stated once
     expect(r.text).toMatch(/Birthday: 6 points\n {2}Profile photo: 6 points\n {2}Bio: 4 points/);
     expect(r.text).toContain("Your number reads 48 now instead of 37% because the score now weighs each of 25 fields");
     expect(r.text).toContain("(previous method: 11 of 30 = 37%)");
@@ -46,7 +47,8 @@ describe("exposure in the Telegram report (MPC-11622)", () => {
     const r = buildReport(yes(), ok(CHAT), ok(PHOTOS), null, { exposureDisplay: true })!;
     const block = r.text.split("\n\n")[0] + r.text.split("\n\n")[1]; // the exposure block
     expect(block).not.toMatch(/\b(protected|clear|safe|fixed|hidden)\b/i);
-    expect(r.text).toContain("This field did not come back in this scan. That can mean your settings hid it, or that you never filled it in - a single scan cannot tell the difference.");
+    expect(r.text).toContain("About \"Not returned\" above: This field did not come back in this scan. That can mean your settings hid it, or that you never filled it in - a single scan cannot tell the difference.");
+    expect(r.text.indexOf("About \"Not returned\"")).toBeGreaterThan(r.text.indexOf("[B] Public profile lookup")); // it sits after the lists it explains
     expect(r.text).not.toMatch(/\bprotected\b/i);
   });
 
@@ -61,6 +63,17 @@ describe("exposure in the Telegram report (MPC-11622)", () => {
       const states = hexagonStates(yes(), chat, []);
       for (const f of TELEGRAM_EXPOSURE.fields) expect(["returned", "not_returned"]).toContain(states.find((h) => h.id === f.id)?.state);
     }
+  });
+
+  it("the longest possible report stays under Telegram's 4096-character message limit with the exposure block on (measured 3315 with the footprint hint)", () => {
+    const update = { ...yes(), message: { ...yes().message, from: { id: ID, is_bot: false, first_name: "Test", last_name: "User", username: "t_user", language_code: "en" } } };
+    const chat = { id: ID, type: "private", first_name: "Test", last_name: "User", username: "t_user", active_usernames: ["a", "b"], bio: "hello", birthdate: { day: 1, month: 2 }, accent_color_id: 1, profile_accent_color_id: 2, is_premium: true,
+      emoji_status_custom_emoji_id: "1", profile_background_custom_emoji_id: "2", accepted_gift_types: { a: 1 }, business_intro: {}, business_location: {}, business_opening_hours: {}, personal_chat: { id: 1 }, has_private_forwards: true,
+      has_restricted_voice_and_video_messages: true, max_reaction_count: 11, photo: { small_file_id: "s", small_file_unique_id: "u1", big_file_id: "b", big_file_unique_id: "u2" } };
+    const photos = { total_count: 2, photos: [[{ file_id: "p", file_unique_id: "u1" }], [{ file_id: "q", file_unique_id: "u3" }]] };
+    const r = buildReport(update, ok({ ok: true, result: chat }), ok({ ok: true, result: photos }), null, { exposureDisplay: true })!;
+    expect(r.exposure).toMatchObject({ score: 100, returned: 25 });
+    expect(r.text.length + 219).toBeLessThan(4000); // 219 = the footprint hint appended for allow-listed senders
   });
 
   it("the locked-down account scores lower than the public one, both through the report", () => {
