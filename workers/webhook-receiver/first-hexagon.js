@@ -32,14 +32,14 @@ export function generateFirstHexagon({ platform, name, handle, phone, email, use
     ``,
     `You just reached <b>MyPrivacyTOOL</b> via ${platformLabel}.`,
     ``,
-    `Here's a snapshot of what's <b>publicly visible</b> about you right now:`,
+    `Here's what's <b>visible from your ${platformLabel} contact</b> right now:`,
     ``,
     ...knownData.map(item => `${item.found ? '🔴' : '⚪'} ${item.label}: <b>${item.value}</b>`),
     ``,
-    `🔒 Data brokers across 200+ sites may be sharing this information without your knowledge.`,
+    `🔒 Data brokers may be sharing your personal information without your knowledge.`,
     ``,
     `Is this you?`,
-    `Reply <b>Y</b> to see your full Privacy Report`,
+    `Reply <b>Y</b> to confirm and see your exposure summary`,
     `Reply <b>N</b> if this isn't you`,
   ];
 
@@ -90,9 +90,10 @@ function buildKnownData({ platform, name, handle, phone, email }) {
   });
 
   // Data broker estimate (static for V1 — will be dynamic in V2)
+  // MPC-7129: labelled as an estimate, not a scan result, to avoid misleading the user
   items.push({
-    label: 'Data broker sites',
-    value: getDataBrokerEstimate(platform),
+    label: 'Est. data broker sites',
+    value: `${getDataBrokerEstimate(platform)} (estimate — full scan at myprivacytool.io)`,
     found: true,
   });
 
@@ -120,14 +121,14 @@ function maskEmail(email) {
 function getDataBrokerEstimate(platform) {
   // V1: static estimate. V2: real API lookup
   const estimates = {
-    telegram: 'Likely 40–80 sites',
-    messenger: 'Likely 60–120 sites (Facebook data shared widely)',
-    instagram: 'Likely 50–100 sites',
-    whatsapp: 'Likely 40–80 sites',
-    sms: 'Likely 80–150 sites (phone number widely traded)',
-    email: 'Likely 60–120 sites (email is primary broker identifier)',
+    telegram: '40–80',
+    messenger: '60–120',
+    instagram: '50–100',
+    whatsapp: '40–80',
+    sms: '80–150',
+    email: '60–120',
   };
-  return estimates[platform] || 'Likely 40–100 sites';
+  return estimates[platform] || '40–100';
 }
 
 const PLATFORM_LABELS = {
