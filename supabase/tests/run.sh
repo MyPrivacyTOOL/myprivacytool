@@ -36,7 +36,7 @@ psql_ "$TEST_URL" -f supabase/sql/mpt-score-baselines.sql
 # MPC-8737: the ledger migration has its own stage further down (fingerprint before / after, rollback, re-apply), so it is excluded here too.
 for f in $(ls supabase/migrations_archive/*.sql | grep -v -e mpc_8671_kpi_views_hourly_counter -e mpc_8737_data_point_ledger_v1 -e mpc_8753_ledger_risk_axis -e mpc_8737_m3_ledger_erase_parity -e mpc_8689_brokers_rows -e exclude_test_scans_from_kpi -e mpc_11547_hexagon_scorecard_views | sort); do echo "   migration $(basename "$f")"; psql_ "$TEST_URL" -f "$f"; done
 # MPC-9896: migrations added after the baseline (supabase/migrations/, version above 20261127060000) are part of the chain too.
-for f in $(ls supabase/migrations/*.sql | awk -F/ '{v=$NF; sub(/_.*/,"",v); if (v+0 > 20261127060000) print $0}' | grep -v -e mpc_11547_hexagon_scorecard_views | sort); do echo "   migration $(basename "$f")"; psql_ "$TEST_URL" -f "$f"; done
+for f in $(ls supabase/migrations/*.sql | awk -F/ '{v=$NF; sub(/_.*/,"",v); if (v+0 > 20261127060000) print $0}' | grep -v -e mpc_11547_hexagon_scorecard_views -e mpc_9896b_agent_readonly_role | sort); do echo "   migration $(basename "$f")"; psql_ "$TEST_URL" -f "$f"; done
 echo "   KPI view chain (supabase/sql), in the order production received it"
 for f in mpt-raw-metrics mpt-youtube-daily-metrics mpt-youtube-daily-join mpt-hk-days mpt-hubspot-daily mpt-cloudflare-daily-metrics mpt-cloudflare-daily-join; do echo "   sql $f.sql"; psql_ "$TEST_URL" -f "supabase/sql/$f.sql"; done
 echo "   migration 20261028120001_mpc_8671_kpi_views_hourly_counter.sql"
@@ -181,6 +181,11 @@ psql_ "$TEST_URL" -f supabase/migrations_archive/20261127060000_exclude_test_sca
 psql_ "$TEST_URL" -At -f supabase/tests/exclude-test-scans.test.sql
 echo "== scorecard daily table: no stand-in zero, one row per measure per day, no public access (MPC-11567)"
 psql_ "$TEST_URL" -At -f supabase/tests/mpc-11567-metrics-daily.test.sql
+echo "== read-only agent role over aggregate wrapper views: reads the nine views, nothing else, writes refused (MPC-9896-B)"
+# Needs mpt_daily_metrics (KPI chain) and the scorecard views (their own stage above), so it is applied here, not in the generic post-baseline loop.
+psql_ "$TEST_URL" -f supabase/migrations/20261128051500_mpc_9896b_agent_readonly_role.sql
+psql_ "$TEST_URL" -f supabase/migrations/20261128051500_mpc_9896b_agent_readonly_role.sql   # idempotent: a second run changes nothing and errors on nothing
+psql_ "$TEST_URL" -At -f supabase/tests/mpc-9896b-agent-readonly.test.sql
 
 echo "== hexagon scorecard views: M1, M2, M3, G on fixtures (MPC-11547)"
 # The MPC-8659 stage re-ran an older counting function but does not touch the scorecard views, which only read tables.
