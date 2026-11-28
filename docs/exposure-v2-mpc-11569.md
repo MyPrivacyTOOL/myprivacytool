@@ -44,6 +44,19 @@ Live = the 54 web checks + the 6 built email checks = **60**. In build 131 (was 
 3. **Shadow first, flip later.** The report JSON now carries `web_scan.exposure_v2_shadow` next to `web_scan.exposure` (v1, still the headline). Nothing is shown to users from it. Flipping a user-visible score to v2 is a separate step that needs the owner's explicit go: compare shadow against v1 on real reports first, then switch (with `mpt-leads` storing `exposure-v2` as its own baseline version, never subtracted from v1).
 4. **Before the flip:** a `found` probe for each of the five email checks that has only ever returned `clear` (own address, local run, recorded in `docs/probe-results/`), and the copy review of the notice and release-note wording. Telegram 30 and X 10 come after the flip, and only the checks observed returning data.
 
+## The flip, built dark (owner decides when)
+
+Two Worker vars, both `"false"` in `wrangler.toml` and inert today:
+
+| Var | Worker | When `"true"` |
+|---|---|---|
+| `EXPOSURE_V2_HEADLINE` | scan-report | the report JSON's `web_scan.exposure` is the v2 result; v1 moves to `exposure_v1_previous`; the shadow field is dropped. The email body is unchanged. |
+| `BASELINE_ACCEPT_EXPOSURE_V2` | mpt-leads | a score tagged `exposure-v2` is stored as its own baseline version and only compared with the same version. Nothing sends one until the page is wired (separate step). |
+
+**Before turning them on (owner):** (1) the `found` probes for the five email checks that have only returned `clear`, or move those back to In build; (2) the copy review, including a headline that is neutral about direction (live shadow data shows v2 below v1 by 3 to 7 points, because most email checks return clear); (3) look at a delivered report's `exposure_v2_shadow` once; (4) decide the method page wording (it still describes v1, which is why the v2 result carries no `method_url`).
+**Flip:** set `EXPOSURE_V2_HEADLINE = "true"` (and, once the page sends v2, `BASELINE_ACCEPT_EXPOSURE_V2 = "true"`), merge, deploy. **Rollback:** set both back to `"false"` and redeploy; reports return to v1 headline plus shadow.
+**Not part of the flip:** the page ring, popup, PDF and the email body. A page-only scan scores the same under v2 (Z 54), so they only change when the page can send email results.
+
 ## Release notes (draft, not published)
 
 **Your exposure score now counts more checks.**

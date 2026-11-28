@@ -160,12 +160,19 @@ export const webExposure = (web) => ({ ...computeExposure(web.map((h) => ({ id: 
 // user's own JSON file, never in the email body, the page or a baseline, and `exposure` above stays the headline. Z = 60 because a report is prepared for an
 // address (totalForV2). email-breaches is rejected as not_built inside computeExposureV2. No method_url: no page describes v2 yet.
 export const webExposureV2 = (web, emailHexes) => computeExposureV2([...web, ...(emailHexes ?? [])].map((h) => ({ id: h.id, status: h.status })), { final: true, total: totalForV2(true) });
-export function buildReportJson({ scanId, webScan, web, emailHexes, score, generatedAt = new Date().toISOString() }) {
+// MPC-11569: THE FLIP, built dark. EXPOSURE_V2_HEADLINE = "true" (Worker var, absent or anything else = off) makes the report JSON's `web_scan.exposure` the v2 result
+// and keeps the v1 result next to it as `exposure_v1_previous`; the shadow field is then dropped (it would only repeat `exposure`). OFF is exactly today's output.
+// No method_url on the v2 result: the method page still describes v1 and its v2 wording needs the owner's copy approval. Only the owner turns this on.
+export const exposureV2HeadlineEnabled = (env = {}) => env.EXPOSURE_V2_HEADLINE === 'true';
+export function buildReportJson({ scanId, webScan, web, emailHexes, score, generatedAt = new Date().toISOString(), exposureV2Headline = false }) {
+  const exposureFields = !webScan ? {}
+    : exposureV2Headline ? { exposure: webExposureV2(web, emailHexes), exposure_v1_previous: webExposure(web) }
+      : { exposure: webExposure(web), exposure_v2_shadow: webExposureV2(web, emailHexes) };
   return {
     schema_version: REPORT_JSON_VERSION,
     generated_at: generatedAt,
     report_id: scanId || null,
-    web_scan: webScan ? { saved: true, id: webScan.id ?? null, created_at: webScan.created_at ?? null, summary: tally(web), exposure: webExposure(web), exposure_v2_shadow: webExposureV2(web, emailHexes), hexagons: web.map(outHex) } : { saved: false, id: null, created_at: null, summary: null, exposure: null, hexagons: [] },
+    web_scan: webScan ? { saved: true, id: webScan.id ?? null, created_at: webScan.created_at ?? null, summary: tally(web), ...exposureFields, hexagons: web.map(outHex) } : { saved: false, id: null, created_at: null, summary: null, exposure: null, hexagons: [] },
     email: { summary: tally(emailHexes), hexagons: emailHexes.map(outHex) },
     score: score ?? null,
   };

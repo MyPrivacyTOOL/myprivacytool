@@ -3,7 +3,7 @@
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { buildReportEmail, BRIDGE, ATTACHMENT_WARNING } from './lib/email.js';
 import { computeScore } from './lib/score.js';
-import { WEB_HEXAGONS, EMAIL_HEXAGONS, reportAttachment, buildReportJson, MAX_VALUE } from './lib/reportHex.js';
+import { WEB_HEXAGONS, EMAIL_HEXAGONS, reportAttachment, buildReportJson, exposureV2HeadlineEnabled, MAX_VALUE } from './lib/reportHex.js';
 import { loadWebScan } from './lib/webScanLoader.js';
 import { captureStatus, isEstimate } from '../../shared/hexagon-registry/status.js';
 
@@ -101,6 +101,21 @@ check(Object.keys(parsed).sort().join() === 'email,generated_at,report_id,schema
   check(sh.coverage.total === 60 && sh.provisional === false && !('method_url' in sh), 'shadow: Z is 60 for a report (an address was given), final, no method page linked');
   check(sh.rejected.some((r) => r.id === 'email-breaches' && r.reason === 'not_built'), 'shadow: email-breaches is never counted (not built)');
   check(!/exposure-v2|exposure_v2/i.test(real.html) && !/exposure-v2|exposure_v2/i.test(real.text), 'shadow: nothing about v2 in the email body (html or text)');
+  // the dark headline switch: OFF is today's output; ON makes `exposure` v2 and moves v1 to `exposure_v1_previous`
+  check(exposureV2HeadlineEnabled({}) === false && exposureV2HeadlineEnabled({ EXPOSURE_V2_HEADLINE: 'false' }) === false && exposureV2HeadlineEnabled({ EXPOSURE_V2_HEADLINE: 'TRUE' }) === false && exposureV2HeadlineEnabled({ EXPOSURE_V2_HEADLINE: 'true' }) === true, 'headline switch: only the exact string "true" turns it on');
+  check(!('exposure_v1_previous' in parsed.web_scan), 'headline switch OFF (default): no exposure_v1_previous, `exposure` stays v1');
+  const sample = { webScan: { id: 'w', created_at: null }, web: parsed.web_scan.hexagons.map((h) => ({ id: h.id, status: h.status })), emailHexes: parsed.email.hexagons.map((h) => ({ id: h.id, status: h.status })), score: null };
+  const off = buildReportJson({ scanId: 'x', ...sample });
+  const on = buildReportJson({ scanId: 'x', ...sample, exposureV2Headline: true });
+  check(off.web_scan.exposure.score_version === 'exposure-v1' && off.web_scan.exposure_v2_shadow.score_version === 'exposure-v2', 'switch off: v1 headline, v2 shadow (unchanged behaviour)');
+  check(on.web_scan.exposure.score_version === 'exposure-v2' && on.web_scan.exposure.coverage.total === 60 && !('method_url' in on.web_scan.exposure), 'switch on: `exposure` is v2 (Z 60), no method_url (the page does not describe v2 yet)');
+  check(on.web_scan.exposure_v1_previous.score_version === 'exposure-v1' && on.web_scan.exposure_v1_previous.score === off.web_scan.exposure.score && !('exposure_v2_shadow' in on.web_scan), 'switch on: v1 kept as exposure_v1_previous, same number as before; no duplicate shadow field');
+  check(on.web_scan.exposure.score === off.web_scan.exposure_v2_shadow.score, 'switch on: the headline number is exactly what the shadow field showed');
+  // wiring: the flag given to buildReportEmail (what index.js passes from the env) reaches the JSON, and the email body is identical either way
+  const dark = buildReportEmail({ scan, breaches: manyBreaches.slice(0, 3), breachStatus: 'checked', brokers: BROKERS, webScan: { id: 'w2', created_at: '2026-10-11T00:00:00Z', hexagons: mix }, unsubscribeLink: UNSUB });
+  const lit = buildReportEmail({ scan, breaches: manyBreaches.slice(0, 3), breachStatus: 'checked', brokers: BROKERS, webScan: { id: 'w2', created_at: '2026-10-11T00:00:00Z', hexagons: mix }, unsubscribeLink: UNSUB, exposureV2Headline: true });
+  check(dark.report.web_scan.exposure.score_version === 'exposure-v1' && lit.report.web_scan.exposure.score_version === 'exposure-v2', 'wiring: buildReportEmail passes the switch through to the JSON');
+  check(dark.html === lit.html && dark.text === lit.text, 'wiring: the email body (html and text) is identical with the switch on or off');
   const noWeb = buildReportJson({ scanId: 'x', webScan: null, web: [], emailHexes: [], score: null });
   check(noWeb.web_scan.exposure === null && !('exposure_v2_shadow' in noWeb.web_scan), 'shadow: no saved web scan => no v2 either');
 }

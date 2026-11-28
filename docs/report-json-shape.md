@@ -27,6 +27,8 @@ Every "Your privacy report" email carries one file, `my-privacy-scan-<report id>
       "coverage": { "checked": 15, "total": 60, "percent": 25 },   // total 60 = 54 web + 6 built email checks; email-breaches is never counted (rejected: not_built)
       "counts": { }, "categories": { /* the nine v1 categories plus email */ }, "excluded_categories": [], "rejected": [ { "id": "email-breaches", "reason": "not_built" } ], "warnings": []
     },
+    // EXPOSURE_V2_HEADLINE = "true" (Worker var, default "false"): `exposure` above becomes the v2 result (score_version "exposure-v2", no method_url), the v1 result
+    // moves to `exposure_v1_previous` (same shape as `exposure` today) and `exposure_v2_shadow` is dropped. Off (today): exactly as shown. The email body is identical either way.
     "hexagons": [
       {
         "id": "location",              // registry id, stable
