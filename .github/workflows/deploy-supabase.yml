@@ -15,6 +15,10 @@ name: Deploy Supabase migrations
 # SUPABASE_DB_PASSWORD environment variable this job already sets, so --password is gone and db push now says --remote. If a later CLI release
 # changes these flags again, the dry run fails at its own step before anything is applied; fix the flags here, do not pass --password again.
 #
+# MPC-9896-B (2026-11-28 14:03 HKT): the first real run (run 46114808949) stopped with "Confirmation required: Apply 2 migrations ... This run can't ask because
+# stdout is not a terminal. Nothing was changed. Re-run with --yes". The current CLI asks for confirmation before it applies. The apply step passes --yes: it is
+# already gated by confirm=DEPLOY and dry_run != 'true', and the dry run above has printed the exact list into the same job log.
+#
 # Repo secrets required (Settings -> Secrets and variables -> Actions); values are never printed:
 #   SUPABASE_ACCESS_TOKEN  personal access token (supabase.com/dashboard/account/tokens)
 #   SUPABASE_DB_PASSWORD   the project's database password
@@ -99,4 +103,4 @@ jobs:
 
       - name: Apply migrations
         if: steps.secrets.outputs.ready == 'true' && inputs.dry_run != 'true'
-        run: supabase db push --remote
+        run: supabase db push --remote --yes
