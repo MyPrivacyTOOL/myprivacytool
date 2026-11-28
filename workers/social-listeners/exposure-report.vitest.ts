@@ -76,6 +76,15 @@ describe("exposure in the Telegram report (MPC-11622)", () => {
     expect(r.text.length + 219).toBeLessThan(4000); // 219 = the footprint hint appended for allow-listed senders
   });
 
+  it("drift guard: on a complete account the five Telegram hexagons the scan never evaluates come back not_checked, and nothing else does", () => {
+    const complete = { id: ID, type: "private", first_name: "T", last_name: "U", username: "u", active_usernames: ["a", "b"], bio: "b", birthdate: { day: 1, month: 2 }, accent_color_id: 1, profile_accent_color_id: 2, is_premium: true, emoji_status_custom_emoji_id: "1",
+      profile_background_custom_emoji_id: "2", accepted_gift_types: { a: 1 }, business_intro: {}, business_location: {}, business_opening_hours: {}, personal_chat: { id: 1 }, has_private_forwards: true, has_restricted_voice_and_video_messages: true, photo: { small_file_id: "s" } };
+    const states = hexagonStates({ ...yes(), message: { ...yes().message, from: { id: ID, first_name: "T", last_name: "U", username: "u", language_code: "en" } } }, complete, [[{ file_unique_id: "a" }], [{ file_unique_id: "b" }]]);
+    const notChecked = states.filter((h) => h.state === "not_checked").map((h) => h.id).sort();
+    expect(notChecked).toEqual(["tg.channel_posts", "tg.group_role", "tg.location_shared", "tg.message_counter", "tg.phone_shared"]);
+    expect(states.filter((h) => h.state === "returned")).toHaveLength(25); // every scored field came back on a complete account
+  });
+
   it("the locked-down account scores lower than the public one, both through the report", () => {
     const locked = buildReport(yes(), ok({ ok: true, result: { id: ID, type: "private", first_name: "T" } }), ok({ ok: true, result: { total_count: 0, photos: [] } }))!;
     const full = buildReport(yes(), ok(CHAT), ok(PHOTOS))!;
