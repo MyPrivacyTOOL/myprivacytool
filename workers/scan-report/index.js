@@ -21,7 +21,7 @@ import { handleScanRecipients } from './lib/scanRecipients.js';   // MPC-9893
 import { handleLive, makeLiveLink, makeLiveToken, runLiveChecks } from './lib/live.js';
 import { loadWebScan } from './lib/webScanLoader.js';
 import { handleResendWebhook } from './lib/receipts.js';
-import { reportAttachment, exposureV2HeadlineEnabled } from './lib/reportHex.js';
+import { reportAttachment } from './lib/reportHex.js';
 import { MAX_WEB_SCAN_BYTES, parseRequestId, parseSaveRequest, readCappedJson, recordEvent, requestIdEnabled, saveWebScanForContact, validateStep, webScanEnabled } from './lib/webScan.js';
 import { handleRecognise, handleRecogniseDelete } from './lib/recognise.js';
 import { allowanceEnabled, consumeScan, dropRefusedScan, getEntitlements, refusalBody } from './lib/entitlements.js';
@@ -465,7 +465,7 @@ async function processScan(env, sb, job, fetchImpl, rctx) {
   // CK-8503: the person may have unsubscribed while this scan ran (HIBP calls are paced, so a run takes minutes). The queue read only saw the state at claim time: look once more right before sending.
   const optOutAt = (await sb.select(`users?id=eq.${job.user_id}&select=email_opt_out_at&limit=1`))[0]?.email_opt_out_at;
   if (optOutAt && Date.parse(optOutAt) > Date.parse(job.created_at)) return { cancelled: 'cancelled: unsubscribed before the report was sent' };
-  const mail = buildReportEmail({ exposureV2Headline: exposureV2HeadlineEnabled(env), liveLink: await makeLiveLink(env, job.id), fixedLink: followupStateEnabled(env) && env.UNSUBSCRIBE_SECRET ? await fixedUrl(env, job.id) : null, scan: { ...result, id: job.id }, breaches, breachStatus: hibp.status, brokers, listings, pasteAvailable: listingCheckEnabled(env), entitlements, basicPrice, breachGated: Boolean(hibp.gated), webScan, referral, emailChecks: emailHex.map((h) => ({ id: h.id, status: h.status, value: h.value, detail: { source: h.source, reason: h.reason || null } })), unsubscribeLink: links?.page });
+  const mail = buildReportEmail({ liveLink: await makeLiveLink(env, job.id), fixedLink: followupStateEnabled(env) && env.UNSUBSCRIBE_SECRET ? await fixedUrl(env, job.id) : null, scan: { ...result, id: job.id }, breaches, breachStatus: hibp.status, brokers, listings, pasteAvailable: listingCheckEnabled(env), entitlements, basicPrice, breachGated: Boolean(hibp.gated), webScan, referral, emailChecks: emailHex.map((h) => ({ id: h.id, status: h.status, value: h.value, detail: { source: h.source, reason: h.reason || null } })), unsubscribeLink: links?.page });
   const sent = await sendEmail(env, { to: email, subject: mail.subject, html: mail.html, text: mail.text, attachments: [reportAttachment(mail.report)], idempotencyKey: `report-${job.id}`, headers: unsubHeaders(links), items: ['email', 'ip', 'scan_result'] }, fetchImpl, rctx);
   if (!sent.sent) throw new Error(`report email not sent: ${sent.reason}`);
   await sb.patch(`scans?id=eq.${job.id}`, {

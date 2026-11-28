@@ -7,7 +7,6 @@ import { createBusinessRequest, markLate, postDigest, sendDelayNotices } from '.
 import { resolveSupabaseUrl, missingSupabaseUrlMessage } from './supabase-url.js';   // CK-11575
 // MPC-7471-F4: the score versions this Worker may store. The scoring itself runs in the browser (and, for saved scans, in scan-report) from the same shared contract.
 import { SCORE_VERSION, LEGACY_SCORE_VERSION } from '../../shared/hexagon-registry/score.js';
-import { SCORE_VERSION_V2 } from '../../shared/hexagon-registry/scoreV2.js';
 
 // MPC-7350 input hardening helpers.
 const EMAIL_RE = /^[^\s@]{1,64}@[^\s@]+\.[^\s@]{2,}$/;
@@ -316,10 +315,7 @@ export default {
 
       // MPC-7173: save the first completed scan as the user's baseline and report it back so the
       // site can show 'Your baseline: X (date)' / the delta on re-scans. Fail-soft, independent of Notion.
-      // MPC-11569: a score tagged exposure-v2 is stored under its own version only when BASELINE_ACCEPT_EXPOSURE_V2 = "true" (off by default; nothing sends it until the owner flips v2).
-      // It is then only ever compared with a baseline of the same version, exactly like exposure-v1. Off: it is treated as any other unknown version (legacy), as before.
-      const baselineVersion = scoreVersionRaw === SCORE_VERSION ? SCORE_VERSION : scoreVersionRaw === SCORE_VERSION_V2 && env.BASELINE_ACCEPT_EXPOSURE_V2 === 'true' ? SCORE_VERSION_V2 : LEGACY_SCORE_VERSION;
-      const baseline = !baselineOwner ? null : await saveBaseline(env, email, riskScore, categoryScores, baselineVersion, rctx);
+      const baseline = !baselineOwner ? null : await saveBaseline(env, email, riskScore, categoryScores, scoreVersionRaw === SCORE_VERSION ? SCORE_VERSION : LEGACY_SCORE_VERSION, rctx);
 
       // 1. Save to Notion
       const properties = {

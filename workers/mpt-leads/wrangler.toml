@@ -39,10 +39,6 @@ CONFIRMATION_OWNER = "scan-report"
 # Declared here because `wrangler deploy` replaces dashboard-set plain vars.
 BASELINE_SCORE_VERSION_COLUMN = "true"
 
-# MPC-11569: accept scores tagged exposure-v2 as their own baseline version. OFF ("false" or absent): an exposure-v2 score is treated as legacy, as any unknown version is.
-# Nothing sends exposure-v2 until the owner flips the headline, so this is inert today. Turn it on together with the flip, not before. Rollback: "false" + redeploy.
-BASELINE_ACCEPT_EXPOSURE_V2 = "false"
-
 # MPC-8368: Turnstile on the scan email form. TURNSTILE_SECRET_KEY is a Worker secret (set already, see EXPECTED_SECRETS.txt).
 # "true" = reject failed/missing tokens with 403 (enforcing since 2026-10-20). "false" = verify and log only (instant rollback:
 # change this and merge). Every failure is logged either way as one line starting TURNSTILE_FAILED (ts, ip, country, origin,
