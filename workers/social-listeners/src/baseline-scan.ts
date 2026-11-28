@@ -175,10 +175,10 @@ export function exposureLines(x: ExposureResult, risk: Risk): string[] {
     `${exposureBar(x)}`,
     `${GROUPS.base.label}: ${x.bar!.base.points} of 100. ${GROUPS.base.note}`,
     `${GROUPS.settings.label}: ${x.bar!.settings.points} more. ${GROUPS.settings.note}`,
-    `Exposure is the share of the risk in these ${x.scored} fields that reached this bot, each field weighted low 1, medium 2 or high 3. The count shows how many fields came back, unweighted. Telegram always sends ${x.bar!.base.fields.total} of the ${x.scored}, so the lowest score possible is ${x.floor}: ${positionText(x)}.`,
-    NOT_RETURNED_COPY,
+    `Exposure is the share of the risk in these ${x.scored} fields that reached this bot, each field weighted low 1, medium 2 or high 3. The count shows how many fields came back, unweighted. Telegram always sends ${x.bar!.base.fields.total} of the ${x.scored} fields.`,
+    `Position: ${positionText(x)}.`,
     "",
-    ...(x.fixes.length ? [`What you can change: ${x.recoverable!.text}. Biggest first:`, ...top] : ["Nothing you can change came back in this check."]),
+    ...(x.fixes.length ? [`${x.recoverable!.text}. Biggest first:`, ...top] : ["Nothing you can change came back in this check."]),
     "",
     methodChangeSentence({ percent: risk.percent, text: `${risk.returned} of ${risk.possible} = ${risk.percent}%` }, x) ?? "",
   ];
@@ -222,6 +222,7 @@ export function buildReport(update: unknown, chatAnswer: Answer, photosAnswer: A
       `That is how many of the ${risk.possible} pieces of information Telegram could send this bot actually reached it in this check (${risk.notChecked} cannot be checked yet). Higher = more exposed. Not returned only means this bot did not receive it: it does not verify your privacy settings.`,
     ]),
     ...hexagonLines(hexagons),
+    ...(showExposure ? ["", `About "Not returned" above: ${NOT_RETURNED_COPY}`] : []),
     ...extraLines(extras),
     "",
     // MPC-8689: Telegram is one channel of the whole footprint. Only hexagons whose check ran here (returned or not returned) count as checked; the rest, including the web scan, are still to review.

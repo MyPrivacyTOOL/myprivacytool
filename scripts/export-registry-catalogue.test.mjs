@@ -95,4 +95,22 @@ assert.equal(clean('[x.dm](http://x.dm)\\_media'), 'x.dm_media');
   for (const id of ['reg-11', 'reg-13', 'reg-15']) assert.deepEqual([by(id).label, by(id).risk, by(id).slug, by(id).added], [id, 'low', id, '2026-11-27'], 'only class and code change');
   assert.deepEqual(exportCatalogue(rs, { dataPointRows: 6, previous: o }), o, 'a re-run on the output changes nothing');
 }
+// MPC-11555: group. A registry-sourced item takes the group most of its channel's approved items carry; approved items keep theirs; a channel with no approved item keeps what it has.
+{
+  const it = (id, o) => ({ id, registry_id: undefined, channel: 'wechat', channel_label: 'WeChat', group: 'Asian', code: 'B1', arrival: 'B', risk: 'low', label: id, reveals: '', field: '', status: 'new', access: '', source: '', slug: id, ...o });
+  const prev = { version: 'old', total: 6, risk_tiers_approved: '2026-10-28', items: [
+    it('wc.a', { registry_id: 20, code: 'B1' }), it('wc.b', { registry_id: 21, code: 'B2' }), it('wc.odd', { registry_id: 22, code: 'B3', group: 'Core' }),   // approved: 2 Asian, 1 Core on wechat (the odd one keeps Core)
+    it('reg-23', { registry_id: 23, channel: 'general', channel_label: 'Cross-channel', group: 'Core', code: 'B4', added: '2026-11-27' }),                       // added, moves to wechat: becomes Asian
+    it('reg-24', { registry_id: 24, channel: 'slack', channel_label: 'Slack', group: 'Global social', code: 'B1', added: '2026-11-27' }),                     // channel with no approved item: unchanged
+    it('reg-25', { registry_id: 25, channel: 'slack', channel_label: 'Slack', group: 'Global social', code: 'B2', added: '2026-11-27' }),
+  ] };
+  const b = (id, ch) => row(id, { 'Channel Key': ch, 'Arrival Order / Capture Point': 'Class B - Public Lookup' });
+  const rs2 = [b(20, 'wechat'), b(21, 'wechat'), b(22, 'wechat'), b(23, 'wechat'), b(24, 'slack'), b(25, 'slack')];
+  const o2 = exportCatalogue(rs2, { dataPointRows: 6, previous: prev });
+  const g = (id) => o2.items.find((i) => i.id === id).group;
+  assert.equal(g('reg-23'), 'Asian', 'a registry-sourced item moved onto a channel takes that channel\'s group');
+  assert.equal(g('wc.odd'), 'Core', 'an approved item keeps its group');
+  assert.deepEqual([g('reg-24'), g('reg-25')], ['Global social', 'Global social'], 'a channel with no approved item keeps its group');
+  assert.deepEqual(exportCatalogue(rs2, { dataPointRows: 6, previous: o2 }), o2, 'a re-run on the output changes nothing');
+}
 console.log('export-registry-catalogue.test.mjs ok');
