@@ -3,7 +3,7 @@
 -- WHAT THIS ADDS (nothing else changes; idempotent, safe to re-run):
 --   * role   mpt_agent_readonly   LOGIN, no password here (Chris sets it by hand, never in a file), NOBYPASSRLS, NOINHERIT, no write grant anywhere.
 --   * schema agent_readonly        nine views over nine SECURITY DEFINER functions (_src_<name>) that read the aggregate objects, owned by the migration runner (postgres, which bypasses RLS).
---   * grants USAGE on that schema and SELECT on those nine views to mpt_agent_readonly. Nothing in public, ledger, visit_log, vault, auth or storage.
+--   * grants USAGE on that schema and SELECT on those nine views to mpt_agent_readonly. Nothing in public, ledger, the visit-log schema, vault, auth or storage.
 --
 -- WHY WRAPPERS: the public metrics views are security_invoker, so they read their base tables (users, subscribers, leads, ...) as the CALLER.
 -- A role that could read those views directly would need access to the personal-data tables. A definer function runs as its owner, so the role
