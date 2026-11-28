@@ -1,0 +1,31 @@
+name: Scorecard daily alive check
+
+# MPC-11567: metrics-daily.yml writes a failed row (and goes red) when it fails, but a day on which GitHub never starts it leaves no row and no red run: the Notion page just keeps an
+# old as_of. This check does not depend on that job or on Notion: it reads the newest rows from public.metrics_daily and turns this run RED when today's four rows are not there
+# (GitHub then emails the repository watchers). Read-only, counts and dates only. Script and tests: scripts/metrics-daily-alive/.
+# 09:00 UTC is three hours after the 06:00 UTC job, to ride out normal cron delay. Exit 2 = credentials missing = also red; a missing check is never a pass.
+# It cannot catch GitHub dropping its own schedule as well: a second silent day shows in the Notion page's as_of.
+
+on:
+  schedule:
+    - cron: '0 9 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  alive:
+    name: Scorecard rows for today
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL || 'https://xmdmkumwxpgahmlweuug.supabase.co' }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.NEW_SUPABASE_SECRET_KEY || secrets.SCAN_REPORT_SUPABASE_SERVICE_ROLE_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Today's four rows are in metrics_daily
+        run: node scripts/metrics-daily-alive/check.mjs
