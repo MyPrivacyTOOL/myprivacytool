@@ -24,6 +24,7 @@ const MPC_9885_ADDED = ["anthropic", "cloudflare-api", "ga4-data-api", "youtube-
 
 /** MPC-9915: added after the MPC-9885 sweep; read-only Google Ads API for the metrics collector. Kept out of the seed pins below. */
 const MPC_9915_ADDED = ["google-ads-api"];
+const MPC_11111_GATED = ["email-guess-service", "ga4-measurement-protocol"];   // built off (MPC-11111); opened by the DebugView-run PR and reverted after it, so they are kept out of the base counts
 const MPC_10790_ADDED = ["supabase-signups"];   // the sign-up forms' own entry, split from "supabase" so each use has its own basis
 
 describe("bundler-safe module", () => {
@@ -37,8 +38,8 @@ describe("seed (MPC-9883, design 1.5)", () => {
   const live = registry.recipients.filter((r) => r.enabled && r.host_kind !== "user_supplied");
   it("pins 13 first-party (8 + account-service MPC-9817 + 3 MPC-9886 + business-team-service MPC-9824) and 24 third-party/processor/platform live recipients (the Map's 21, less hibp, switched off by MPC-9885 until MPC-9904, plus pwned-password MPC-9886, meta-graph and stripe, switched on by MPC-9885: WhatsApp replies are live and checkout is gated by CHECKOUT_ENABLED)", () => {
     expect(registry.recipients.find((r) => r.key === "hibp")).toMatchObject({ enabled: false });
-    expect(live.filter((r) => r.party === "first" && !MPC_9885_ADDED.includes(r.key))).toHaveLength(13);
-    expect(live.filter((r) => r.party !== "first" && !MPC_9885_ADDED.includes(r.key) && !MPC_9915_ADDED.includes(r.key) && !MPC_10790_ADDED.includes(r.key))).toHaveLength(24);
+    expect(live.filter((r) => r.party === "first" && !MPC_9885_ADDED.includes(r.key) && !MPC_11111_GATED.includes(r.key))).toHaveLength(13);
+    expect(live.filter((r) => r.party !== "first" && !MPC_9885_ADDED.includes(r.key) && !MPC_9915_ADDED.includes(r.key) && !MPC_10790_ADDED.includes(r.key) && !MPC_11111_GATED.includes(r.key))).toHaveLength(24);
     expect(MPC_9915_ADDED.every((k) => registry.recipients.find((r) => r.key === k)?.enabled === true)).toBe(true);
   });
   it("MPC-9885 added exactly these recipients, all enabled", () => {

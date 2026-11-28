@@ -45,8 +45,8 @@ psql_ "$TEST_URL" -f supabase/migrations_archive/20261028120001_mpc_8671_kpi_vie
 echo "   migration 20261127060000_exclude_test_scans_from_kpi.sql"
 psql_ "$TEST_URL" -f supabase/migrations_archive/20261127060000_exclude_test_scans_from_kpi.sql
 # MPC-11547: the scorecard views call mpt_is_test_address (above), so they come after it.
-echo "   migration 20261127070000_mpc_11547_hexagon_scorecard_views.sql"
-psql_ "$TEST_URL" -f supabase/migrations/20261127070000_mpc_11547_hexagon_scorecard_views.sql
+echo "   migration 20261127075144_mpc_11547_hexagon_scorecard_views.sql"
+psql_ "$TEST_URL" -f supabase/migrations/20261127075144_mpc_11547_hexagon_scorecard_views.sql
 # CK-8493: migrations proposed but not yet released (not read by deploy-supabase.yml). Tested here against the throwaway database only.
 # MPC-7471-F4 is excluded here: it drops mpt_score_baselines_email_hash_key, which schema.test.sql still needs, and it has its own stage further down.
 for f in $(ls supabase/proposed/*.sql 2>/dev/null | grep -v mpc_7471_f4_baseline_score_version | sort); do echo "   proposed $(basename "$f")"; psql_ "$TEST_URL" -f "$f"; done
@@ -314,7 +314,7 @@ psql_ "$TEST_URL" -At -f supabase/tests/mpc-8689-brokers-rows.test.sql
 
 # MPC-11541: hexagon_catalogue is marked DEPRECATED by comment only. Applied by the loop above; applied again here to prove it is idempotent. Row count is the 368 left by MPC-8689.
 echo "== hexagon_catalogue marked deprecated (MPC-11541)"
-psql_ "$TEST_URL" -f supabase/migrations/20261127080000_mpc_11541_hexagon_catalogue_deprecated.sql
+psql_ "$TEST_URL" -f supabase/migrations/20261127120000_mpc_11541_hexagon_catalogue_deprecated.sql
 psql_ "$TEST_URL" -At -f supabase/tests/hexagon-catalogue-deprecated.test.sql
 
 # MPC-9817: accounts and sign-in. The migration is applied by the loop above; applied again here to prove it is idempotent, then the assertions (RLS, no IP column, consent carry, link/claim, 7-day exit, can(), real delete).

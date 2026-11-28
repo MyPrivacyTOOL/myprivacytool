@@ -10,7 +10,7 @@ steps:
   - name: gcr.io/google.com/cloudsdktool/cloud-sdk
     entrypoint: gcloud
     args: ["run", "deploy", "shadow-audit-api-staging", "--image=$_REGION-docker.pkg.dev/$PROJECT_ID/shadow-audit/api:$BUILD_ID",
-           "--region=$_REGION", "--no-allow-unauthenticated", "--update-env-vars=SHADOW_AUDIT_ENV=staging,NOTION_DB_ID=e86ff98ace7946dcb11e45bc2908f2a3,LOG_TABLE=$PROJECT_ID.agent_logs.logs",
-           "--set-secrets=SIGNING_KEY_HEX=shadow-audit-ed25519-key-staging:latest,API_TOKEN=shadow-audit-api-token-staging:latest,NOTION_TOKEN=shadow-audit-notion-token:latest,SLACK_WEBHOOK_URL=shadow-audit-slack-webhook:latest"]
+           "--region=$_REGION", "--no-allow-unauthenticated", "--update-env-vars=SHADOW_AUDIT_ENV=staging,NOTION_DB_ID=e86ff98ace7946dcb11e45bc2908f2a3,LOG_TABLE=$PROJECT_ID.agent_logs.logs,QUEUE_ENDPOINT=https://mpt-shadow-audit-producer.myprivacytool.workers.dev/enqueue",
+           "--set-secrets=SIGNING_KEY_HEX=shadow-audit-ed25519-key-staging:latest,API_TOKEN=shadow-audit-api-token-staging:latest,NOTION_TOKEN=shadow-audit-notion-token:latest,SLACK_WEBHOOK_URL=shadow-audit-slack-webhook:latest,QUEUE_SECRET=mpt-audit-producer-secret:latest"]
 substitutions:
   _REGION: us-central1

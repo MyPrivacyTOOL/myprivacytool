@@ -4,6 +4,8 @@
 import HEX, { EMAIL } from './hexagons.generated.js';
 // MPC-7471-F4: the one exposure score. Imported from the shared registry module, never re-implemented here.
 import { computeExposure } from '../../../shared/hexagon-registry/score.js';
+// MPC-11569: exposure-v2, in SHADOW only (see webExposureV2 below). Never the headline.
+import { computeExposureV2, totalForV2 } from '../../../shared/hexagon-registry/scoreV2.js';
 // MPC-7561: each approved hexagon has its own guide page; the rest fall back to the generic guide below.
 import { hasGuide, guidePath } from '../../../shared/hexagon-registry/guides.js';
 
@@ -154,12 +156,16 @@ const outHex = (h) => ({ id: h.id, label: h.label, category: h.category, status:
 // A saved scan is final. `report.score` below is a different measure (the email-footprint privacy health score) and is left as it was.
 export const EXPOSURE_METHOD_URL = 'https://myprivacytool.io/how-we-calculate-your-score';
 export const webExposure = (web) => ({ ...computeExposure(web.map((h) => ({ id: h.id, status: h.status })), { final: true }), method_url: EXPOSURE_METHOD_URL });
+// MPC-11569: exposure-v2 computed from the SAME saved statuses (web + email), recorded next to the v1 score for comparison. SHADOW: it is only a field in the
+// user's own JSON file, never in the email body, the page or a baseline, and `exposure` above stays the headline. Z = 60 because a report is prepared for an
+// address (totalForV2). email-breaches is rejected as not_built inside computeExposureV2. No method_url: no page describes v2 yet.
+export const webExposureV2 = (web, emailHexes) => computeExposureV2([...web, ...(emailHexes ?? [])].map((h) => ({ id: h.id, status: h.status })), { final: true, total: totalForV2(true) });
 export function buildReportJson({ scanId, webScan, web, emailHexes, score, generatedAt = new Date().toISOString() }) {
   return {
     schema_version: REPORT_JSON_VERSION,
     generated_at: generatedAt,
     report_id: scanId || null,
-    web_scan: webScan ? { saved: true, id: webScan.id ?? null, created_at: webScan.created_at ?? null, summary: tally(web), exposure: webExposure(web), hexagons: web.map(outHex) } : { saved: false, id: null, created_at: null, summary: null, exposure: null, hexagons: [] },
+    web_scan: webScan ? { saved: true, id: webScan.id ?? null, created_at: webScan.created_at ?? null, summary: tally(web), exposure: webExposure(web), exposure_v2_shadow: webExposureV2(web, emailHexes), hexagons: web.map(outHex) } : { saved: false, id: null, created_at: null, summary: null, exposure: null, hexagons: [] },
     email: { summary: tally(emailHexes), hexagons: emailHexes.map(outHex) },
     score: score ?? null,
   };

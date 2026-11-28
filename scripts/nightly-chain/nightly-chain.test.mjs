@@ -2,7 +2,7 @@
 // Run: node scripts/nightly-chain/nightly-chain.test.mjs
 import { createHash } from 'node:crypto';
 import { runChain, metricsRow, hkDay } from './run.mjs';
-import { fixtureScan, checkReport, scanRequestBody, resolveLinks, linksToResolve } from './checks.mjs';
+import { fixtureScan, checkReport, scanRequestBody, consentRequestBody, consentVersion, resolveLinks, linksToResolve, BOT_BLOCKED_VERIFIED_HOSTS, CERT_CHAIN_VERIFIED_HOSTS, BLOCKED_UNVERIFIED_HOSTS } from './checks.mjs';
 import { isTestAddress, testAddress, excludeTestFilter, onlyTestFilter } from '../../shared/test-records.js';
 import { buildReportEmail } from '../../workers/scan-report/lib/email.js';
 
@@ -14,12 +14,18 @@ const json = (o, status = 200) => ({ ok: status < 400, status, json: async () =>
 
 // ------------------------------------------------------------ fake world
 function world(opts = {}) {
-  const db = { webScans: {}, links: [], scans: {}, users: {}, suppressions: new Set(), erased: [], deleted: [], posts: [], gets: [] };
+  const db = { webScans: {}, links: [], scans: {}, users: {}, suppressions: new Set(), erased: [], deleted: [], posts: [], gets: [], consents: [] };
   let polls = 0;
   const html = {};
   const f = async (url, init = {}) => {
     url = String(url); const method = init.method || 'GET';
     db.gets.push(`${method} ${url.replace(/[?#].*/, '')}`);
+    if (url === 'https://synth.invalid/api/consent') {   // MPC-10608 (the real handler's contract is proven in consent-contract.vitest.mjs)
+      if (opts.consentRefused) return json({ error: 'Unknown consent wording' }, 400);
+      const row = { id: `22222222-2222-4222-8222-${String(db.consents.length + 1).padStart(12, '0')}`, ...JSON.parse(init.body) };
+      db.consents.push(row);
+      return json({ consent_id: row.id, scan_id: row.scan_id }, 201);
+    }
     if (url.startsWith('https://synth.invalid/api/scan')) {
       if (opts.synthMissing) return json({}, 404);
       const b = JSON.parse(init.body); db.posts.push(b);
@@ -27,7 +33,8 @@ function world(opts = {}) {
       const sid = `00000000-0000-4000-8000-${String(Object.keys(db.scans).length + 1).padStart(12, '0')}`;
       const wid = `11111111-1111-4111-8111-${String(Object.keys(db.webScans).length + 1).padStart(12, '0')}`;
       db.users[b.email] = { email: b.email, email_opt_out_at: null };
-      db.scans[sid] = { id: sid, source: 'web_scan', report_status: 'pending', email: b.email, confirmation_sent_at: null, report_sent_at: null, resend_message_id: null };
+      if (b.consent_id && !db.consents.some((c) => c.id === b.consent_id)) return json({ error: 'Consent required' }, 403);
+      db.scans[sid] = { id: sid, source: 'web_scan', consent_id: opts.consentDropped ? null : b.consent_id ?? null, report_status: 'pending', email: b.email, confirmation_sent_at: null, report_sent_at: null, resend_message_id: null };
       db.webScans[wid] = { id: wid, hexagon_count: b.scan.length, results_bytes: 100, results: opts.mutateSaved ? opts.mutateSaved(b.scan) : b.scan, created_at: NOW.toISOString() };
       if (!opts.noLink) db.links.push({ web_scan_id: wid, channel: 'email', contact_id: sid, save_consent_at: opts.noConsent ? null : NOW.toISOString(), save_consent_version: opts.noConsent ? null : '2026-10-12-v1' });
       return json({ success: true, duplicate: false, scan_saved: true, scan_number: wid });
@@ -53,6 +60,8 @@ function world(opts = {}) {
         polls++;
         if (!opts.neverConfirm && polls >= 2) s.confirmation_sent_at = NOW.toISOString();
         if (!opts.neverSend && polls >= 4) { s.report_status = opts.failReport ? 'failed' : 'sent'; s.report_sent_at = NOW.toISOString(); s.resend_message_id = 'msg_1'; s.report_last_error = opts.failReport ? 'boom for someone@example.com' : null; s.report_attempts = 5; }
+        // The production report job's consent gate: a request with no consent is refused before any attempt, whatever the synthetic Worker accepted.
+        if (!s.consent_id && polls >= 4) Object.assign(s, { report_status: 'failed', resend_message_id: null, report_last_error: 'consent: no consent on record for this scan', report_attempts: 0 });
         return json([{ ...s, users: { email: opts.realAddress ? 'real.person@example.com' : s.email } }]);
       }
       if (path.startsWith('email_sends?provider_message_id=eq.')) {   // MPC-7556: the row the Resend webhook updates
@@ -73,6 +82,7 @@ function world(opts = {}) {
       db.suppressions.add(createHash('sha256').update(e).digest('hex')); return json({ ok: true });
     }
     if (url.startsWith('https://myprivacytool.io/') || url.startsWith('https://www.myprivacytool.io/')) return json({}, opts.deadLink && url.includes(opts.deadLink) ? 404 : 200);
+    if (opts.forbidden && url.includes(opts.forbidden)) return json({}, 403);
     if (url.startsWith('https://')) return json({}, 200);   // other pages the report links to (guides, HIBP)
     return json({}, 500);
   };
@@ -97,6 +107,10 @@ check(hkDay(NOW) === '20261029', 'run day is the Hong Kong date (16:00 UTC is al
   check(isTestAddress(b.email) && b['cf-turnstile-response'] === 'XXXX.DUMMY.TOKEN.XXXX' && b.consent === true && b.save_consent === true && b.scan.length === fixtureScan().length, 'nightly: request is a consented test-alias scan carrying the Turnstile TEST token');
   check(w.db.gets.every((g) => !g.startsWith('POST https://prod.invalid/api/scan')), 'nightly: nothing is ever POSTed to the production /api/scan');
   check(r.facts.report_source === 'provider' && r.facts.html_bytes < 100000 && r.facts.links_checked >= 2, 'nightly: report read back from the provider, under 100 KB, links fetched');
+  check(w.db.consents.length === 1 && b.consent_id === w.db.consents[0].id, 'nightly: a scan consent is recorded first and its id is sent with the scan');
+  check(w.db.gets.indexOf('POST https://synth.invalid/api/consent') >= 0 && w.db.gets.indexOf('POST https://synth.invalid/api/consent') < w.db.gets.indexOf('POST https://synth.invalid/api/scan') && w.db.gets.every((g) => !g.startsWith('POST https://prod.invalid/api/consent')), 'nightly: the consent goes to the synthetic Worker, before the scan');
+  const cb = consentRequestBody(w.db.consents[0].scan_id);
+  check(Object.keys(cb).sort().join() === 'consent_text_sha256,consent_version,locale,scan_id' && cb.consent_version === consentVersion() && /^[0-9a-f]{64}$/.test(cb.consent_text_sha256), 'consent request: the four fields the Worker accepts, current wording version');
   const row = metricsRow(r, NOW);
   check(row.status === 'ok' && row.source === 'nightly_chain' && !/@/.test(JSON.stringify(row)), 'metrics row: ok, counts only, no email address');
 }
@@ -104,6 +118,8 @@ check(hkDay(NOW) === '20261029', 'run day is the Hong Kong date (16:00 UTC is al
 // ------------------------------------------------------------ nightly, one broken link each
 const broken = [
   ['synthetic Worker not deployed', { synthMissing: true }, 'scan_request'],
+  ['the Worker refuses the scan consent', { consentRefused: true }, 'scan_request'],
+  ['the Worker does not attach the consent to the request', { consentDropped: true }, 'report_request'],
   ['no contact link', { noLink: true }, 'linked_contact_consent'],
   ['no consent record on the link', { noConsent: true }, 'linked_contact_consent'],
   ['first email never accepted', { neverConfirm: true }, 'first_email_accepted'],
@@ -179,6 +195,59 @@ for (const [name, opts, step] of broken) {
   const links = linksToResolve(good.html);
   check(links.length > 0 && links.every((l) => /^https:/.test(l) && !/unsubscribe\?/.test(l) && !l.includes('&amp;')), 'links to resolve: https only, unsubscribe link never fetched, entities decoded');
   check((await resolveLinks(['https://a.invalid/x'], async () => { throw new Error('down'); })).length === 1 && (await resolveLinks(['https://a.invalid/x'], async () => json({}, 410))).length === 1 && (await resolveLinks(['https://a.invalid/x'], async () => json({}, 200))).length === 0, 'resolveLinks: network error and 410 are failures, 200 passes');
+}
+
+
+// ------------------------------------------------------------ MPC-10608: HTTP 403 from broker opt-out pages
+{
+  const status = (code, finalUrl) => async () => ({ ...json({}, code), ...(finalUrl ? { url: finalUrl } : {}) });
+  const allowedHosts = { 'broker.invalid': { verified: '2026-01-01' } };
+  const probe = async (url, impl) => { const blocked = []; const bad = await resolveLinks([url], impl, { blocked, allowedHosts }); return { bad: bad.length, blocked: blocked.length }; };
+  const is = (r, bad, blocked) => r.bad === bad && r.blocked === blocked;
+  check(is(await probe('https://broker.invalid/optout', status(200)), 0, 0), '403 rule: 200 passes and is not counted as blocked');
+  check(is(await probe('https://broker.invalid/optout', status(403)), 0, 1), '403 rule: 403 from a listed host is "automated check blocked", not a failure');
+  check(is(await probe('https://other.invalid/optout', status(403)), 1, 0), '403 rule: 403 from a host not on the list fails');
+  check(is(await probe('https://sub.broker.invalid/optout', status(403)), 1, 0) && is(await probe('https://broker.invalid.evil.invalid/x', status(403)), 1, 0), '403 rule: only the exact host, not a subdomain or a look-alike');
+  check(is(await probe('https://broker.invalid/optout', status(403, 'https://elsewhere.invalid/x')), 1, 0), '403 rule: a redirect ending in a 403 on another host fails');
+  for (const code of [401, 404, 410, 429, 500, 503]) check(is(await probe('https://broker.invalid/optout', status(code)), 1, 0), `403 rule: ${code} from a listed host fails`);
+  for (const name of ['TimeoutError', 'TypeError']) check(is(await probe('https://broker.invalid/optout', async () => { throw Object.assign(new Error('x'), { name }); }), 1, 0), `403 rule: ${name} (timeout, DNS, TLS) on a listed host fails`);
+  check(is(await probe('https://constructor/x', status(403)), 1, 0), '403 rule: an inherited object key is not a listed host');
+  const tls = (code) => async () => { throw Object.assign(new TypeError('fetch failed'), { cause: { code } }); };
+  const certHosts = { 'chain.invalid': { code: 'UNABLE_TO_VERIFY_LEAF_SIGNATURE' } };
+  const probeTls = async (url, impl) => { const blocked = []; const bad = await resolveLinks([url], impl, { blocked, allowedHosts, certHosts }); return { bad: bad.length, blocked: blocked.length, text: [...bad, ...blocked].join() }; };
+  const chain = await probeTls('https://chain.invalid/help', tls('UNABLE_TO_VERIFY_LEAF_SIGNATURE'));
+  check(is(chain, 0, 1) && /chain\.invalid \(incomplete certificate chain\)/.test(chain.text), 'certificate rule: the missing-intermediate error on the listed host is "automated check blocked"');
+  for (const code of ['CERT_HAS_EXPIRED', 'ERR_TLS_CERT_ALTNAME_INVALID', 'DEPTH_ZERO_SELF_SIGNED_CERT', 'ENOTFOUND', 'ECONNREFUSED']) check(is(await probeTls('https://chain.invalid/help', tls(code)), 1, 0), `certificate rule: ${code} on the listed host fails`);
+  const elsewhere = await probeTls('https://broker.invalid/optout', tls('UNABLE_TO_VERIFY_LEAF_SIGNATURE'));
+  check(is(elsewhere, 1, 0) && /TypeError \(UNABLE_TO_VERIFY_LEAF_SIGNATURE\)/.test(elsewhere.text), 'certificate rule: the same error on any other host fails, and the failure names the error code');
+  check(is(await probeTls('https://chain.invalid/help', status(403)), 1, 0), 'certificate rule: a 403 from the certificate-listed host is not covered by it');
+  check(Object.keys(CERT_CHAIN_VERIFIED_HOSTS).join() === 'help.whitepages.com.au' && Object.values(CERT_CHAIN_VERIFIED_HOSTS).every((v) => v.code === 'UNABLE_TO_VERIFY_LEAF_SIGNATURE' && v.saw), 'certificate rule: one host, one error code');
+  check(Object.keys(BOT_BLOCKED_VERIFIED_HOSTS).sort().join() === 'www.beenverified.com,www.intelius.com,www.mylife.com,www.truthfinder.com', '403 rule: exactly the four hosts whose opt-out page opened in a browser');
+  check(Object.keys(BLOCKED_UNVERIFIED_HOSTS).sort().join() === 'www.fastpeoplesearch.com,www.whitepages.com', 'unverified rule: exactly the two hosts the owner decided on');
+  for (const host of Object.keys(BLOCKED_UNVERIFIED_HOSTS)) {
+    const one = async (impl) => { const blocked = []; const unverified = []; const bad = await resolveLinks([`https://${host}/x`], impl, { blocked, unverified }); return `${bad.length}/${blocked.length}/${unverified.length}`; };
+    check(await one(status(403)) === '0/0/1', `unverified rule: a 403 from ${host} is counted as NOT verified, never as browser-verified`);
+    for (const code of [401, 404, 410, 429, 500, 503]) check(await one(status(code)) === '1/0/0', `unverified rule: ${code} from ${host} fails`);
+    check(await one(status(403, 'https://elsewhere.invalid/x')) === '1/0/0' && await one(tls('ENOTFOUND')) === '1/0/0' && await one(tls('UNABLE_TO_VERIFY_LEAF_SIGNATURE')) === '1/0/0', `unverified rule: a 403 after a redirect elsewhere, DNS and certificate errors on ${host} fail`);
+  }
+  check(Object.keys(BLOCKED_UNVERIFIED_HOSTS).every((h) => !Object.hasOwn(BOT_BLOCKED_VERIFIED_HOSTS, h)), 'unverified rule: no host is on both lists');
+  check(Object.values(BOT_BLOCKED_VERIFIED_HOSTS).every((v) => /^\d{4}-\d{2}-\d{2}$/.test(v.verified) && v.saw), '403 rule: every listed host records when it was opened in a browser and what was seen');
+}
+{
+  const listed = world({ forbidden: 'www.truthfinder.com' }); const r = await run({}, listed);
+  const step = r.steps.find((s) => s.step === 'links_resolve');
+  check(r.ok && r.facts.links_check_blocked === 1 && /1 automated check blocked .*not proven.*www\.truthfinder\.com/.test(step.detail), `nightly: a 403 from the listed host passes, counted and named as "automated check blocked" (${step.detail})`);
+  const nv = world({ forbidden: 'www.whitepages.com/' }); const rn = await run({}, nv);
+  const nvStep = rn.steps.find((s) => s.step === 'links_resolve');
+  check(rn.ok && rn.facts.links_blocked_unverified === 1 && rn.facts.links_check_blocked === 0 && /1 blocked, NOT verified .*www\.whitepages\.com/.test(nvStep.detail), `nightly: an unverified host passes but every run names it as NOT verified (${nvStep.detail})`);
+  check(metricsRow(rn, NOW).payload.links_blocked_unverified === 1, 'metrics row: the unverified count is recorded apart from the verified one');
+  const every = world(); const orig = every.f; const refused = new RegExp([...Object.keys(BOT_BLOCKED_VERIFIED_HOSTS), ...Object.keys(BLOCKED_UNVERIFIED_HOSTS)].map((h) => `//${h.replace(/\./g, '\\.')}/`).join('|'));
+  const ra = await run({}, { f: async (u, i) => (refused.test(String(u)) ? json({}, 403) : orig(u, i)), db: every.db });
+  const allStep = ra.steps.find((s) => s.step === 'links_resolve');
+  check(ra.ok && Object.keys(BLOCKED_UNVERIFIED_HOSTS).every((h) => allStep.detail.includes(h)), `nightly: with every listed host refusing, the step detail names both unverified hosts (${ra.facts.links_check_blocked} verified, ${ra.facts.links_blocked_unverified} unverified)`);
+  const unlisted = world({ forbidden: 'www.spokeo.com' }); const r2 = await run({}, unlisted);
+  check(r2.failedStep === 'links_resolve' && r2.facts.links_check_blocked === 0 && r2.facts.links_failed.length === 1 && /spokeo.*HTTP 403/.test(r2.facts.links_failed[0]), 'nightly: a 403 from an unlisted host fails the run, and the failing link is recorded');
+  check(metricsRow(r2, NOW).payload.links_failed.length === 1 && !/@/.test(JSON.stringify(metricsRow(r2, NOW))), 'metrics row: failing links recorded, still no email address');
 }
 
 console.log(failed ? `${failed} FAILED` : 'ALL PASS');

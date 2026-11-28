@@ -32,7 +32,6 @@ const KEYS = ['web', 'email', 'telegram', 'whatsapp', 'sms', 'phone', 'x', 'inst
 assert.equal(KEYS.length, 33);
 assert.deepEqual(CATALOGUE_CHANNELS.map((c) => c.key).filter((k) => k !== 'general').sort(), [...KEYS].sort());
 assert.equal(CATALOGUE_CHANNELS.length, 34);
-assert.equal(count(() => true, 'channel').general, 120, 'blank Channel Key rows are filed as general');
 assert.deepEqual(count(() => true, 'risk'), { high: 284, medium: 268, low: 98 });
 assert.deepEqual(count(() => true, 'status'), { defined: 101, new: 549 });
 assert.deepEqual(count(legacy, 'risk'), { high: 90, medium: 207, low: 66 });
@@ -43,9 +42,21 @@ assert.equal(new Set(HEXAGON_CATALOGUE.map((i) => i.id)).size, 650, 'ids are uni
 assert.equal(new Set(HEXAGON_CATALOGUE.map((i) => i.slug)).size, 650, 'slugs are unique');
 assert.ok(HEXAGON_CATALOGUE.every((i) => /^[a-z0-9]+(-[a-z0-9]+)*$/.test(i.slug)), 'slugs are url-safe');
 for (const c of CATALOGUE_CHANNELS) assert.ok(CHANNELS[c.key], `channel ${c.key} is in CHANNELS`);
-const perChannel = count((i) => i.channel, 'channel');
-// Channel = the registry Channel Key (8 rows differ from their id prefix: x.location, x.email, x.dm_media, li.email, gh.public_email, email-domain-record, email.web_archive, tg.miniapp_*).
-assert.equal(perChannel.web, 109); assert.equal(perChannel.telegram, 47); assert.equal(perChannel.email, 30);
+// MPC-11555: per-channel counts are DERIVED, never pinned. Channel = the registry Channel Key, so every correction of a Channel Key moves them (the 2026-11-27 cleanup moved nine rows;
+// about 38 reg-* items already carried a real key in the registry while the committed file still read `general`). A pinned number (web 109, telegram 47, email 30, general 120) fails
+// the moment the JSON is regenerated from the registry. The three artifacts that must agree are grouped over ALL items, reg-* and Mini App rows included, not a hand-picked list.
+const group = (items, key = (i) => i.channel) => items.reduce((m, i) => ((m[key(i)] = (m[key(i)] || 0) + 1), m), {});
+const perChannel = group(HEXAGON_CATALOGUE);
+assert.deepEqual(perChannel, group(rawSource.items), 'catalogue.js channel counts = hexagons-366.json (rebuild with node scripts/build-hexagon-catalogue.mjs)');
+// The public file stores the display name (scripts/build-hexagon-catalogue.mjs shortChannel), so group both sides by it.
+const shortChannel = (i) => (i.channel === 'web' ? 'Web' : i.channel_label.replace(/\s*\(.*\)$/, ''));
+assert.deepEqual(group(rawSource.items, shortChannel), group(publicDataset), '/footprint/ dataset channel counts = catalogue');
+assert.equal(Object.values(perChannel).reduce((a, b) => a + b, 0), HEXAGON_CATALOGUE.length, 'every item is on exactly one channel');
+assert.deepEqual(Object.keys(perChannel).filter((k) => k !== 'general' && !KEYS.includes(k)), [], 'every item is on one of the 33 Channel Keys or on general');
+assert.equal(perChannel.general ?? 0, HEXAGON_CATALOGUE.length - KEYS.reduce((n, k) => n + (perChannel[k] || 0), 0), 'blank Channel Key rows are filed as general');
+for (const k of Object.keys(perChannel)) assert.equal(new Set(rawSource.items.filter((i) => i.channel === k).map((i) => i.channel_label)).size, 1, `channel ${k} has one label`);
+// Floors come from the code, not from a number typed here: the 54 web hexagons, the 7 email hexagons and the 30 Telegram hexagons are all in the catalogue, so a channel cannot hold fewer rows than the code defines for it.
+assert.ok(perChannel.web >= HEXAGON_COUNT && perChannel.email >= EMAIL_HEXAGONS.length && perChannel.telegram >= TELEGRAM_HEXAGONS.length, 'a channel holds at least the hexagons the code defines for it');
 
 // 101 defined = 91 whose ids are exactly what the code defines (54 web + 7 email + 30 Telegram, nothing renamed) + 10 X candidates that main's CK-8502 X hexagons
 // build under different ids. Each of those 10 carries code_ids, and every code_id must be a real X hexagon; nothing is renamed or guessed.
@@ -83,6 +94,10 @@ const decided = Object.fromEntries(raw.filter((i) => i.decision).map((i) => [i.i
 // The four 2026-10-29 drops (web.reverse_dns, email.wkd, tg.reactions_polls, email.inbound_signature) are no longer published (Decision = Dropped); the two holds stay.
 assert.deepEqual(decided, { 'email.subdomains': 'held', 'tg.join_request_bio': 'held' });
 assert.ok(raw.filter((i) => i.decision).every((i) => i.decision_reason && i.decided === '2026-10-29' && i.status === 'new'));
+// MPC-11541: the four 2026-10-29 drops are Decision = Dropped now, so they are not published; their record (decision, reason, date) is kept in registry.excluded[].was, not deleted.
+const keptDrops = Object.fromEntries(rawSource.registry.excluded.filter((e) => e.was).map((e) => [e.was.id, e.was.decision]));
+assert.deepEqual(keptDrops, { 'web.reverse_dns': 'dropped', 'email.wkd': 'dropped', 'tg.reactions_polls': 'dropped', 'email.inbound_signature': 'dropped' });
+assert.ok(rawSource.registry.excluded.filter((e) => e.was).every((e) => e.was.decision_reason && e.was.decided === '2026-10-29'), 'each dropped item keeps its reason and date');
 assert.equal(channelOfHexagon('tg.username'), 'TG');
 console.log('catalogue.test.mjs ok');
 
@@ -107,5 +122,6 @@ assert.equal(HEXAGON_CATALOGUE.find((i) => i.id === 'wa.media').access, 'Verify'
 assert.equal(HEXAGON_CATALOGUE.find((i) => i.id === 'wa.other_apps').plan, 'not_planned');
 assert.equal(HEXAGON_CATALOGUE.find((i) => i.id === 'wa.other_apps').plan_decision, 10);
 assert.equal(HEXAGON_CATALOGUE.filter((i) => i.channel === 'whatsapp' && i.plan === 'not_planned').length, 14);
-assert.ok(HEXAGON_CATALOGUE.filter((i) => i.channel === 'messenger').every((i) => i.plan === 'not_planned'), 'Messenger is unchanged');
+// MPC-11555: scoped to the items published before the registry export (legacy). Registry rows that later gain Channel Key messenger (reg-251 to reg-254) are new items with no plan.
+assert.ok(HEXAGON_CATALOGUE.filter((i) => legacy(i) && i.channel === 'messenger').every((i) => i.plan === 'not_planned'), 'Messenger is unchanged');
 console.log('catalogue.test.mjs decisions ok');

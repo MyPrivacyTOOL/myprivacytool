@@ -1,5 +1,5 @@
 -- MPC-11547: the hexagon scorecard views, against fixtures whose answers were worked out by hand. Everything is rolled back.
--- supabase/tests/run.sh has already applied migration 20261127070000 to the THROWAWAY database. Any failed assertion aborts the run.
+-- supabase/tests/run.sh has already applied migration 20261127075144 to the THROWAWAY database. Any failed assertion aborts the run.
 \set ON_ERROR_STOP on
 begin;
 create or replace function pg_temp.assert(ok boolean, msg text) returns void language plpgsql as $$ begin if ok is not true then raise exception 'FAIL: %', msg; end if; end $$;

@@ -51,10 +51,14 @@ service = "core-brain"
 # the bot wording change first (workers/social-listeners/probe-erase.vitest.ts fails if this line changes).
 PROBE_MODE = "off"
 TELEGRAM_DEEP_SCAN = "on"
-# MPC-11111 (the magic guess, built OFF): "the Mirror seals an email found in the person's own X bio into the bridge link". Needs ALL FOUR: the registry entry email-guess-service enabled, this switch exactly "true", the Worker secret EMAIL_GUESS_KEY (the SAME value on mpt-scan-report and
+# MPC-11111 (the magic guess, OPENED FOR THE DEBUGVIEW RUN: revert straight after): "the Mirror seals an email found in the person's own X bio into the bridge link". Needs ALL FOUR: the registry entry email-guess-service enabled, this switch exactly "true", the Worker secret EMAIL_GUESS_KEY (the SAME value on mpt-scan-report and
 # social-listeners; only Chris creates it), and the site flag VITE_EMAIL_GUESS_ENABLED. Anything but the exact string "true" is off. Wording is DRAFT until Chris approves it.
 # See docs/email-guess-mpc-11111.md. Rollback: set "false" and deploy (tokens already sent simply stop opening).
-EMAIL_GUESS_ENABLED = "false"
+EMAIL_GUESS_ENABLED = "true"
+# MPC-11111 (server-side GA4 events, OPENED FOR THE DEBUGVIEW RUN: revert straight after): needs ALL THREE: the registry entry ga4-measurement-protocol enabled, this switch exactly "true",
+# and the Worker secret GA4_API_SECRET (only Chris creates it). GA4_DEBUG_MODE "true" makes each event show in GA4 DebugView. See docs/email-guess-mpc-11111.md. Rollback: revert the PR.
+GA4_SERVER_EVENTS_ENABLED = "true"
+GA4_DEBUG_MODE = "true"
 # MPC-7891 baseline scan (the first risk number): moved here on 2026-10-29 at the owner's instruction so a deploy does not wipe it (the flags workflow value is dropped
 # by the next deploy). Only acts for senders in PROBE_TELEGRAM_IDS (allow-listed test accounts) unless TELEGRAM_SCAN_SCOPE="all" (NOT set; do not set it before the
 # rehearsal and wording approval, see docs/core-brain-game-flow.md). Rollback: set "off" (or delete this line) and deploy.

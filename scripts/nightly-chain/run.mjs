@@ -12,9 +12,9 @@
 // Writes one counts-only row to mpt_raw_metrics (source nightly_chain), which the existing daily collector turns into the usual Slack alert, naming the step.
 // Exit code: 0 all steps passed, 1 a step failed, 2 not configured (a distinct state: never reported as a pass).
 import { pathToFileURL } from 'node:url';
-import { webcrypto } from 'node:crypto';
+import { webcrypto, randomUUID } from 'node:crypto';
 import { testAddress, isTestAddress } from '../../shared/test-records.js';
-import { fixtureScan, scanRequestBody, checkReport, linksToResolve, resolveLinks, STEPS, WEEKLY_STEPS, DB_REQUIRED } from './checks.mjs';
+import { fixtureScan, scanRequestBody, consentRequestBody, checkReport, linksToResolve, resolveLinks, STEPS, WEEKLY_STEPS, DB_REQUIRED } from './checks.mjs';
 import { buildReportEmail } from '../../workers/scan-report/lib/email.js';
 import { unsubscribeToken } from '../../workers/scan-report/lib/onboarding.js';
 
@@ -63,7 +63,7 @@ export async function runChain(env, { fetchImpl = fetch, sleep = (ms) => new Pro
   const email = testAddress(mode, /^\d{1,9}$/.test(env.MANUAL_RUN_NUMBER ?? '') ? `${result.day}m${env.MANUAL_RUN_NUMBER}` : result.day);
   if (!isTestAddress(email)) { result.notConfigured = 'refusing to run: address is not a test address'; return result; }   // belt and braces: nothing below may ever touch a real person
   const fixture = fixtureScan();
-  const ctx = { email, scanNumber: null, scanId: null };
+  const ctx = { email, scanNumber: null, scanId: null, consentId: null };
 
   const steps = {
     // ---- nightly
@@ -84,7 +84,16 @@ export async function runChain(env, { fetchImpl = fetch, sleep = (ms) => new Pro
       return `${DB_REQUIRED.functions.length} functions and ${DB_REQUIRED.columns.length} tables present`;
     },
     async scan_request() {
-      const res = await fetchImpl(`${synth}/api/scan`, { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: ORIGIN }, body: JSON.stringify(scanRequestBody(email, fixture)) });
+      // MPC-10608: the production cron that sends the report fails any scan with no consent on record (CONSENT_GATE_ENFORCED, MPC-9888). The synthetic Worker accepts
+      // a scan without one, so leaving this out only showed up at report_sent. Record the scan consent first, as the site's consent block does, and send its id with
+      // the scan. The row goes when the scan is deleted. The gate itself is untouched.
+      const post = (path, body) => fetchImpl(`${synth}${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: ORIGIN }, body: JSON.stringify(body) });
+      const consent = await post('/api/consent', consentRequestBody(randomUUID()));
+      const consentOut = await consent.json().catch(() => ({}));
+      if (consent.status === 404) throw new Error('synthetic Worker not deployed (HTTP 404)');
+      if (!consent.ok || !consentOut.consent_id) throw new Error(`POST /api/consent HTTP ${consent.status}${consentOut.error ? ': ' + consentOut.error : ''}`);
+      ctx.consentId = consentOut.consent_id;
+      const res = await post('/api/scan', { ...scanRequestBody(email, fixture), consent_id: ctx.consentId });
       const out = await res.json().catch(() => ({}));
       if (res.status === 404) throw new Error('synthetic Worker not deployed (HTTP 404)');
       if (!res.ok) throw new Error(`POST /api/scan HTTP ${res.status}${out.error ? ': ' + out.error : ''}`);
@@ -107,11 +116,13 @@ export async function runChain(env, { fetchImpl = fetch, sleep = (ms) => new Pro
       return 'linked, consent record present';
     },
     async report_request() {
-      const s = (await sb.select(`scans?id=eq.${ctx.scanId}&select=id,report_status,source,users(email)`))[0];
+      const s = (await sb.select(`scans?id=eq.${ctx.scanId}&select=id,report_status,source,consent_id,users(email)`))[0];
       if (!s) throw new Error('no scans row for the linked contact');
       if (!isTestAddress(s.users?.email)) throw new Error('the request is attached to a non-test address; stopping');
       if (s.source !== 'web_scan') throw new Error(`request source is ${s.source}`);
-      return `request exists, status ${s.report_status}`;
+      // MPC-10608: fail here, by name, if the Worker did not attach this run's consent: the report job would refuse the request up to 15 minutes later.
+      if (s.consent_id !== ctx.consentId) throw new Error('the request does not carry the consent recorded for this run (scans.consent_id)');
+      return `request exists with this run's consent, status ${s.report_status}`;
     },
     async first_email_accepted() {
       const row = await waitFor(async () => (await sb.select(`scans?id=eq.${ctx.scanId}&select=confirmation_sent_at`))[0]?.confirmation_sent_at, { timeoutMs: Number(env.WAIT_CONFIRM_MS ?? 180000), everyMs: 10000, sleep });
@@ -152,10 +163,17 @@ export async function runChain(env, { fetchImpl = fetch, sleep = (ms) => new Pro
     },
     async links_resolve() {
       const urls = linksToResolve(ctx.html);
-      const bad = await resolveLinks(urls, fetchImpl);
+      const blocked = []; const unverified = [];
+      const bad = await resolveLinks(urls, fetchImpl, { blocked, unverified });
       result.facts.links_checked = urls.length;
+      result.facts.links_check_blocked = blocked.length;
+      result.facts.links_blocked_unverified = unverified.length;
+      if (bad.length) result.facts.links_failed = bad;   // every failing link, not only the first three the step detail has room for
       if (bad.length) throw new Error(`${bad.length} of ${urls.length} links do not resolve: ${bad.slice(0, 3).join('; ')}`);
-      return `${urls.length} links resolve`;
+      const parts = [`${urls.length - blocked.length - unverified.length} links resolve`];
+      if (unverified.length) parts.push(`${unverified.length} blocked, NOT verified (nobody has seen the page; accepted by decision): ${unverified.join(', ')}`);   // named first: the part a reader must not miss
+      if (blocked.length) parts.push(`${blocked.length} automated check blocked (browser-verified host, not proven by this run): ${blocked.join(', ')}`);
+      return parts.join('; ');
     },
     // MPC-7556: proves the Resend webhook is delivering events every night. The report email (sent through the real provider to the test mailbox) must come back as a
     // stored 'delivered' event on its per-send row (email_sends, written by the webhook). No event in the wait = the webhook, the secret or the migration is broken.
@@ -243,6 +261,7 @@ export function metricsRow(r, now = new Date()) {
 export async function main(env = process.env, fetchImpl = fetch) {
   const r = await runChain(env, { fetchImpl });
   for (const s of r.steps) console.log(`${s.skipped ? 'SKIP' : s.ok ? 'PASS' : 'FAIL'} ${s.step}${s.detail ? ' - ' + s.detail : ''}`);
+  for (const link of r.facts.links_failed ?? []) console.log(`  failed link: ${link}`);
   if (r.notConfigured) console.log(`NOT CONFIGURED: ${r.notConfigured}`);
   if (env.SUPABASE_URL && env.SUPABASE_SERVICE_ROLE_KEY && env.DRY_RUN !== '1') {
     try { await new Supabase(env, fetchImpl).insert('mpt_raw_metrics', metricsRow(r)); console.log('result row written to mpt_raw_metrics'); }

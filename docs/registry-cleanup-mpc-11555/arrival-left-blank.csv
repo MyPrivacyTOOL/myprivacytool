@@ -1,0 +1,21 @@
+hexagon_id,title,channel_key,channel,evidence_key,reason
+358,SMS Delivery Timestamp,,SMS / Phone Call,message_time,delivery-status callback vs inbound timestamp: unclear which this row means
+369,Messaging App Profile Leakage (WhatsApp/Viber),whatsapp,WhatsApp,deepseekblack1.369,"generic profile-leakage row, no capture path stated"
+378,LinkedIn Connection & Endorsement Network Mapping,,Professional (LinkedIn/GitHub),linkedin_connection_graph,"connection graph: not public, not in any API we hold; B, C or D all arguable"
+379,LinkedIn Document & Media Upload Leakage,,Professional (LinkedIn/GitHub),deepseekblack1.379,"generic upload-leakage row, no capture path"
+387,Contact Intelligence & Identity Resolution Profiling,,Cross-Channel / General,deepseekblack1.387,"generic profiling concept, no channel or capture path"
+389,Unsanitized Threat Indicator Sharing,,Cross-Channel / General,deepseekblack1.389,"process risk, not a data point that arrives"
+390,"Lack of Data Handling Designations (e.g., TLP)",,Cross-Channel / General,deepseekblack1.390,"process risk, not a data point that arrives"
+391,Anonymized Data Re-identification Risk,,Cross-Channel / General,deepseekblack1.391,"concept row, no capture path"
+393,Machine & Workload Identity Leakage,,Cross-Channel / General,deepseekblack1.393,"generic identity-leakage row, no channel"
+399,Location History (Phone-Based),,SMS / Phone Call,location_history,"phone location history: carrier, Google or user export all arguable"
+404,Emergency Contact Leaks,,SMS / Phone Call,emergency_contacts,source of the leak not stated
+407,Discord Profile → Server Member Exposure,,Social Media (IG/FB/X/TikTok),group_membership,same key is A and B on Discord; row gives no way to tell
+408,Audit Log Visibility Exposure,,Social Media (IG/FB/X/TikTok),deepseekblack1.408,"admin-side concept, no capture path"
+409,Bot Token Leakage in Commands,,Social Media (IG/FB/X/TikTok),bot_token,pasted by the person or leaked by a bot: not stated
+411,Message History & Deletion Lag,,Social Media (IG/FB/X/TikTok),deepseekblack1.411,"concept row, no capture path"
+412,Server Invite Tracking & Profiling,,Social Media (IG/FB/X/TikTok),how_you_found_us,invite code arrives at join (A) but the same key is B elsewhere
+413,Incoming Webhook URL Exposure,,Social Media (IG/FB/X/TikTok),webhook_url,"concept row, no capture path"
+415,Bulk Member Enumeration & Export,,Social Media (IG/FB/X/TikTok),group_membership,needs admin or bot rights: same key is A and B
+416,IP Address Exposure via P2P Features,,Social Media (IG/FB/X/TikTok),ip_address,depends on whether the person starts the P2P feature
+418,LinkedIn Connection Graph Exposure,,Professional (LinkedIn/GitHub),linkedin_connection_graph,same as 378
