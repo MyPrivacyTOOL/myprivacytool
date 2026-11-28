@@ -7,7 +7,7 @@
 //   --now   compute "the current period" as of this instant (default: now)
 //   --rows  read the view rows from a JSON file instead of the database: { "<view name>": [rows], "config_versions_above_0": <n> }
 //
-// The definitions are in supabase/migrations/20261127070000_mpc_11547_hexagon_scorecard_views.sql and docs/scorecard-mpc-11547.md.
+// The definitions are in supabase/migrations/20261127075144_mpc_11547_hexagon_scorecard_views.sql and docs/scorecard-mpc-11547.md.
 // Output is counts and rates only. Exit code 0 = printed, 1 = failed, 2 = bad usage.
 import { readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';

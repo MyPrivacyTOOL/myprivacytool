@@ -10,22 +10,46 @@
    {
     "registry_id": 78,
     "label": "IP hostname",
-    "reason": "Decision = Dropped (owner, 2026-11-27): stays a data point in the registry, not published"
+    "reason": "Decision = Dropped (owner, 2026-11-27): stays a data point in the registry, not published",
+    "was": {
+     "id": "web.reverse_dns",
+     "decision": "dropped",
+     "decision_reason": "MPC-7350 rules out sending the visitor's IP to a third-party resolver.",
+     "decided": "2026-10-29"
+    }
    },
    {
     "registry_id": 90,
     "label": "If they email us: signature block",
-    "reason": "Decision = Dropped (owner, 2026-11-27): stays a data point in the registry, not published"
+    "reason": "Decision = Dropped (owner, 2026-11-27): stays a data point in the registry, not published",
+    "was": {
+     "id": "email.inbound_signature",
+     "decision": "dropped",
+     "decision_reason": "Reads the message body, which holds personal data; the inbound Email Worker is approved for sender details and mail app and timezone only.",
+     "decided": "2026-10-29"
+    }
    },
    {
     "registry_id": 99,
     "label": "Own-server encryption key",
-    "reason": "Decision = Dropped (owner, 2026-11-27): stays a data point in the registry, not published"
+    "reason": "Decision = Dropped (owner, 2026-11-27): stays a data point in the registry, not published",
+    "was": {
+     "id": "email.wkd",
+     "decision": "dropped",
+     "decision_reason": "The Web Key Directory request carries a hash of the address, which breaks \"address never sent\".",
+     "decided": "2026-10-29"
+    }
    },
    {
     "registry_id": 153,
     "label": "Reactions and poll answers",
-    "reason": "Decision = Dropped (owner, 2026-11-27): stays a data point in the registry, not published"
+    "reason": "Decision = Dropped (owner, 2026-11-27): stays a data point in the registry, not published",
+    "was": {
+     "id": "tg.reactions_polls",
+     "decision": "dropped",
+     "decision_reason": "Needs a chat the bot administers, and poll answers only exist for polls the bot sent; it would show for almost no one.",
+     "decided": "2026-10-29"
+    }
    },
    {
     "registry_id": 538,

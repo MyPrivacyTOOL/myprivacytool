@@ -22,6 +22,7 @@ Add a PR here when a Notion row marks it held; remove it when the row is closed.
 | 450 | Draft, seed/cleanup SQL touching live data (MPC-7385-F1) |
 
 ## Released
+- MPC-11111 gates for the GA4 DebugView run (PR 909): no longer held. Chris said "merge" on 2026-11-27 (HKT) after being told that the privacy owner's sign-off on the two public registry entries and the real-people check were not recorded, so the PR merged without them. It turns the registry entries ga4-measurement-protocol and email-guess-service and the Worker switches ON; nothing is sent or shown until Chris also sets the secrets (EMAIL_GUESS_KEY, GA4_API_SECRET) and the Pages variable VITE_EMAIL_GUESS_ENABLED (then rebuilds the site). To switch it all off again: revert PR 909 (https://github.com/MyPrivacyTOOL/myprivacytool/pull/909) and delete the Pages variable.
 - MPC-7385 scan go-live (PR 162): no longer held. PR 162 merged 2026-10-10 14:52 UTC (https://github.com/MyPrivacyTOOL/myprivacytool/pull/162); row MPC-7385 is Done.
 - MPC-9808 /contact support@ and reply time (PR 821): no longer held. Chris said "merge #821" on 2026-11-25 (MPC-10803) after the support@ test email arrived. PR 821 merged 2026-11-25 05:22 UTC as d07e671 (https://github.com/MyPrivacyTOOL/myprivacytool/pull/821); the MPC-6798 swarm and real-people check was not done and Chris accepted that.
 Notes: Never merge a PR opened by another session or person.

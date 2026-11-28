@@ -1773,7 +1773,7 @@
       "host_kind": "fixed",
       "surface": "worker",
       "data_items": [],
-      "purpose": "Would send three server-side flow events (a message arrived, the email link was confirmed, the report email was delivered) to our own GA4 property so the funnel can be measured. Each event carries only its name, the channel or email type, and a random anonymous id. No email, handle, message text, IP or scan result.",
+      "purpose": "Sends three server-side flow events (a message arrived, the email link was confirmed, the report email was delivered) to our own GA4 property so the funnel can be measured. Each event carries only its name, the channel name for a message that arrived, and a random anonymous id. No email, handle, message text, IP or scan result.",
       "party": "third",
       "retention": {
         "days": null,
@@ -1781,14 +1781,13 @@
       },
       "consent_basis": "service",
       "phase": "post_click",
-      "enabled": false,
+      "enabled": true,
       "flag": "GA4_SERVER_EVENTS_ENABLED",
       "country_overrides": {},
       "dpa_listed": false,
       "since": "2026-11-23",
       "until": null,
-      "reason": "Disabled until Chris approves it and the privacy text covers it (rule 7). Needs the GA4_API_SECRET Worker secret, which only Chris creates.",
-      "note": "MPC-11111: built switched off. Turning it on needs three things together: enabled true here, GA4_SERVER_EVENTS_ENABLED=true on the Workers, and the GA4_API_SECRET secret."
+      "note": "MPC-11111: opened for the DebugView run, to be reverted straight after. Needs all three together: enabled true here, GA4_SERVER_EVENTS_ENABLED=true on core-brain, scan-report and social-listeners, and the GA4_API_SECRET secret."
     },
     {
       "key": "email-guess-service",
@@ -1809,14 +1808,13 @@
       },
       "consent_basis": "service",
       "phase": "pre_click",
-      "enabled": false,
+      "enabled": true,
       "flag": "VITE_EMAIL_GUESS_ENABLED",
       "country_overrides": {},
       "dpa_listed": false,
       "since": "2026-11-26",
       "until": null,
-      "reason": "Disabled until the privacy owner approves it and the Privacy text covers it (rule 7). The call happens before the visitor's scan consent click, so it needs its own pre_click entry; the browser refused it as built without one (found in the 2026-11-26 local rehearsal).",
-      "note": "MPC-11111: built switched off. To turn the magic guess on: this entry enabled true, EMAIL_GUESS_ENABLED on scan-report and social-listeners, the EMAIL_GUESS_KEY secret, and VITE_EMAIL_GUESS_ENABLED."
+      "note": "MPC-11111: opened for the DebugView run, to be reverted straight after. The magic guess needs all four together: this entry enabled true, EMAIL_GUESS_ENABLED on scan-report and social-listeners, the EMAIL_GUESS_KEY secret, and VITE_EMAIL_GUESS_ENABLED."
     }
   ]
 }

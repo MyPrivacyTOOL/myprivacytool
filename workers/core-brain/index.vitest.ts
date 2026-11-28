@@ -590,16 +590,19 @@ describe("recipient wrapper (fetch-spy)", () => {
 describe("GA4 dm_received (MPC-11111)", () => {
   const ga4On = { ...env, GA4_SERVER_EVENTS_ENABLED: "true", GA4_API_SECRET: "test-secret-not-real" };
   const ga4Calls = () => calls.filter((c) => c.url.includes("google-analytics.com"));
-  const enableRegistry = () => {
+  const enableRegistry = (enabled = true) => {
     const reg = parseRegistry(JSON.parse(JSON.stringify(recipientsData)));
-    reg.recipients.find((r) => r.key === "ga4-measurement-protocol")!.enabled = true;
+    reg.recipients.find((r) => r.key === "ga4-measurement-protocol")!.enabled = enabled;
     return setBundledRegistryForTests(reg);
   };
-  it("sends nothing in the shipped state, even with the env switch and secret set (the registry entry is disabled)", async () => {
+  it("sends nothing while the registry entry is disabled (the shipped state), even with the env switch and secret set", async () => {
     stub({ qwen: { intent: "scan", confidence: 0.9 } });
-    const r = await post(msg("scan me"), undefined, ga4On);
-    expect(r.status).toBe(200);
-    expect(ga4Calls()).toHaveLength(0);
+    const restore = enableRegistry(false);   // explicit, so this stays true whichever way the shipped file is set
+    try {
+      const r = await post(msg("scan me"), undefined, ga4On);
+      expect(r.status).toBe(200);
+      expect(ga4Calls()).toHaveLength(0);
+    } finally { restore(); }
   });
   it("with every gate open sends one dm_received with the channel only: no sender id, no text", async () => {
     stub({ qwen: { intent: "scan", confidence: 0.9 } });

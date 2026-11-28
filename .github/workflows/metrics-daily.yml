@@ -1,0 +1,47 @@
+name: Scorecard daily (M1/M2/M3/G)
+
+# MPC-11567: runs scripts/metrics-daily.mjs every day at 06:00 UTC. The job calls scripts/metrics-report.mjs (read only), writes one row per measure (M1, M2, M3, G)
+# for today into public.metrics_daily, and rewrites the Notion page "MPT > Scorecard — M1/M2/M3/G" from that table. The locked KPI is the page headline.
+# Never estimates, backfills or carries a value forward: a measure that cannot be computed gets NULL, its status and the reason in `note`.
+# A failed run writes failed rows (the page shows them in red) AND turns this run red. There is deliberately no continue-on-error here.
+# Manual run: `drill = true` makes the report read hit a view that does not exist, so the real failure path runs end to end. It ends red on purpose.
+# Reuses existing repo secrets (nothing new is created): NEW_SUPABASE_SECRET_KEY (else SCAN_REPORT_SUPABASE_SERVICE_ROLE_KEY) and NOTION_TOKEN. The Notion
+# integration behind NOTION_TOKEN must be able to edit the Scorecard page (share the page with it); until it can, this job is red, not quiet.
+
+on:
+  schedule:
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+    inputs:
+      drill:
+        description: 'true = failure drill (the report read fails on purpose; the run ends red and the page shows the failure)'
+        required: false
+        default: 'false'
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: metrics-daily
+  cancel-in-progress: false
+
+jobs:
+  scorecard:
+    name: Scorecard daily
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL || 'https://xmdmkumwxpgahmlweuug.supabase.co' }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.NEW_SUPABASE_SECRET_KEY || secrets.SCAN_REPORT_SUPABASE_SERVICE_ROLE_KEY }}
+      NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+      NOTION_SCORECARD_PAGE_ID: 42528547-eaa7-817d-9478-cf9f8c77f64e
+      DRILL: ${{ inputs.drill }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Write today's rows and update the Notion page
+        run: |
+          if [ "$DRILL" = "true" ]; then node scripts/metrics-daily.mjs --drill; else node scripts/metrics-daily.mjs; fi
