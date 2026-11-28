@@ -2,15 +2,17 @@
 // SLACK_BOT_TOKEN and SLACK_CHANNEL_ID that this Worker already holds. Table: public.mpt_business_requests (supabase/migrations_archive/20261108070000_*).
 import { callRecipient } from '../../shared/recipients/outbound.ts';
 import { workerRecipientContext } from '../../shared/recipients/worker-ctx.ts';
+import { resolveSupabaseUrl } from './supabase-url.js';   // CK-11575
 import { dueAt, formatHKT, makeRef, buildDigest, hoursLeft, delayEmail, DELAY_NOTICE_AT_HOURS, OPEN_STATUSES } from '../../shared/business/sla.js';
 
 const EMAIL_RE = /^[^\s@]{1,64}@[^\s@]+\.[^\s@]{2,}$/;
 const SIZES = ['1-10', '11-50', '51-200', '200+'];
-const DEFAULT_SUPABASE_URL = 'https://xmdmkumwxpgahmlweuug.supabase.co';
 const DEDUPE_MINUTES = 10;
 const clip = (v, n) => (typeof v === 'string' ? v : v == null ? '' : String(v)).slice(0, n);
 
-const table = (env) => `${env.SUPABASE_URL || DEFAULT_SUPABASE_URL}/rest/v1/mpt_business_requests`;
+const table = (env) => `${resolveSupabaseUrl(env)}/rest/v1/mpt_business_requests`;
+// CK-11575: configured = a service key AND a resolvable URL (non-production without SUPABASE_URL is NOT configured; it never falls back to production).
+const supabaseReady = (env) => !!(env.SUPABASE_SERVICE_ROLE_KEY && resolveSupabaseUrl(env));
 const sbHeaders = (env, extra = {}) => ({ apikey: env.SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`, 'Content-Type': 'application/json', ...extra });
 
 // MPC-9885: the one door for this module's two recipients. The queue row holds the requester's email and name; Slack carries a ref, team size and times only.
@@ -38,7 +40,7 @@ export async function createBusinessRequest(env, input, now = new Date(), fetchI
   if (!EMAIL_RE.test(email)) return { status: 400, body: { error: 'Email required' } };
   if (!company) return { status: 400, body: { error: 'Company required' } };
   if (!consented) return { status: 400, body: { error: 'Consent required' } };
-  if (!env.SUPABASE_SERVICE_ROLE_KEY) { console.error('business-request: Supabase not configured'); return { status: 503, body: { error: 'Queue unavailable' } }; }
+  if (!supabaseReady(env)) { console.error('business-request: Supabase not configured'); return { status: 503, body: { error: 'Queue unavailable' } }; }
   const source = String(input.consent_source || 'business_page').replace(/[^a-z0-9_-]/gi, '').slice(0, 64) || 'business_page';
   try {
     // A double click or a retry inside DEDUPE_MINUTES returns the existing row instead of a second clock.
@@ -66,7 +68,7 @@ export async function createBusinessRequest(env, input, now = new Date(), fetchI
 // Every cron tick: any open request past due_at that has not been flagged yet becomes Late and Chris is alerted once (late_notified_at is set in the
 // same write, so moving a Late row back to "In review" does not re-alert; the digest still shows it OVERDUE from due_at).
 export async function markLate(env, now = new Date(), fetchImpl = undefined) {
-  if (!env.SUPABASE_SERVICE_ROLE_KEY) return { late: 0, skipped: 'supabase not configured' };
+  if (!supabaseReady(env)) return { late: 0, skipped: 'supabase not configured' };
   try {
     const r = await sbCall(env, fetchImpl, `${table(env)}?status=in.(New,In%20review,Approved)&late_notified_at=is.null&due_at=lt.${encodeURIComponent(now.toISOString())}&select=ref`, {
       method: 'PATCH', headers: sbHeaders(env, { Prefer: 'return=representation' }), body: JSON.stringify({ status: 'Late', late_notified_at: now.toISOString() }),
@@ -84,7 +86,7 @@ export async function markLate(env, now = new Date(), fetchImpl = undefined) {
 // T+36h and still New / In review (nobody has approved it): tell the requester honestly instead of staying silent. Claim first (set delay_notice_sent_at in the
 // same write that selects the rows), then send, so a tick that overlaps another cannot send twice; a failed send is alerted in Slack for a manual email.
 export async function sendDelayNotices(env, now = new Date(), fetchImpl = undefined) {
-  if (!env.SUPABASE_SERVICE_ROLE_KEY) return { sent: 0, skipped: 'supabase not configured' };
+  if (!supabaseReady(env)) return { sent: 0, skipped: 'supabase not configured' };
   try {
     const cutoff = new Date(now.getTime() - DELAY_NOTICE_AT_HOURS * 3600 * 1000).toISOString();
     const r = await sbCall(env, fetchImpl, `${table(env)}?status=in.(New,In%20review)&delay_notice_sent_at=is.null&created_at=lt.${encodeURIComponent(cutoff)}&select=ref,contact_name,contact_email,due_at`, {
@@ -112,7 +114,7 @@ export async function sendDelayNotices(env, now = new Date(), fetchImpl = undefi
 
 // Daily digest (08:00 HKT = 00:00 UTC tick). Posts even when the queue is empty, so a silent day is distinguishable from a dead digest.
 export async function postDigest(env, now = new Date(), fetchImpl = undefined) {
-  if (!env.SUPABASE_SERVICE_ROLE_KEY) return { posted: false, skipped: 'supabase not configured' };
+  if (!supabaseReady(env)) return { posted: false, skipped: 'supabase not configured' };
   try {
     const r = await sbCall(env, fetchImpl, `${table(env)}?status=in.(${OPEN_STATUSES.map(encodeURIComponent).join(',')})&select=ref,status,team_size,due_at&order=due_at.asc&limit=100`, { headers: sbHeaders(env) }, []);
     if (!r.ok) { console.error('business-request digest query failed:', r.status); await slack(env, ':rotating_light: *MPT Business digest FAILED*: could not read the queue (HTTP ' + r.status + ').', fetchImpl); return { posted: false, failed: r.status }; }
