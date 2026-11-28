@@ -231,6 +231,32 @@ describe('Supabase engagement + baseline', () => {
     await post({ email: 'a@b.co', riskScore: 10 }, { e: { ...env, SUPABASE_URL: 'https://custom.supabase.co' } });
     expect(to('custom.supabase.co/rest/v1/mpt_user_engagement')).toHaveLength(1);
   });
+  // CK-11575: a non-production run that forgot SUPABASE_URL must never reach the production project.
+  it('never falls back to the production project outside production', async () => {
+    for (const ENVIRONMENT of ['development', 'staging', 'anything-else']) {
+      calls.length = 0;
+      const json = await (await post({ email: 'a@b.co' }, { e: { ...env, ENVIRONMENT } })).json();
+      expect(calls.filter((c) => c.url.includes('supabase.co'))).toHaveLength(0);
+      expect(json.engagement_recorded).toBe(false);
+      // a scored request needs the Supabase sign-in check, which cannot run without a URL: rejected (401), nothing written, still no Supabase call.
+      calls.length = 0;
+      expect((await post({ email: 'a@b.co', riskScore: 10 }, { e: { ...env, ENVIRONMENT } })).status).toBe(401);
+      expect(calls.filter((c) => c.url.includes('supabase.co'))).toHaveLength(0);
+    }
+    expect(console.error).toHaveBeenCalledWith(expect.stringContaining('SUPABASE_URL is required when ENVIRONMENT=development'));
+  });
+  it('keeps the production fallback when ENVIRONMENT is unset or production', async () => {
+    for (const e of [env, { ...env, ENVIRONMENT: 'production' }, { ...env, ENVIRONMENT: ' Production ' }]) {
+      calls.length = 0;
+      await post({ email: 'a@b.co' }, { e });
+      expect(to('xmdmkumwxpgahmlweuug.supabase.co/rest/v1/mpt_user_engagement')).toHaveLength(1);
+    }
+  });
+  it('uses an explicit SUPABASE_URL in a non-production environment', async () => {
+    await post({ email: 'a@b.co' }, { e: { ...env, ENVIRONMENT: 'staging', SUPABASE_URL: 'https://nonprod.supabase.co' } });
+    expect(to('nonprod.supabase.co/rest/v1/mpt_user_engagement')).toHaveLength(1);
+    expect(to('xmdmkumwxpgahmlweuug')).toHaveLength(0);
+  });
   it('reports engagement_recorded so a lead that missed the database is visible (MPC-7616)', async () => {
     expect((await (await post({ email: 'a@b.co', riskScore: 10 })).json()).engagement_recorded).toBe(true);
     handlers['mpt_user_engagement'] = () => ({ ok: false, status: 401, text: async () => 'bad key' });
