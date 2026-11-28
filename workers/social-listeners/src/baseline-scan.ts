@@ -4,6 +4,8 @@
 import { ARRIVAL, TELEGRAM_EXTRA_HEXAGONS, TELEGRAM_HEXAGONS, type ArrivalId, type ObservationState } from "../../../shared/hexagon-registry/channels.js";
 import { BAND_LABEL, bandFor } from "../../../shared/hexagon-registry/score.js";
 import { footprintSummary, footprintLine } from "../../../shared/hexagon-registry/footprint.js";
+import { GROUPS, NOT_RETURNED_COPY, methodChangeSentence, positionText, type ExposureResult } from "../../../shared/exposure/exposure.js";
+import { scoreTelegram } from "../../../shared/exposure/channels/telegram.js";
 import { FOOTPRINT_CALLBACK, footprintLinksEnabled } from "./dashboard-link";
 import { callRecipient } from "../../../shared/recipients/outbound";
 import type { Logger } from "./logger";
@@ -38,6 +40,8 @@ export const NEVER_SENT = ["phone number (unless you tap a share button)", "last
 export const DISABLED_INSIGHTS = { message_count: "message_id measurement not run", account_era: "no approved id-to-era table" } as const;
 
 export const baselineScanEnabled = (env: Env): boolean => env.TELEGRAM_BASELINE_SCAN === "on";
+/** MPC-11622: show the tier-weighted exposure score (shared/exposure, method exposure-tier-1) in the report. Default off: nobody sees it until the owner flips it. */
+export const exposureDisplayEnabled = (env: Env): boolean => env.TELEGRAM_EXPOSURE_DISPLAY === "on";
 
 interface Decision { intent?: unknown; state?: unknown; next_state?: unknown; state_source?: unknown }
 /** True only for the Y that confirms the pending consent question: awaiting_confirmation -> confirmed on a stored (not assumed) state. */
@@ -77,7 +81,7 @@ const result = (a: Answer): Record<string, unknown> | null => {
 const str = (v: unknown): string | null => (typeof v === "string" && v.trim() !== "" ? v : null);
 
 export interface HexagonState { id: string; channel: "TG"; arrival: ArrivalId; state: ObservationState }
-export interface Report { risk: Risk; insights: string[]; hexagons: HexagonState[]; extras: HexagonState[]; text: string }
+export interface Report { risk: Risk; exposure: ExposureResult; insights: string[]; hexagons: HexagonState[]; extras: HexagonState[]; text: string }
 
 const has = (o: Record<string, unknown>, k: string): boolean => o[k] !== undefined && o[k] !== null && o[k] !== "";
 
@@ -152,8 +156,36 @@ function extraLines(extras: HexagonState[]): string[] {
   return ["", `Extra checks (not part of your number): ${extras.filter((x) => x.state !== "not_checked").length} looked at.`, `  Seen: ${seen.join(", ") || "none"}`, ...(notSeen.length ? [`  Not in this message: ${notSeen.join(", ")}`] : [])];
 }
 
+/** A 20-cell text bar: "Always sent" cells, then "Your settings" cells, then the empty rest. Cells are 5 points each, so it is a picture; the numbers beside it are the facts. */
+export function exposureBar(x: ExposureResult): string {
+  if (!x.bar) return "";
+  const base = Math.round(x.bar.base.points / 5), settings = Math.min(20 - base, Math.round(x.score! / 5) - base);
+  return "▓".repeat(base) + "▒".repeat(Math.max(0, settings)) + "·".repeat(20 - base - Math.max(0, settings));
+}
+
+/**
+ * MPC-11622: the exposure block of the report (rules: Notion "Exposure scoring - the rules for every channel"). Pure. Score and count side by side, the stacked bar
+ * as two labelled numbers, the achievable-range position (no band: the web bands are not valid for a channel with a floor of 35), the Changes-free fix list ordered by
+ * points recoverable, the required not-returned wording, and the one sentence that explains the jump from the previous method.
+ */
+export function exposureLines(x: ExposureResult, risk: Risk): string[] {
+  const top = x.fixes.slice(0, 5).map((f) => `  ${f.label}: ${f.points} ${f.points === 1 ? "point" : "points"}`);
+  return [
+    `Telegram exposure ${x.score} · ${x.countText}`,
+    `${exposureBar(x)}`,
+    `${GROUPS.base.label}: ${x.bar!.base.points} of 100. ${GROUPS.base.note}`,
+    `${GROUPS.settings.label}: ${x.bar!.settings.points} more. ${GROUPS.settings.note}`,
+    `Exposure is the share of the risk in these ${x.scored} fields that reached this bot, each field weighted low 1, medium 2 or high 3. The count shows how many fields came back, unweighted. Telegram always sends ${x.bar!.base.fields.total} of the ${x.scored}, so the lowest score possible is ${x.floor}: ${positionText(x)}.`,
+    NOT_RETURNED_COPY,
+    "",
+    ...(x.fixes.length ? [`What you can change: ${x.recoverable!.text}. Biggest first:`, ...top] : ["Nothing you can change came back in this check."]),
+    "",
+    methodChangeSentence({ percent: risk.percent, text: `${risk.returned} of ${risk.possible} = ${risk.percent}%` }, x) ?? "",
+  ];
+}
+
 /** Pure: builds the report from successful answers. Returns null if a required call failed (no score is ever invented). */
-export function buildReport(update: unknown, chatAnswer: Answer, photosAnswer: Answer, personalPosts: Answer | null = null): Report | null {
+export function buildReport(update: unknown, chatAnswer: Answer, photosAnswer: Answer, personalPosts: Answer | null = null, opts: { exposureDisplay?: boolean } = {}): Report | null {
   const chat = result(chatAnswer), photos = result(photosAnswer);
   if (!chat || !photos) return null;
   const m = (update as { update_id?: unknown; message?: { from?: { id?: number; first_name?: string; last_name?: string; language_code?: string } } }).message?.from ?? {};
@@ -165,6 +197,8 @@ export function buildReport(update: unknown, chatAnswer: Answer, photosAnswer: A
   const accent = typeof chat.accent_color_id === "number" ? chat.accent_color_id : null;
   const defaultColour = idNum !== null && accent !== null && accent === idNum % 7;
   const risk = riskFrom(hexagons);
+  const exposure = scoreTelegram(hexagons); // MPC-11622: always computed and stored; shown only when TELEGRAM_EXPOSURE_DISPLAY=on
+  const showExposure = opts.exposureDisplay === true && exposure.status === "scored";
 
   const insights: string[] = [];
   if (got("tg.birthday")) insights.push("Birthday: your day and month were returned to this bot. A birthday is a common security-question answer.");
@@ -183,8 +217,10 @@ export function buildReport(update: unknown, chatAnswer: Answer, photosAnswer: A
   if (engagement.length > 0) insights.push(`How Telegram describes your account: ${engagement.join(", ")}.`);
 
   const text = [
-    `Telegram risk (draft test report): ${risk.returned} / ${risk.possible} - ${risk.label}`,
-    `That is how many of the ${risk.possible} pieces of information Telegram could send this bot actually reached it in this check (${risk.notChecked} cannot be checked yet). Higher = more exposed. Not returned only means this bot did not receive it: it does not verify your privacy settings.`,
+    ...(showExposure ? exposureLines(exposure, risk) : [
+      `Telegram risk (draft test report): ${risk.returned} / ${risk.possible} - ${risk.label}`,
+      `That is how many of the ${risk.possible} pieces of information Telegram could send this bot actually reached it in this check (${risk.notChecked} cannot be checked yet). Higher = more exposed. Not returned only means this bot did not receive it: it does not verify your privacy settings.`,
+    ]),
     ...hexagonLines(hexagons),
     ...extraLines(extras),
     "",
@@ -197,7 +233,7 @@ export function buildReport(update: unknown, chatAnswer: Answer, photosAnswer: A
     "",
     "Next: change settings yourself in Telegram > Settings > Privacy, then ask for a re-check. Risk version " + RISK_VERSION + ".",
   ].join("\n");
-  return { risk, insights, hexagons, extras, text };
+  return { risk, exposure, insights, hexagons, extras, text };
 }
 
 async function post(env: Env, path: string, body: unknown, headers: Record<string, string> = {}): Promise<Response> {
@@ -250,7 +286,7 @@ export async function runBaselineScan(env: Env, update: unknown, log: Logger): P
     ]);
     // Personal channel latest posts (extra hexagon): only asked for when the profile has a personal channel; the posts themselves are never stored or logged.
     const personal = result(chat)?.personal_chat ? await call(env, "getUserPersonalChatMessages", { user_id: Number(sender.id), limit: 20 }) : null;
-    const report = buildReport(update, chat, photos, personal);
+    const report = buildReport(update, chat, photos, personal, { exposureDisplay: exposureDisplayEnabled(env) });
     const date = (update as { message?: { date?: unknown } }).message?.date;
     const saved = await saveSnapshot(env, {
       platform: "telegram", sender_id: storedId, update_id: updateId, status: report ? "complete" : "failed",
@@ -258,7 +294,7 @@ export async function runBaselineScan(env: Env, update: unknown, log: Logger): P
       consent: { state_before: "awaiting_confirmation", state_after: "confirmed", confirming_update_id: updateId, consent_text_key: "bot.first_hexagon.question" },
       consent_at: typeof date === "number" ? new Date(date * 1000).toISOString() : null,
       get_chat: redactStoredId(stripFileIds(chat), env), photos: stripFileIds(photos),
-      report: report ? { channel: "TG", risk: report.risk, never_sent: NEVER_SENT, hexagons: report.hexagons, extras: report.extras, insights: report.insights, disabled: DISABLED_INSIGHTS } : null,
+      report: report ? { channel: "TG", risk: report.risk, exposure: report.exposure, never_sent: NEVER_SENT, hexagons: report.hexagons, extras: report.extras, insights: report.insights, disabled: DISABLED_INSIGHTS } : null,
       expires_at: new Date(Date.now() + retentionDays(env) * DAY_MS).toISOString(),
     }, log);
     const offerLink = !!report && footprintLinksEnabled(env) && probeIds(env).has(sender.id);
