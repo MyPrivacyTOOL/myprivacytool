@@ -60,4 +60,39 @@ assert.equal(clean('[x.dm](http://x.dm)\\_media'), 'x.dm_media');
   const second = exportCatalogue(rs, { dataPointRows: 2, previous: first });
   assert.deepEqual(second.registry.excluded[0].was, first.registry.excluded[0].was, 'a re-run keeps the record');
 }
+// MPC-11555: arrival class and code. An approved item (no `added`) keeps its class and code whatever the registry says; a registry-sourced item (`added`) follows the registry's class,
+// gets a new code only when its class changes or its code clashes in the channel it now sits on, and a re-run changes nothing.
+{
+  const item = (id, o) => ({ id, registry_id: undefined, channel: 'web', channel_label: 'Web scan', group: 'Core', code: 'A1', arrival: 'A', risk: 'low', label: id, reveals: '', field: '', status: 'new', access: '', source: '', slug: id, ...o });
+  const prev = { version: 'old', total: 6, risk_tiers_approved: '2026-10-28', items: [
+    item('appr.keep', { registry_id: 10, channel: 'telegram', code: 'C4', arrival: 'C' }),                  // approved: keeps class C and code C4
+    item('reg-11', { registry_id: 11, channel: 'web', code: 'D1', arrival: 'D', added: '2026-11-27' }),      // added, registry now says B: becomes B, new code
+    item('reg-12', { registry_id: 12, channel: 'web', code: 'D2', arrival: 'D', added: '2026-11-27' }),      // added, registry blank: stays D, code unchanged
+    item('reg-13', { registry_id: 13, channel: 'general', code: 'C4', arrival: 'C', added: '2026-11-27' }),  // added, moves to telegram where approved C4 exists: new code
+    item('reg-14', { registry_id: 14, channel: 'web', code: 'B7', arrival: 'B', added: '2026-11-27' }),      // added twice on one code with reg-15: the lower registry id keeps it
+    item('reg-15', { registry_id: 15, channel: 'web', code: 'B7', arrival: 'B', added: '2026-11-27' }),
+  ] };
+  const cls = (c) => `Class ${c}`;
+  const rs = [
+    row(10, { 'Channel Key': 'telegram', 'Arrival Order / Capture Point': cls('A - First Contact') }),   // registry disagrees with the approved class: ignored
+    row(11, { 'Channel Key': 'web', 'Arrival Order / Capture Point': cls('B - Public Lookup') }),
+    row(12, { 'Channel Key': 'web', 'Arrival Order / Capture Point': '' }),                              // blank registry class
+    row(13, { 'Channel Key': 'telegram', 'Arrival Order / Capture Point': cls('C - User Action / Consent') }),
+    row(14, { 'Channel Key': 'web', 'Arrival Order / Capture Point': cls('B - Public Lookup') }),
+    row(15, { 'Channel Key': 'web', 'Arrival Order / Capture Point': cls('B - Public Lookup') }),
+  ];
+  const o = exportCatalogue(rs, { dataPointRows: 6, previous: prev });
+  const by = (id) => o.items.find((i) => i.id === id);
+  assert.deepEqual([by('appr.keep').arrival, by('appr.keep').code], ['C', 'C4'], 'an approved item keeps its class and code');
+  assert.equal(by('reg-11').arrival, 'B', 'a registry-sourced item follows the registry class');
+  assert.match(by('reg-11').code, /^B\d+$/); assert.notEqual(by('reg-11').code, 'D1');
+  assert.deepEqual([by('reg-12').arrival, by('reg-12').code], ['D', 'D2'], 'a blank registry class is D and an unchanged class keeps its code');
+  assert.deepEqual([by('reg-13').arrival, by('reg-13').channel], ['C', 'telegram']);
+  assert.notEqual(by('reg-13').code, 'C4', 'a code that now clashes with an approved item is re-issued');
+  assert.equal(by('reg-14').code, 'B7', 'the lower registry id keeps a shared code');
+  assert.notEqual(by('reg-15').code, 'B7', 'the other item is re-issued');
+  assert.equal(new Set(o.items.map((i) => `${i.channel}|${i.code}`)).size, o.items.length, 'no two items share a code in a channel');
+  for (const id of ['reg-11', 'reg-13', 'reg-15']) assert.deepEqual([by(id).label, by(id).risk, by(id).slug, by(id).added], [id, 'low', id, '2026-11-27'], 'only class and code change');
+  assert.deepEqual(exportCatalogue(rs, { dataPointRows: 6, previous: o }), o, 'a re-run on the output changes nothing');
+}
 console.log('export-registry-catalogue.test.mjs ok');
