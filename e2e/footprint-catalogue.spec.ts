@@ -1,4 +1,11 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { test, expect } from "./fixtures";
+
+// MPC-11555: the Telegram count is DERIVED from the catalogue source file, not pinned. It moves whenever a registry Channel Key is corrected (47 became 49 when two Mini App rows moved from Web to Telegram),
+// and the served /footprint/ file must agree with the source it was built from, so a stale public dataset still fails here.
+const sourceItems: { channel: string }[] = JSON.parse(readFileSync(path.join(process.cwd(), "shared/hexagon-registry/hexagons-366.json"), "utf8")).items;
+const TELEGRAM_ITEMS = sourceItems.filter((i) => i.channel === "telegram").length;
 
 // MPC-8689 / MPC-11541: the complete footprint. /footprint/ loads every published data point of the Hexagon Registry export (Row Type = Data point, less every row with Decision = Dropped),
 // each tile carries a Live / In build / Planned badge, and no headline total appears in the copy. Every hexagon has its own risk page.
@@ -9,7 +16,7 @@ test("/footprint/ dataset: every registry data point, one badge each, Live = the
     const by = (k: string) => d.reduce((m: Record<string, number>, i: Record<string, string>) => ((m[i[k]] = (m[i[k]] || 0) + 1), m), {});
     return { total: d.length, telegram: by("channel").Telegram, risk: by("sens"), tile: by("tile"), ids: new Set(d.map((i: { id: string }) => i.id)).size };
   });
-  expect(data).toEqual({ total: 650, telegram: 47, risk: { high: 284, medium: 268, low: 98 }, tile: { live: 60, in_build: 131, planned: 459 }, ids: 650 });
+  expect(data).toEqual({ total: 650, telegram: TELEGRAM_ITEMS, risk: { high: 284, medium: 268, low: 98 }, tile: { live: 60, in_build: 131, planned: 459 }, ids: 650 });
 });
 
 test("/footprint/ renders a status badge on all 650 tiles and states no total", async ({ page }) => {
