@@ -63,10 +63,22 @@ export const CATALOGUE_CHANNELS = [
   "group": "Global social"
  },
  {
+  "key": "tiktok",
+  "code": "TT",
+  "label": "TikTok",
+  "group": "Core"
+ },
+ {
   "key": "reddit",
   "code": "RD",
   "label": "Reddit (block 60)",
   "group": "Global social"
+ },
+ {
+  "key": "weibo",
+  "code": "WB",
+  "label": "Weibo (China)",
+  "group": "Core"
  },
  {
   "key": "douyin",
@@ -91,6 +103,12 @@ export const CATALOGUE_CHANNELS = [
   "code": "YT",
   "label": "YouTube (block 60)",
   "group": "Global social"
+ },
+ {
+  "key": "github",
+  "code": "GH",
+  "label": "GitHub",
+  "group": "Core"
  },
  {
   "key": "wechat",
@@ -120,7 +138,7 @@ export const CATALOGUE_CHANNELS = [
   "key": "phone",
   "code": "CALL",
   "label": "Phone call",
-  "group": "Offline"
+  "group": "Core"
  },
  {
   "key": "viber",
@@ -135,33 +153,15 @@ export const CATALOGUE_CHANNELS = [
   "group": "Global social"
  },
  {
-  "key": "line",
-  "code": "LINE",
-  "label": "LINE (Japan, Thailand, Taiwan)",
-  "group": "Asian"
- },
- {
-  "key": "github",
-  "code": "GH",
-  "label": "GitHub",
-  "group": "Global social"
- },
- {
-  "key": "tiktok",
-  "code": "TT",
-  "label": "TikTok",
-  "group": "Global social"
- },
- {
   "key": "kakaotalk",
   "code": "KK",
   "label": "KakaoTalk (Korea)",
-  "group": "Asian"
+  "group": "Core"
  },
  {
-  "key": "weibo",
-  "code": "WB",
-  "label": "Weibo (China)",
+  "key": "line",
+  "code": "LINE",
+  "label": "LINE (Japan, Thailand, Taiwan)",
   "group": "Asian"
  },
  {
@@ -1736,7 +1736,7 @@ export const HEXAGON_CATALOGUE = [
  {
   "id": "email-domain-record",
   "slug": "website-ownership-record",
-  "channel": "web",
+  "channel": "email",
   "group": "Core",
   "arrival": "B",
   "risk": "medium",
@@ -1889,7 +1889,7 @@ export const HEXAGON_CATALOGUE = [
  {
   "id": "email.web_archive",
   "slug": "web-archive-mentions",
-  "channel": "web",
+  "channel": "email",
   "group": "Core",
   "arrival": "D",
   "risk": "medium",
@@ -3095,7 +3095,7 @@ export const HEXAGON_CATALOGUE = [
  {
   "id": "tg.miniapp_device",
   "slug": "mini-app-device-and-app",
-  "channel": "web",
+  "channel": "telegram",
   "group": "Core",
   "arrival": "C",
   "risk": "medium",
@@ -3127,7 +3127,7 @@ export const HEXAGON_CATALOGUE = [
  {
   "id": "tg.miniapp_location",
   "slug": "mini-app-precise-location",
-  "channel": "web",
+  "channel": "telegram",
   "group": "Core",
   "arrival": "C",
   "risk": "high",
@@ -3229,7 +3229,7 @@ export const HEXAGON_CATALOGUE = [
  {
   "id": "x.dm_media",
   "slug": "attachment",
-  "channel": "email",
+  "channel": "x",
   "group": "Global social",
   "arrival": "A",
   "risk": "medium",
@@ -3345,7 +3345,7 @@ export const HEXAGON_CATALOGUE = [
  {
   "id": "x.location",
   "slug": "stated-location",
-  "channel": "web",
+  "channel": "x",
   "group": "Global social",
   "arrival": "B",
   "risk": "medium",
@@ -3463,7 +3463,7 @@ export const HEXAGON_CATALOGUE = [
  {
   "id": "x.email",
   "slug": "confirmed-email",
-  "channel": "email",
+  "channel": "x",
   "group": "Global social",
   "arrival": "C",
   "risk": "high",
@@ -3746,7 +3746,7 @@ export const HEXAGON_CATALOGUE = [
  {
   "id": "li.email",
   "slug": "email-and-verified-flag",
-  "channel": "email",
+  "channel": "linkedin",
   "group": "Global social",
   "arrival": "C",
   "risk": "high",
@@ -3765,7 +3765,7 @@ export const HEXAGON_CATALOGUE = [
  {
   "id": "reg-212",
   "slug": "tiktok-user-id",
-  "channel": "general",
+  "channel": "tiktok",
   "group": "Core",
   "arrival": "B",
   "risk": "high",
@@ -3782,7 +3782,7 @@ export const HEXAGON_CATALOGUE = [
  {
   "id": "reg-213",
   "slug": "nickname",
-  "channel": "general",
+  "channel": "tiktok",
   "group": "Core",
   "arrival": "B",
   "risk": "high",
@@ -3867,7 +3867,7 @@ export const HEXAGON_CATALOGUE = [
  {
   "id": "reg-218",
   "slug": "public-profile-url",
-  "channel": "general",
+  "channel": "linkedin",
   "group": "Core",
   "arrival": "B",
   "risk": "high",
@@ -3884,7 +3884,7 @@ export const HEXAGON_CATALOGUE = [
  {
   "id": "reg-219",
   "slug": "full-name",
-  "channel": "general",
+  "channel": "linkedin",
   "group": "Core",
   "arrival": "B",
   "risk": "high",
@@ -3901,7 +3901,7 @@ export const HEXAGON_CATALOGUE = [
  {
   "id": "reg-220",
   "slug": "current-job-title",
-  "channel": "general",
+  "channel": "linkedin",
   "group": "Core",
   "arrival": "B",
   "risk": "high",
@@ -3918,7 +3918,7 @@ export const HEXAGON_CATALOGUE = [
  {
   "id": "reg-221",
   "slug": "current-company",
-  "channel": "general",
+  "channel": "linkedin",
   "group": "Core",
   "arrival": "B",
   "risk": "high",
@@ -3952,7 +3952,7 @@ export const HEXAGON_CATALOGUE = [
  {
   "id": "reg-223",
   "slug": "verified-status",
-  "channel": "general",
+  "channel": "weibo",
   "group": "Core",
   "arrival": "B",
   "risk": "high",
@@ -4224,7 +4224,7 @@ export const HEXAGON_CATALOGUE = [
  {
   "id": "reg-239",
   "slug": "github-username",
-  "channel": "general",
+  "channel": "github",
   "group": "Core",
   "arrival": "B",
   "risk": "high",
@@ -4258,7 +4258,7 @@ export const HEXAGON_CATALOGUE = [
  {
   "id": "gh.public_email",
   "slug": "public-email",
-  "channel": "email",
+  "channel": "github",
   "group": "Global social",
   "arrival": "B",
   "risk": "high",
@@ -4274,7 +4274,7 @@ export const HEXAGON_CATALOGUE = [
  {
   "id": "reg-242",
   "slug": "company",
-  "channel": "general",
+  "channel": "github",
   "group": "Core",
   "arrival": "B",
   "risk": "high",
@@ -4325,7 +4325,7 @@ export const HEXAGON_CATALOGUE = [
  {
   "id": "reg-245",
   "slug": "display-name",
-  "channel": "general",
+  "channel": "instagram",
   "group": "Core",
   "arrival": "B",
   "risk": "high",
@@ -4342,7 +4342,7 @@ export const HEXAGON_CATALOGUE = [
  {
   "id": "reg-246",
   "slug": "profile-bio",
-  "channel": "general",
+  "channel": "instagram",
   "group": "Core",
   "arrival": "C",
   "risk": "high",
@@ -4359,7 +4359,7 @@ export const HEXAGON_CATALOGUE = [
  {
   "id": "reg-247",
   "slug": "profile-picture-url",
-  "channel": "general",
+  "channel": "instagram",
   "group": "Core",
   "arrival": "B",
   "risk": "high",
@@ -4376,7 +4376,7 @@ export const HEXAGON_CATALOGUE = [
  {
   "id": "reg-248",
   "slug": "follower-following-count",
-  "channel": "general",
+  "channel": "instagram",
   "group": "Core",
   "arrival": "B",
   "risk": "high",
@@ -4410,7 +4410,7 @@ export const HEXAGON_CATALOGUE = [
  {
   "id": "reg-250",
   "slug": "external-url",
-  "channel": "general",
+  "channel": "instagram",
   "group": "Core",
   "arrival": "B",
   "risk": "high",
@@ -4427,7 +4427,7 @@ export const HEXAGON_CATALOGUE = [
  {
   "id": "reg-251",
   "slug": "fb-user-id",
-  "channel": "general",
+  "channel": "messenger",
   "group": "Core",
   "arrival": "B",
   "risk": "high",
@@ -4444,7 +4444,7 @@ export const HEXAGON_CATALOGUE = [
  {
   "id": "reg-252",
   "slug": "messenger-username",
-  "channel": "general",
+  "channel": "messenger",
   "group": "Core",
   "arrival": "B",
   "risk": "high",
@@ -4461,7 +4461,7 @@ export const HEXAGON_CATALOGUE = [
  {
   "id": "reg-253",
   "slug": "active-status",
-  "channel": "general",
+  "channel": "messenger",
   "group": "Core",
   "arrival": "B",
   "risk": "high",
@@ -4478,7 +4478,7 @@ export const HEXAGON_CATALOGUE = [
  {
   "id": "reg-254",
   "slug": "last-active",
-  "channel": "general",
+  "channel": "messenger",
   "group": "Core",
   "arrival": "B",
   "risk": "high",
@@ -4512,7 +4512,7 @@ export const HEXAGON_CATALOGUE = [
  {
   "id": "reg-256",
   "slug": "wechat-alias",
-  "channel": "general",
+  "channel": "wechat",
   "group": "Core",
   "arrival": "B",
   "risk": "high",
@@ -4529,7 +4529,7 @@ export const HEXAGON_CATALOGUE = [
  {
   "id": "reg-257",
   "slug": "region-setting",
-  "channel": "general",
+  "channel": "wechat",
   "group": "Core",
   "arrival": "B",
   "risk": "high",
@@ -4546,7 +4546,7 @@ export const HEXAGON_CATALOGUE = [
  {
   "id": "reg-258",
   "slug": "moments-privacy",
-  "channel": "general",
+  "channel": "wechat",
   "group": "Core",
   "arrival": "B",
   "risk": "high",
@@ -4904,7 +4904,7 @@ export const HEXAGON_CATALOGUE = [
  {
   "id": "reg-279",
   "slug": "caller-id-number",
-  "channel": "general",
+  "channel": "phone",
   "group": "Core",
   "arrival": "B",
   "risk": "high",
@@ -4991,7 +4991,7 @@ export const HEXAGON_CATALOGUE = [
  {
   "id": "reg-284",
   "slug": "carrier-name",
-  "channel": "general",
+  "channel": "phone",
   "group": "Core",
   "arrival": "B",
   "risk": "high",
@@ -5061,7 +5061,7 @@ export const HEXAGON_CATALOGUE = [
  {
   "id": "reg-288",
   "slug": "call-forwarding-status",
-  "channel": "general",
+  "channel": "phone",
   "group": "Core",
   "arrival": "B",
   "risk": "high",
@@ -5265,7 +5265,7 @@ export const HEXAGON_CATALOGUE = [
  {
   "id": "reg-300",
   "slug": "sender-phone-number",
-  "channel": "general",
+  "channel": "sms",
   "group": "Core",
   "arrival": "B",
   "risk": "high",
@@ -5282,7 +5282,7 @@ export const HEXAGON_CATALOGUE = [
  {
   "id": "reg-301",
   "slug": "receiver-phone-number",
-  "channel": "general",
+  "channel": "sms",
   "group": "Core",
   "arrival": "B",
   "risk": "high",
@@ -5299,7 +5299,7 @@ export const HEXAGON_CATALOGUE = [
  {
   "id": "reg-302",
   "slug": "message-timestamp",
-  "channel": "general",
+  "channel": "sms",
   "group": "Core",
   "arrival": "B",
   "risk": "high",
@@ -5316,7 +5316,7 @@ export const HEXAGON_CATALOGUE = [
  {
   "id": "reg-303",
   "slug": "message-body-content",
-  "channel": "general",
+  "channel": "sms",
   "group": "Core",
   "arrival": "B",
   "risk": "high",
@@ -5333,7 +5333,7 @@ export const HEXAGON_CATALOGUE = [
  {
   "id": "reg-304",
   "slug": "message-type-sms-mms",
-  "channel": "general",
+  "channel": "sms",
   "group": "Core",
   "arrival": "B",
   "risk": "high",
@@ -5401,7 +5401,7 @@ export const HEXAGON_CATALOGUE = [
  {
   "id": "reg-308",
   "slug": "mms-media-urls",
-  "channel": "general",
+  "channel": "sms",
   "group": "Core",
   "arrival": "B",
   "risk": "high",
@@ -5418,7 +5418,7 @@ export const HEXAGON_CATALOGUE = [
  {
   "id": "reg-309",
   "slug": "opt-out-status",
-  "channel": "general",
+  "channel": "sms",
   "group": "Core",
   "arrival": "B",
   "risk": "high",
@@ -5758,7 +5758,7 @@ export const HEXAGON_CATALOGUE = [
  {
   "id": "reg-329",
   "slug": "profile-banner",
-  "channel": "general",
+  "channel": "x",
   "group": "Core",
   "arrival": "C",
   "risk": "high",
@@ -5775,7 +5775,7 @@ export const HEXAGON_CATALOGUE = [
  {
   "id": "reg-330",
   "slug": "protected-tweet-privacy",
-  "channel": "general",
+  "channel": "x",
   "group": "Core",
   "arrival": "B",
   "risk": "high",
@@ -5792,7 +5792,7 @@ export const HEXAGON_CATALOGUE = [
  {
   "id": "reg-331",
   "slug": "default-language",
-  "channel": "general",
+  "channel": "x",
   "group": "Core",
   "arrival": "B",
   "risk": "high",
@@ -5894,7 +5894,7 @@ export const HEXAGON_CATALOGUE = [
  {
   "id": "reg-337",
   "slug": "open-chat-room-membership",
-  "channel": "general",
+  "channel": "kakaotalk",
   "group": "Core",
   "arrival": "B",
   "risk": "high",
@@ -5911,7 +5911,7 @@ export const HEXAGON_CATALOGUE = [
  {
   "id": "reg-338",
   "slug": "profile-background",
-  "channel": "general",
+  "channel": "kakaotalk",
   "group": "Core",
   "arrival": "C",
   "risk": "high",
@@ -5945,7 +5945,7 @@ export const HEXAGON_CATALOGUE = [
  {
   "id": "reg-340",
   "slug": "last-seen-status",
-  "channel": "general",
+  "channel": "kakaotalk",
   "group": "Core",
   "arrival": "B",
   "risk": "high",
@@ -6199,7 +6199,7 @@ export const HEXAGON_CATALOGUE = [
  {
   "id": "reg-355",
   "slug": "country-region",
-  "channel": "general",
+  "channel": "line",
   "group": "Core",
   "arrival": "B",
   "risk": "high",
@@ -6216,7 +6216,7 @@ export const HEXAGON_CATALOGUE = [
  {
   "id": "reg-356",
   "slug": "linked-phone-number",
-  "channel": "general",
+  "channel": "line",
   "group": "Core",
   "arrival": "B",
   "risk": "high",
@@ -6233,7 +6233,7 @@ export const HEXAGON_CATALOGUE = [
  {
   "id": "reg-357",
   "slug": "friend-count",
-  "channel": "general",
+  "channel": "line",
   "group": "Core",
   "arrival": "B",
   "risk": "high",
